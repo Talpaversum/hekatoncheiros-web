@@ -2,6 +2,8 @@ import type { PropsWithChildren } from "react";
 
 import { NavLink, useLocation } from "react-router-dom";
 
+import { useAppRegistryQuery } from "../../data/api/app-registry";
+
 type SidebarNavProps = PropsWithChildren;
 
 const sidebarConfig = [
@@ -29,11 +31,25 @@ const sidebarConfig = [
       { to: "/core/licensing", label: "Aktivace" },
     ],
   },
+  {
+    prefix: "/admin",
+    title: "Admin",
+    items: [{ to: "/admin/apps", label: "Apps" }],
+  },
 ];
 
 export function SidebarNav({ children }: SidebarNavProps) {
   const location = useLocation();
-  const current = sidebarConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? sidebarConfig[0];
+  const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
+  const appId = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
+  const appEntry = appRegistry?.items.find((item) => item.app_id === appId);
+
+  const current = appEntry
+    ? {
+        title: appEntry.app_id,
+        items: appEntry.nav_entries.map((entry) => ({ to: entry.path, label: entry.label })),
+      }
+    : sidebarConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? sidebarConfig[0];
 
   return (
     <>
