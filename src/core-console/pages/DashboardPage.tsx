@@ -1,5 +1,4 @@
 import { Card } from "../../ui-kit/components/Card";
-import { TopBar } from "../../ui-kit/layout/TopBar";
 import { useContextQuery } from "../../data/api/context";
 
 export function DashboardPage() {
@@ -7,14 +6,13 @@ export function DashboardPage() {
 
   return (
     <div>
-      <TopBar
-        title="Dashboard"
-        meta={data ? `Tenant ${data.tenant.id}` : "Načítání…"}
-      >
-        <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-hc-muted">
-          {data?.actor?.user_id ?? "Neznámý uživatel"}
-        </span>
-      </TopBar>
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-wide text-hc-muted">Dashboard</div>
+        <div className="mt-1 text-2xl font-semibold">Přehled</div>
+        <div className="mt-1 text-sm text-hc-muted">
+          {data ? `Tenant ${data.tenant.id}` : "Načítání…"}
+        </div>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -22,7 +20,7 @@ export function DashboardPage() {
           {isLoading ? (
             <div className="mt-4 text-sm">Načítám…</div>
           ) : (
-            <pre className="mt-4 whitespace-pre-wrap text-xs text-hc-text">
+            <pre className="mt-4 rounded-hc-sm bg-hc-surface-variant p-3 text-xs text-hc-text">
               {JSON.stringify(data, null, 2)}
             </pre>
           )}

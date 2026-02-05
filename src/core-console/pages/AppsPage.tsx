@@ -4,7 +4,6 @@ import { authFetch } from "../../data/auth/auth-fetch";
 import { getAccessToken } from "../../data/auth/storage";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
-import { TopBar } from "../../ui-kit/layout/TopBar";
 
 export function AppsPage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -18,7 +17,11 @@ export function AppsPage() {
 
   return (
     <div>
-      <TopBar title="Apps" meta="Registry & tenant enablement" />
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-wide text-hc-muted">Apps</div>
+        <div className="mt-1 text-2xl font-semibold">Registry</div>
+        <div className="mt-1 text-sm text-hc-muted">Registry & tenant enablement</div>
+      </div>
       <Card>
         <div className="flex flex-col gap-4">
           <div className="text-sm text-hc-muted">app_inventory (MVP)</div>
@@ -26,7 +29,7 @@ export function AppsPage() {
             <Button onClick={() => handleToggle("enable")} disabled={!token}>
               Enable
             </Button>
-            <Button variant="secondary" onClick={() => handleToggle("disable")} disabled={!token}>
+            <Button variant="outlined" onClick={() => handleToggle("disable")} disabled={!token}>
               Disable
             </Button>
           </div>

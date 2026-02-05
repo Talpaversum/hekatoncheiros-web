@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "../../data/auth/auth-fetch";
 import { getAccessToken } from "../../data/auth/storage";
 import { Card } from "../../ui-kit/components/Card";
-import { TopBar } from "../../ui-kit/layout/TopBar";
 
 type LicenseResponse = {
   app_id: string;
@@ -24,7 +23,11 @@ export function LicensingPage() {
 
   return (
     <div>
-      <TopBar title="Licensing" meta="app_inventory" />
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-wide text-hc-muted">Licensing</div>
+        <div className="mt-1 text-2xl font-semibold">App inventory</div>
+        <div className="mt-1 text-sm text-hc-muted">app_inventory</div>
+      </div>
       <Card>
         {!token ? (
           <div className="text-sm text-hc-muted">Chybí access token, přihlas se znovu.</div>
@@ -35,7 +38,7 @@ export function LicensingPage() {
             <div className="text-sm text-hc-muted">Stav licence</div>
             <div className="text-lg font-semibold">{data?.state ?? "inactive"}</div>
             <div className="text-xs text-hc-muted">Plan: {data?.plan ?? "-"}</div>
-            <pre className="rounded-hc-sm border border-hc-border bg-hc-bg/60 p-3 text-xs text-hc-text">
+            <pre className="rounded-hc-sm border border-hc-outline bg-hc-surface-variant p-3 text-xs text-hc-text">
               {JSON.stringify(data, null, 2)}
             </pre>
           </div>

@@ -1,23 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  :root {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 
-  --hc-bg: #0f172a;
-  --hc-surface: #111827;
-  --hc-border: rgba(148, 163, 184, 0.2);
-  --hc-text: #e2e8f0;
-  --hc-muted: #94a3b8;
-  --hc-primary: #38bdf8;
-  --hc-primary-foreground: #0f172a;
-  --hc-danger: #f97316;
-  --hc-danger-foreground: #0f172a;
+    --hc-bg: #e6ded3;
+    --hc-surface: #fbf9f6;
+    --hc-surface-variant: #e7ddd1;
+    --hc-rail: #bfae9e;
+    --hc-topbar: #9a806a;
+    --hc-text: #27221a;
+    --hc-muted: #6d6358;
+    --hc-primary: #8b5d2e;
+    --hc-on-primary: #fbf6ef;
+    --hc-danger: #b4472f;
+    --hc-on-danger: #fbf6ef;
+    --hc-shadow: rgba(39, 34, 26, 0.12);
+    --hc-topbar-glow: rgba(255, 255, 255, 0.45);
+    --hc-topbar-depth: rgba(39, 34, 26, 0.35);
+  }
+
+  :root[data-theme="dark"] {
+    --hc-bg: #1b1611;
+    --hc-surface: #2d241c;
+    --hc-surface-variant: #443a2f;
+    --hc-rail: #19130e;
+    --hc-topbar: #120d09;
+    --hc-text: #f2ede5;
+    --hc-muted: #c0b3a3;
+    --hc-primary: #d6a06b;
+    --hc-on-primary: #1d1914;
+    --hc-danger: #d77b5a;
+    --hc-on-danger: #1d1914;
+    --hc-shadow: rgba(0, 0, 0, 0.5);
+    --hc-topbar-glow: rgba(255, 255, 255, 0.1);
+    --hc-topbar-depth: rgba(0, 0, 0, 0.65);
+  }
+}
+
+@theme {
+  --color-hc-bg: var(--hc-bg);
+  --color-hc-surface: var(--hc-surface);
+  --color-hc-surface-variant: var(--hc-surface-variant);
+  --color-hc-rail: var(--hc-rail);
+  --color-hc-topbar: var(--hc-topbar);
+  --color-hc-text: var(--hc-text);
+  --color-hc-muted: var(--hc-muted);
+  --color-hc-primary: var(--hc-primary);
+  --color-hc-on-primary: var(--hc-on-primary);
+  --color-hc-danger: var(--hc-danger);
+  --color-hc-on-danger: var(--hc-on-danger);
+  --color-hc-topbar-glow: var(--hc-topbar-glow);
+  --color-hc-topbar-depth: var(--hc-topbar-depth);
+  --shadow-hc-card: 0 12px 24px var(--hc-shadow);
+  --shadow-hc-elevation: 0 16px 40px var(--hc-shadow);
+  --shadow-hc-topbar: 0 12px 30px var(--hc-shadow);
+  --radius-hc-sm: 6px;
+  --radius-hc-md: 10px;
+  --radius-hc-lg: 16px;
 }
 
 body {

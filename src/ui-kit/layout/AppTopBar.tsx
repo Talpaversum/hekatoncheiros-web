@@ -1,0 +1,133 @@
+import { useMemo, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+
+import { clearTokens } from "../../data/auth/storage";
+import { Avatar } from "../components/Avatar";
+import { IconButton } from "../components/IconButton";
+import { Menu } from "../components/Menu";
+import { Switch } from "../components/Switch";
+import { useTheme } from "../theme/useTheme";
+
+type AppTopBarProps = {
+  userId?: string;
+};
+
+export function AppTopBar({ userId }: AppTopBarProps) {
+  const navigate = useNavigate();
+  const { isDark, toggle } = useTheme();
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
+
+  const initials = useMemo(() => {
+    if (!userId) return "U";
+    return userId
+      .split(/[^a-zA-Z0-9]/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("");
+  }, [userId]);
+
+  const handleLogout = () => {
+    clearTokens();
+    navigate("/login");
+  };
+
+  return (
+    <header className="sticky top-0 z-40 bg-hc-topbar shadow-hc-topbar">
+      <div className="absolute inset-0 bg-gradient-to-b from-hc-topbar-glow via-transparent to-hc-topbar-depth opacity-70" />
+      <div className="flex h-16 items-center justify-between px-6">
+        <div className="relative flex items-center gap-6">
+          <div className="text-lg font-semibold">Hekatoncheiros</div>
+          <nav className="flex items-center gap-3 text-sm">
+            <NavLink
+              to="/core/dashboard"
+              className={({ isActive }) =>
+                `rounded-hc-sm px-3 py-2 transition ${
+                  isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted hover:text-hc-text"
+                }`
+              }
+            >
+              Dashboard
+            </NavLink>
+            <div className="relative">
+              <button
+                onClick={() => setAppsOpen((prev) => !prev)}
+                className="rounded-hc-sm px-3 py-2 text-hc-muted transition hover:text-hc-text"
+                aria-expanded={appsOpen}
+              >
+                Apps ▾
+              </button>
+              <Menu open={appsOpen} onClose={() => setAppsOpen(false)}>
+                <NavLink
+                  to="/core/apps"
+                  className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
+                >
+                  Registry
+                </NavLink>
+                <div className="mt-1 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
+                  Další aplikace již brzy
+                </div>
+              </Menu>
+            </div>
+            <NavLink
+              to="/core/licensing"
+              className={({ isActive }) =>
+                `rounded-hc-sm px-3 py-2 transition ${
+                  isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted hover:text-hc-text"
+                }`
+              }
+            >
+              Licensing
+            </NavLink>
+          </nav>
+        </div>
+
+        <div className="relative flex items-center gap-3">
+          <IconButton aria-label="Messaging">
+            💬
+          </IconButton>
+          <div className="relative">
+            <IconButton aria-label="Settings" onClick={() => setSettingsOpen((prev) => !prev)}>
+              ⚙️
+            </IconButton>
+            <Menu open={settingsOpen} onClose={() => setSettingsOpen(false)} className="w-64">
+              <div className="flex items-center justify-between rounded-hc-sm px-3 py-2">
+                <div>
+                  <div className="text-sm font-medium">Tmavý režim</div>
+                  <div className="text-xs text-hc-muted">Přepnout vzhled</div>
+                </div>
+                <Switch checked={isDark} onClick={toggle} />
+              </div>
+              <div className="mt-2 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
+                Další nastavení přidáme později.
+              </div>
+            </Menu>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setUserOpen((prev) => !prev)}
+              className="rounded-full"
+              aria-expanded={userOpen}
+            >
+              <Avatar initials={initials} title={userId ?? "Profil"} />
+            </button>
+            <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
+              <div className="px-3 py-2">
+                <div className="text-sm font-medium">{userId ?? "Uživatel"}</div>
+                <div className="text-xs text-hc-muted">Profil & účet</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+              >
+                Odhlásit
+              </button>
+            </Menu>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}

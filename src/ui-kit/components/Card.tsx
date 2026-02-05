@@ -6,7 +6,9 @@ type CardProps = PropsWithChildren<{ className?: string }>;
 
 export function Card({ className, children }: CardProps) {
   return (
-    <div className={cn("rounded-hc-md border border-hc-border bg-hc-surface p-5 shadow-hc-card", className)}>
+    <div
+      className={cn("rounded-hc-lg bg-hc-surface p-5 shadow-hc-card", className)}
+    >
       {children}
     </div>
   );
