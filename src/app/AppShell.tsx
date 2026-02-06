@@ -8,6 +8,7 @@ import { getAccessToken } from "../data/auth/storage";
 export function AppShell() {
   const token = getAccessToken();
   const { data } = useContextQuery(!!token);
+  const privileges = data?.privileges ?? [];
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -15,9 +16,9 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-hc-bg text-hc-text">
-      <AppTopBar userId={data?.actor?.user_id} />
+      <AppTopBar userId={data?.actor?.user_id} privileges={privileges} />
       <div className="flex min-h-[calc(100vh-4rem)]">
-        <SidebarNav>
+        <SidebarNav privileges={privileges}>
           {data?.actor?.impersonating && (
             <div className="mb-4 rounded-hc-sm border border-hc-danger bg-hc-danger/10 px-4 py-2 text-xs text-hc-danger">
               Impersonation aktivní

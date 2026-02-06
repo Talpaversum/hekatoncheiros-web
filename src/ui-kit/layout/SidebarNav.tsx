@@ -4,7 +4,9 @@ import { NavLink, useLocation } from "react-router-dom";
 
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 
-type SidebarNavProps = PropsWithChildren;
+type SidebarNavProps = PropsWithChildren<{
+  privileges?: string[];
+}>;
 
 const sidebarConfig = [
   {
@@ -38,18 +40,21 @@ const sidebarConfig = [
   },
 ];
 
-export function SidebarNav({ children }: SidebarNavProps) {
+export function SidebarNav({ children, privileges }: SidebarNavProps) {
+  const canManageApps = (privileges ?? []).includes("platform.apps.manage");
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
   const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
   const appEntry = appRegistry?.items.find((item) => item.slug === slug);
+  const filteredConfig = sidebarConfig.filter((section) => section.prefix !== "/admin" || canManageApps);
+  const fallbackSection = filteredConfig[0] ?? sidebarConfig[0];
 
   const current = appEntry
     ? {
         title: appEntry.app_id,
         items: appEntry.nav_entries.map((entry) => ({ to: entry.path, label: entry.label })),
       }
-    : sidebarConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? sidebarConfig[0];
+    : filteredConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? fallbackSection;
 
   return (
     <>
@@ -58,7 +63,7 @@ export function SidebarNav({ children }: SidebarNavProps) {
         <nav className="mt-4 flex flex-col gap-2">
           {current.items.map((item) => (
             <NavLink
-              key={item.label}
+              key={`${item.to}-${item.label}`}
               to={item.to}
               className={({ isActive }) =>
                 `rounded-hc-sm px-3 py-2 text-sm transition ${

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
+import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { clearTokens } from "../../data/auth/storage";
 import { Avatar } from "../components/Avatar";
 import { IconButton } from "../components/IconButton";
@@ -10,14 +11,17 @@ import { useTheme } from "../theme/useTheme";
 
 type AppTopBarProps = {
   userId?: string;
+  privileges?: string[];
 };
 
-export function AppTopBar({ userId }: AppTopBarProps) {
+export function AppTopBar({ userId, privileges = [] }: AppTopBarProps) {
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
+  const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
   const [appsOpen, setAppsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const isAdmin = privileges.includes("platform.apps.manage");
 
   const initials = useMemo(() => {
     if (!userId) return "U";
@@ -33,6 +37,8 @@ export function AppTopBar({ userId }: AppTopBarProps) {
     clearTokens();
     navigate("/login");
   };
+
+  const appGroups = registry?.items ?? [];
 
   return (
     <header className="sticky top-0 z-40 bg-hc-topbar shadow-hc-topbar">
@@ -59,16 +65,48 @@ export function AppTopBar({ userId }: AppTopBarProps) {
               >
                 Apps ▾
               </button>
-              <Menu open={appsOpen} onClose={() => setAppsOpen(false)}>
-                <NavLink
-                  to="/core/apps"
-                  className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
-                >
-                  Registry
-                </NavLink>
-                <div className="mt-1 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
-                  Další aplikace již brzy
+              <Menu open={appsOpen} onClose={() => setAppsOpen(false)} className="w-80">
+                <div className="max-h-[24rem] overflow-auto pr-1">
+                  {registryLoading && <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Načítám aplikace…</div>}
+                  {!registryLoading && appGroups.length === 0 && (
+                    <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Žádné aplikace nejsou dostupné.</div>
+                  )}
+
+                  {appGroups.map((app) => (
+                    <div key={app.slug} className="mb-2">
+                      <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-hc-muted">
+                        {app.app_id}
+                      </div>
+                      {app.nav_entries.length === 0 ? (
+                        <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Bez navigačních položek</div>
+                      ) : (
+                        app.nav_entries.map((entry) => (
+                          <NavLink
+                            key={`${app.slug}-${entry.path}-${entry.label}`}
+                            to={entry.path}
+                            onClick={() => setAppsOpen(false)}
+                            className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
+                          >
+                            {entry.label}
+                          </NavLink>
+                        ))
+                      )}
+                    </div>
+                  ))}
                 </div>
+
+                {isAdmin && (
+                  <>
+                    <div className="my-2 border-t border-hc-outline" />
+                    <NavLink
+                      to="/admin/apps"
+                      onClick={() => setAppsOpen(false)}
+                      className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
+                    >
+                      Manage apps…
+                    </NavLink>
+                  </>
+                )}
               </Menu>
             </div>
             <NavLink
