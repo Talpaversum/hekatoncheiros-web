@@ -20,7 +20,7 @@ export default function App() {
       <Route path="/admin" element={<AppShell />}>
         <Route path="apps" element={<AppsPage />} />
       </Route>
-      <Route path="/app/:appId/*" element={<AppShell />}>
+      <Route path="/app/:slug/*" element={<AppShell />}>
         <Route index element={<AppRuntimePage />} />
         <Route path="*" element={<AppRuntimePage />} />
       </Route>

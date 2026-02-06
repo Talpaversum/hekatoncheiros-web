@@ -41,8 +41,8 @@ const sidebarConfig = [
 export function SidebarNav({ children }: SidebarNavProps) {
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
-  const appId = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
-  const appEntry = appRegistry?.items.find((item) => item.app_id === appId);
+  const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
+  const appEntry = appRegistry?.items.find((item) => item.slug === slug);
 
   const current = appEntry
     ? {
