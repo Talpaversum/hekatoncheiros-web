@@ -16,8 +16,8 @@ type LicenseResponse = {
 export function LicensingPage() {
   const token = getAccessToken();
   const { data, isLoading } = useQuery({
-    queryKey: ["license", "app_inventory"],
-    queryFn: () => authFetch<LicenseResponse>(`/licensing/apps/app_inventory`),
+    queryKey: ["license", "com.talpaversum.inventory"],
+    queryFn: () => authFetch<LicenseResponse>(`/licensing/apps/com.talpaversum.inventory`),
     enabled: !!token,
   });
 
@@ -25,8 +25,8 @@ export function LicensingPage() {
     <div>
       <div className="mb-6">
         <div className="text-xs uppercase tracking-wide text-hc-muted">Licensing</div>
-        <div className="mt-1 text-2xl font-semibold">App inventory</div>
-        <div className="mt-1 text-sm text-hc-muted">app_inventory</div>
+        <div className="mt-1 text-2xl font-semibold">Inventory</div>
+        <div className="mt-1 text-sm text-hc-muted">com.talpaversum.inventory</div>
       </div>
       <Card>
         {!token ? (
