@@ -36,8 +36,18 @@ function getStatus(app: InstalledApp, registrySlugs: Set<string>) {
     return { label: "Error", reason: "Missing ui_url (core-managed field)." };
   }
 
+  if (!app.licensed) {
+    return {
+      label: "Unlicensed",
+      reason: "App je nainstalovaná, ale tenant pro ni nemá aktivní licenci.",
+    };
+  }
+
   if (!registrySlugs.has(app.slug)) {
-    return { label: "Error", reason: "Registry mismatch: app slug is not present in registry." };
+    return {
+      label: "No access",
+      reason: "App je licencovaná, ale aktuální uživatel ji nevidí v registry (chybějící oprávnění).",
+    };
   }
 
   return { label: "Installed" as const, reason: null };
@@ -203,7 +213,17 @@ export function AppsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm">{app.slug}</td>
                       <td className="px-4 py-3 text-sm">
-                        <div className={status.label === "Error" ? "text-hc-danger" : "text-hc-text"}>{status.label}</div>
+                        <div
+                          className={
+                            status.label === "Installed"
+                              ? "text-hc-text"
+                              : status.label === "Error"
+                                ? "text-hc-danger"
+                                : "text-hc-muted"
+                          }
+                        >
+                          {status.label}
+                        </div>
                         {status.reason && <div className="mt-1 text-xs text-hc-muted">{status.reason}</div>}
                       </td>
                       <td className="px-4 py-3 text-sm">{app.ui_url ? "✓" : "—"}</td>
