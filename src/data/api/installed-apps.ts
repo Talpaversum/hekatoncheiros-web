@@ -5,10 +5,14 @@ import { authFetch } from "../auth/auth-fetch";
 export type InstalledApp = {
   app_id: string;
   slug: string;
+  app_name?: string;
   base_url: string;
   ui_url: string;
   ui_integrity: string;
   required_privileges: string[];
+  nav_entries?: Array<{ label: string; path: string; required_privileges?: string[] }>;
+  enabled?: boolean;
+  licensed: boolean;
   manifest: Record<string, unknown>;
 };
 
