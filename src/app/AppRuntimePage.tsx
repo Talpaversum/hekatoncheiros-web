@@ -6,6 +6,16 @@ import { useAppRegistryQuery } from "../data/api/app-registry";
 import { API_BASE } from "../data/api/client";
 import { authFetch } from "../data/auth/auth-fetch";
 
+function rewritePluginImports(params: {
+  source: string;
+  reactModuleUrl: string;
+  jsxRuntimeModuleUrl: string;
+}) {
+  return params.source
+    .replace(/from\s+["']react\/[jJ][sS][xX]-runtime["']/g, `from "${params.jsxRuntimeModuleUrl}"`)
+    .replace(/from\s+["']react["']/g, `from "${params.reactModuleUrl}"`);
+}
+
 type PluginRoute = {
   path: string;
   component: ComponentType<Record<string, never>>;
@@ -75,9 +85,29 @@ export function AppRuntimePage() {
     const loadPlugin = async () => {
       try {
         const pluginUrl = new URL(appEntry.ui_url, API_BASE).toString();
-        const mod = (await import(/* @vite-ignore */ pluginUrl)) as {
+        const [reactShim, jsxRuntimeShim, pluginResponse] = await Promise.all([
+          import("./runtime/react-shim"),
+          import("./runtime/jsx-runtime-shim"),
+          fetch(pluginUrl),
+        ]);
+
+        if (!pluginResponse.ok) {
+          throw new Error(`Plugin module fetch failed: ${pluginResponse.status}`);
+        }
+
+        const pluginSource = await pluginResponse.text();
+        const rewrittenSource = rewritePluginImports({
+          source: pluginSource,
+          reactModuleUrl: reactShim.MODULE_URL,
+          jsxRuntimeModuleUrl: jsxRuntimeShim.MODULE_URL,
+        });
+        const blobUrl = URL.createObjectURL(new Blob([rewrittenSource], { type: "text/javascript" }));
+
+        const mod = (await import(/* @vite-ignore */ blobUrl)) as {
           register?: (ctx: AppContext) => PluginRegistration;
         };
+
+        URL.revokeObjectURL(blobUrl);
 
         if (typeof mod.register !== "function") {
           throw new Error("Plugin module must export register(appContext)");
