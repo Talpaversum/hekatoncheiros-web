@@ -4,6 +4,7 @@ import { authFetch } from "../auth/auth-fetch";
 
 export type AppRegistryEntry = {
   app_id: string;
+  app_name?: string;
   slug: string;
   ui_url: string;
   nav_entries: Array<{
