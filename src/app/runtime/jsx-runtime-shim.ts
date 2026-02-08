@@ -1,3 +1,5 @@
 export const MODULE_URL = import.meta.url;
 
-export * from "react/jsx-runtime";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+
+export { Fragment, jsx, jsxs };
