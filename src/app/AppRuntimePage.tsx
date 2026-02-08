@@ -3,6 +3,7 @@ import { useLocation, useParams } from "react-router-dom";
 
 import { useContextQuery } from "../data/api/context";
 import { useAppRegistryQuery } from "../data/api/app-registry";
+import { API_BASE } from "../data/api/client";
 import { authFetch } from "../data/auth/auth-fetch";
 
 type PluginRoute = {
@@ -73,7 +74,8 @@ export function AppRuntimePage() {
 
     const loadPlugin = async () => {
       try {
-        const mod = (await import(/* @vite-ignore */ appEntry.ui_url)) as {
+        const pluginUrl = new URL(appEntry.ui_url, API_BASE).toString();
+        const mod = (await import(/* @vite-ignore */ pluginUrl)) as {
           register?: (ctx: AppContext) => PluginRegistration;
         };
 
