@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "react";
 
 import { NavLink, useLocation } from "react-router-dom";
 
+import { hasPrivilege } from "../../access/privileges";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 
 type SidebarNavProps = PropsWithChildren<{
@@ -41,7 +42,7 @@ const sidebarConfig = [
 ];
 
 export function SidebarNav({ children, privileges }: SidebarNavProps) {
-  const canManageApps = (privileges ?? []).includes("platform.apps.manage");
+  const canManageApps = hasPrivilege(privileges ?? [], "platform.apps.manage");
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
   const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
+import { hasPrivilege } from "../../access/privileges";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { clearTokens } from "../../data/auth/storage";
 import { Avatar } from "../components/Avatar";
@@ -11,9 +12,11 @@ import { useTheme } from "../theme/useTheme";
 
 type AppTopBarProps = {
   userId?: string;
+  privileges?: string[];
+  tenantMode?: string;
 };
 
-export function AppTopBar({ userId }: AppTopBarProps) {
+export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProps) {
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
@@ -34,6 +37,16 @@ export function AppTopBar({ userId }: AppTopBarProps) {
   const handleLogout = () => {
     clearTokens();
     navigate("/login");
+  };
+
+  const openPlatformConfig = () => {
+    setSettingsOpen(false);
+    navigate("/core/platform");
+  };
+
+  const openTenantConfig = () => {
+    setSettingsOpen(false);
+    navigate("/core/tenant");
   };
 
   const appGroups = registry?.items ?? [];
@@ -114,6 +127,22 @@ export function AppTopBar({ userId }: AppTopBarProps) {
               ⚙️
             </IconButton>
             <Menu open={settingsOpen} onClose={() => setSettingsOpen(false)} className="w-64">
+              {hasPrivilege(privileges, "platform.superadmin") && (
+                <button
+                  onClick={openPlatformConfig}
+                  className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+                >
+                  Platform configuration
+                </button>
+              )}
+              {hasPrivilege(privileges, "tenant.config.manage") && (
+                <button
+                  onClick={openTenantConfig}
+                  className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+                >
+                  Tenant configuration
+                </button>
+              )}
               <div className="flex items-center justify-between rounded-hc-sm px-3 py-2">
                 <div>
                   <div className="text-sm font-medium">Tmavý režim</div>
@@ -122,7 +151,7 @@ export function AppTopBar({ userId }: AppTopBarProps) {
                 <Switch checked={isDark} onClick={toggle} />
               </div>
               <div className="mt-2 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
-                Další nastavení přidáme později.
+                Tenant mode: {tenantMode ?? "unknown"}
               </div>
             </Menu>
           </div>

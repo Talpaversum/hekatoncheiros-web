@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { hasPrivilege } from "../../access/privileges";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
   useInstallAppMutation,
@@ -63,7 +64,7 @@ function getStatus(app: InstalledApp, registrySlugs: Set<string>) {
 
 export function AppsPage() {
   const { data: context } = useContextQuery(true);
-  const canManageApps = (context?.privileges ?? []).includes("platform.apps.manage");
+  const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data, isLoading, error: installedQueryError } = useInstalledAppsQuery(canManageApps);
   const { data: registryData } = useAppRegistryQuery(canManageApps);
   const installMutation = useInstallAppMutation();

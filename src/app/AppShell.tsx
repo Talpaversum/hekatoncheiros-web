@@ -16,7 +16,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-hc-bg text-hc-text">
-      <AppTopBar userId={data?.actor?.user_id} />
+      <AppTopBar userId={data?.actor?.user_id} privileges={privileges} tenantMode={data?.tenant?.mode} />
       <div className="flex min-h-[calc(100vh-4rem)]">
         <SidebarNav privileges={privileges}>
           {data?.actor?.impersonating && (
