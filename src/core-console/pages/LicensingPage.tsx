@@ -6,18 +6,23 @@ import { Card } from "../../ui-kit/components/Card";
 
 type LicenseResponse = {
   app_id: string;
-  state: "active" | "inactive" | "expired";
-  plan: string | null;
-  expires_at: string | null;
-  features: Record<string, boolean>;
-  limits: Record<string, unknown>;
+  selected_entitlement_id: string | null;
+  items: Array<{
+    id: string;
+    source: string;
+    tier: string;
+    valid_from: string;
+    valid_to: string;
+    limits: Record<string, unknown>;
+    status: string;
+  }>;
 };
 
 export function LicensingPage() {
   const token = getAccessToken();
   const { data, isLoading } = useQuery({
-    queryKey: ["license", "com.talpaversum.inventory"],
-    queryFn: () => authFetch<LicenseResponse>(`/licensing/apps/com.talpaversum.inventory`),
+    queryKey: ["license", "com.talpaversum.inventory", "entitlements"],
+    queryFn: () => authFetch<LicenseResponse>(`/licensing/entitlements?app_id=com.talpaversum.inventory`),
     enabled: !!token,
   });
 
@@ -35,9 +40,9 @@ export function LicensingPage() {
           <div className="text-sm">Načítám…</div>
         ) : (
           <div className="space-y-3">
-            <div className="text-sm text-hc-muted">Stav licence</div>
-            <div className="text-lg font-semibold">{data?.state ?? "inactive"}</div>
-            <div className="text-xs text-hc-muted">Plan: {data?.plan ?? "-"}</div>
+            <div className="text-sm text-hc-muted">Entitlements</div>
+            <div className="text-lg font-semibold">{data?.items?.length ?? 0}</div>
+            <div className="text-xs text-hc-muted">Selected: {data?.selected_entitlement_id ?? "none"}</div>
             <pre className="rounded-hc-sm border border-hc-outline bg-hc-surface-variant p-3 text-xs text-hc-text">
               {JSON.stringify(data, null, 2)}
             </pre>

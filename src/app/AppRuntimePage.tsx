@@ -30,6 +30,14 @@ type AppContext = {
     request<T>(path: string, init?: RequestInit): Promise<T>;
   };
   privileges: string[];
+  entitlement?: {
+    tier: string;
+    valid_from: string;
+    valid_to: string;
+    limits: Record<string, unknown>;
+    source: string;
+    entitlement_id: string;
+  } | null;
 };
 
 function matchesRoutePath(routePath: string, subPath: string) {
@@ -80,16 +88,20 @@ export function AppRuntimePage() {
         request: (path, init) => authFetch(path, init),
       },
       privileges: context?.privileges ?? [],
+      entitlement: null,
     };
 
     const loadPlugin = async () => {
       try {
         const pluginUrl = new URL(appEntry.ui_url, API_BASE).toString();
-        const [reactShim, jsxRuntimeShim, pluginResponse] = await Promise.all([
+        const [reactShim, jsxRuntimeShim, pluginResponse, entitlementResponse] = await Promise.all([
           import("./runtime/react-shim"),
           import("./runtime/jsx-runtime-shim"),
           fetch(pluginUrl),
+          authFetch<AppContext["entitlement"]>(`/apps/${encodeURIComponent(appEntry.slug)}/entitlement`).catch(() => null),
         ]);
+
+        appContext.entitlement = entitlementResponse;
 
         if (!pluginResponse.ok) {
           throw new Error(`Plugin module fetch failed: ${pluginResponse.status}`);

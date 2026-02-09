@@ -12,7 +12,19 @@ export type InstalledApp = {
   required_privileges: string[];
   nav_entries?: Array<{ label: string; path: string; required_privileges?: string[] }>;
   enabled?: boolean;
-  licensed: boolean;
+  resolved_entitlement:
+    | {
+        entitlement_id: string;
+        tenant_id: string;
+        app_id: string;
+        source: string;
+        tier: string;
+        valid_from: string;
+        valid_to: string;
+        limits: Record<string, unknown>;
+      }
+    | null;
+  has_any_entitlement: boolean;
   manifest: Record<string, unknown>;
 };
 
