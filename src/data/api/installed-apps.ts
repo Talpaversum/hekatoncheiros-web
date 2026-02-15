@@ -7,6 +7,9 @@ export type InstalledApp = {
   slug: string;
   app_name?: string;
   base_url: string;
+  app_version?: string;
+  manifest_version?: string;
+  fetched_at?: string;
   ui_url: string;
   ui_integrity: string;
   required_privileges: string[];
@@ -29,9 +32,24 @@ export type InstalledApp = {
 };
 
 export type InstallAppPayload = {
-  app_id: string;
   base_url: string;
+  expected_manifest_hash: string;
+};
+
+export type FetchManifestPayload = {
+  base_url: string;
+};
+
+export type FetchManifestResponse = {
+  normalized_base_url: string;
+  fetched_from_url: string;
+  fetched_at: string;
   manifest: Record<string, unknown>;
+  manifest_hash: string;
+  manifest_version: string;
+  app_id: string;
+  app_version: string;
+  slug: string | null;
 };
 
 export function useInstalledAppsQuery(enabled = true) {
@@ -55,6 +73,16 @@ export function useInstallAppMutation() {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
       await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
     },
+  });
+}
+
+export function useFetchInstallManifestMutation() {
+  return useMutation({
+    mutationFn: (payload: FetchManifestPayload) =>
+      authFetch<FetchManifestResponse>("/apps/installed/fetch-manifest", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   });
 }
 

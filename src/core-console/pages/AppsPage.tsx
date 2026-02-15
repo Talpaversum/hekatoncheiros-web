@@ -3,9 +3,11 @@ import { useMemo, useState } from "react";
 import { hasPrivilege } from "../../access/privileges";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
+  useFetchInstallManifestMutation,
   useInstallAppMutation,
   useInstalledAppsQuery,
   useUninstallAppMutation,
+  type FetchManifestResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
 import { useContextQuery } from "../../data/api/context";
@@ -67,6 +69,7 @@ export function AppsPage() {
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data, isLoading, error: installedQueryError } = useInstalledAppsQuery(canManageApps);
   const { data: registryData } = useAppRegistryQuery(canManageApps);
+  const fetchManifestMutation = useFetchInstallManifestMutation();
   const installMutation = useInstallAppMutation();
   const uninstallMutation = useUninstallAppMutation();
   const setSelectionMutation = useSetSelectionMutation();
@@ -81,8 +84,8 @@ export function AppsPage() {
   const [offlineToken, setOfflineToken] = useState<string>("");
   const [installForm, setInstallForm] = useState({
     base_url: "",
-    manifest: "{}",
   });
+  const [fetchedManifest, setFetchedManifest] = useState<FetchManifestResponse | null>(null);
 
   const installed = data?.items ?? [];
   const effectiveSelectedAppId = selectedAppId ?? (installed.length > 0 ? installed[0].app_id : null);
@@ -92,33 +95,48 @@ export function AppsPage() {
     installedQueryError instanceof Error
       ? installedQueryError.message
       : "Nelze načíst seznam nainstalovaných aplikací.";
-  const canSubmit = useMemo(
-    () => installForm.base_url.trim().length > 0 && installForm.manifest.trim().length > 0,
-    [installForm.base_url, installForm.manifest],
-  );
+  const canFetchManifest = installForm.base_url.trim().length > 0;
+  const canInstall = fetchedManifest !== null;
+
+  const readString = (obj: Record<string, unknown>, key: string): string | null => {
+    const value = obj[key];
+    return typeof value === "string" && value.trim().length > 0 ? value : null;
+  };
+
+  const handleFetchManifest = async () => {
+    setMessage(null);
+    setActionError(null);
+    setFetchedManifest(null);
+
+    try {
+      const fetched = await fetchManifestMutation.mutateAsync({
+        base_url: installForm.base_url.trim(),
+      });
+
+      setFetchedManifest(fetched);
+      setInstallForm({ base_url: fetched.normalized_base_url });
+    } catch (err) {
+      setActionError((err as Error).message);
+    }
+  };
 
   const handleInstall = async () => {
     setMessage(null);
     setActionError(null);
 
+    if (!fetchedManifest) {
+      setActionError("Nejprve načti a validuj manifest.");
+      return;
+    }
+
     try {
-      const parsed = JSON.parse(installForm.manifest || "{}") as Record<string, unknown>;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error("Manifest JSON musí být objekt.");
-      }
-
-      const appId = parsed["app_id"];
-      if (typeof appId !== "string" || appId.trim().length === 0) {
-        throw new Error("Manifest musí obsahovat validní app_id.");
-      }
-
       await installMutation.mutateAsync({
-        app_id: appId,
         base_url: installForm.base_url.trim(),
-        manifest: parsed,
+        expected_manifest_hash: fetchedManifest.manifest_hash,
       });
-      setMessage(`App ${appId} byla nainstalována.`);
-      setInstallForm({ base_url: "", manifest: "{}" });
+      setMessage(`App ${fetchedManifest.app_id} byla nainstalována.`);
+      setInstallForm({ base_url: "" });
+      setFetchedManifest(null);
       setInstallOpen(false);
     } catch (err) {
       setActionError((err as Error).message);
@@ -200,34 +218,62 @@ export function AppsPage() {
 
           {installOpen && (
             <div className="mb-5 rounded-hc-md border border-hc-outline bg-hc-surface-variant/40 p-4">
-              <div className="text-sm font-semibold">Install app (DEV MVP)</div>
+              <div className="text-sm font-semibold">Install app</div>
               <div className="mt-3 rounded-hc-sm border border-hc-outline bg-hc-surface px-3 py-2 text-xs text-hc-muted">
-                UI plugins are fetched and hosted by the platform core during installation. You do not provide UI URLs manually.
+                Instalace probíhá pouze přes HTTPS Base URL. Core si manifest načte a validuje automaticky.
               </div>
 
               <div className="mt-4 grid gap-3">
                 <div>
                   <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">Base URL</label>
                   <Input
-                    placeholder="http://127.0.0.1:4010"
+                    placeholder="https://example.com"
                     value={installForm.base_url}
-                    onChange={(event) => setInstallForm((prev) => ({ ...prev, base_url: event.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">Manifest JSON</label>
-                  <textarea
-                    className="min-h-[180px] w-full rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/30"
-                    value={installForm.manifest}
-                    onChange={(event) => setInstallForm((prev) => ({ ...prev, manifest: event.target.value }))}
+                    onChange={(event) => {
+                      setInstallForm((prev) => ({ ...prev, base_url: event.target.value }));
+                      setFetchedManifest(null);
+                    }}
                   />
                 </div>
 
-                <div className="flex justify-end">
-                  <Button onClick={handleInstall} disabled={!canSubmit || installMutation.isPending}>
-                    {installMutation.isPending ? "Installing…" : "Install app"}
+                <div className="flex justify-between gap-2">
+                  <Button onClick={handleFetchManifest} disabled={!canFetchManifest || fetchManifestMutation.isPending}>
+                    {fetchManifestMutation.isPending ? "Fetching manifest…" : "Fetch manifest"}
+                  </Button>
+                  <Button onClick={handleInstall} disabled={!canInstall || installMutation.isPending}>
+                    {installMutation.isPending ? "Installing…" : "Install"}
                   </Button>
                 </div>
+
+                {fetchedManifest && (
+                  <div className="rounded-hc-sm border border-hc-outline bg-hc-surface p-3 text-sm">
+                    <div className="mb-2 text-xs uppercase tracking-wide text-hc-muted">Manifest preview (read-only)</div>
+                    <div><strong>Base URL:</strong> {fetchedManifest.normalized_base_url}</div>
+                    <div><strong>App ID:</strong> {fetchedManifest.app_id}</div>
+                    <div><strong>App name:</strong> {readString(fetchedManifest.manifest, "app_name") ?? "—"}</div>
+                    <div><strong>Version:</strong> {fetchedManifest.app_version}</div>
+                    <div><strong>Slug:</strong> {fetchedManifest.slug ?? "—"}</div>
+                    <div>
+                      <strong>Scopes:</strong>{" "}
+                      {Array.isArray((fetchedManifest.manifest["privileges"] as { required?: unknown } | undefined)?.required)
+                        ? ((fetchedManifest.manifest["privileges"] as { required?: string[] }).required ?? []).join(", ")
+                        : "—"}
+                    </div>
+                    <div>
+                      <strong>Routes:</strong>{" "}
+                      {Array.isArray(
+                        ((fetchedManifest.manifest["integration"] as { ui?: { nav_entries?: unknown } } | undefined)?.ui
+                          ?.nav_entries as unknown[] | undefined) ?? [],
+                      )
+                        ? ((((fetchedManifest.manifest["integration"] as { ui?: { nav_entries?: Array<{ path?: string }> } })
+                            .ui?.nav_entries ?? []) as Array<{ path?: string }>)
+                            .map((entry) => entry.path)
+                            .filter((value): value is string => typeof value === "string")
+                            .join(", ") || "—")
+                        : "—"}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
