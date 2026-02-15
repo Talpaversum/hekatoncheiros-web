@@ -10,6 +10,7 @@ import {
   type FetchManifestResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
+import { readErrorMessage } from "../../data/api/read-error-message";
 import { useContextQuery } from "../../data/api/context";
 import {
   useAppEntitlementsQuery,
@@ -19,8 +20,16 @@ import {
 } from "../../data/api/licensing";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
+import { Dialog } from "../../ui-kit/components/Dialog";
 import { Input } from "../../ui-kit/components/Input";
 import { Table } from "../../ui-kit/components/Table";
+
+type UninstallState =
+  | { status: "idle" }
+  | { status: "confirm"; app: InstalledApp }
+  | { status: "running"; app: InstalledApp }
+  | { status: "success" }
+  | { status: "error"; app: InstalledApp; error: string };
 
 function pickAppDisplayName(app: InstalledApp) {
   const displayName = app.manifest?.["display_name"];
@@ -86,6 +95,8 @@ export function AppsPage() {
     base_url: "",
   });
   const [fetchedManifest, setFetchedManifest] = useState<FetchManifestResponse | null>(null);
+  const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
+  const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
 
   const installed = data?.items ?? [];
   const effectiveSelectedAppId = selectedAppId ?? (installed.length > 0 ? installed[0].app_id : null);
@@ -97,10 +108,39 @@ export function AppsPage() {
       : "Nelze načíst seznam nainstalovaných aplikací.";
   const canFetchManifest = installForm.base_url.trim().length > 0;
   const canInstall = fetchedManifest !== null;
+  const uninstallDialogOpen = uninstallState.status !== "idle";
+  const uninstallRunning = uninstallState.status === "running";
 
   const readString = (obj: Record<string, unknown>, key: string): string | null => {
     const value = obj[key];
     return typeof value === "string" && value.trim().length > 0 ? value : null;
+  };
+
+  const resetUninstallState = () => {
+    if (uninstallState.status === "running") {
+      return;
+    }
+    setUninstallState({ status: "idle" });
+    setUninstallConfirmChecked(false);
+  };
+
+  const executeUninstall = async (app: InstalledApp) => {
+    setMessage(null);
+    setActionError(null);
+    setUninstallState({ status: "running", app });
+
+    try {
+      await uninstallMutation.mutateAsync(app.app_id);
+      setUninstallState({ status: "success" });
+      setMessage(`App ${app.app_id} byla odinstalována.`);
+    } catch (error) {
+      console.error("Uninstall failed", { appId: app.app_id, error });
+      setUninstallState({
+        status: "error",
+        app,
+        error: readErrorMessage(error),
+      });
+    }
   };
 
   const handleFetchManifest = async () => {
@@ -116,7 +156,7 @@ export function AppsPage() {
       setFetchedManifest(fetched);
       setInstallForm({ base_url: fetched.normalized_base_url });
     } catch (err) {
-      setActionError((err as Error).message);
+      setActionError(readErrorMessage(err));
     }
   };
 
@@ -139,27 +179,13 @@ export function AppsPage() {
       setFetchedManifest(null);
       setInstallOpen(false);
     } catch (err) {
-      setActionError((err as Error).message);
+      setActionError(readErrorMessage(err));
     }
   };
 
-  const handleUninstall = async (app: InstalledApp) => {
-    const confirmed = window.confirm(
-      `This removes the app from the platform UI. App data schemas are not deleted.\n\napp_id: ${app.app_id}\nslug: ${app.slug}`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setMessage(null);
-    setActionError(null);
-    try {
-      await uninstallMutation.mutateAsync(app.app_id);
-      setMessage(`App ${app.app_id} byla odinstalována.`);
-    } catch (err) {
-      setActionError((err as Error).message);
-    }
+  const handleUninstall = (app: InstalledApp) => {
+    setUninstallConfirmChecked(false);
+    setUninstallState({ status: "confirm", app });
   };
 
   const handleSetSelection = async () => {
@@ -325,11 +351,7 @@ export function AppsPage() {
                       <td className="px-4 py-3 text-sm">{app.ui_url ? "✓" : "—"}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
-                          <Button
-                            variant="outlined"
-                            onClick={() => void handleUninstall(app)}
-                            disabled={uninstallMutation.isPending}
-                          >
+                          <Button variant="outlined" onClick={() => handleUninstall(app)} disabled={uninstallRunning}>
                             Uninstall
                           </Button>
                           <Button variant="tonal" onClick={() => setSelectedAppId(app.app_id)}>
@@ -417,6 +439,92 @@ export function AppsPage() {
         {message && <div className="text-sm text-hc-primary">{message}</div>}
         {actionError && <div className="text-sm text-hc-danger">{actionError}</div>}
       </div>
+
+      <Dialog
+        open={uninstallDialogOpen}
+        title="Uninstall app"
+        disableClose={uninstallState.status === "running"}
+        onClose={resetUninstallState}
+      >
+        {uninstallState.status === "confirm" && (
+          <div>
+            <div className="text-lg font-semibold">Confirm uninstall</div>
+            <div className="mt-2 text-sm text-hc-muted">Tato akce odstraní aplikaci z runtime instalací platformy.</div>
+
+            <div className="mt-4 rounded-hc-sm border border-hc-outline bg-hc-surface-variant/30 p-3 text-sm">
+              <div><strong>App:</strong> {pickAppDisplayName(uninstallState.app)}</div>
+              <div><strong>App ID:</strong> {uninstallState.app.app_id}</div>
+              <div><strong>Base URL:</strong> {uninstallState.app.base_url}</div>
+            </div>
+
+            <label className="mt-4 flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={uninstallConfirmChecked}
+                onChange={(event) => setUninstallConfirmChecked(event.target.checked)}
+              />
+              <span>Rozumím dopadu odinstalace.</span>
+            </label>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={resetUninstallState}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={!uninstallConfirmChecked}
+                onClick={() => void executeUninstall(uninstallState.app)}
+              >
+                Confirm uninstall
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {uninstallState.status === "running" && (
+          <div>
+            <div className="text-lg font-semibold">Uninstall in progress</div>
+            <div className="mt-2 text-sm text-hc-muted">Odinstalace aplikace právě probíhá. Prosím čekej…</div>
+            <div className="mt-4 flex items-center gap-3 text-sm">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-hc-outline border-t-hc-primary" />
+              <span>Running uninstall for {uninstallState.app.app_id}</span>
+            </div>
+          </div>
+        )}
+
+        {uninstallState.status === "success" && (
+          <div>
+            <div className="text-lg font-semibold">Uninstall completed</div>
+            <div className="mt-2 text-sm text-hc-muted">Aplikace byla úspěšně odinstalována.</div>
+            <div className="mt-5 flex justify-end">
+              <Button onClick={resetUninstallState}>Close</Button>
+            </div>
+          </div>
+        )}
+
+        {uninstallState.status === "error" && (
+          <div>
+            <div className="text-lg font-semibold text-hc-danger">Uninstall failed</div>
+            <div className="mt-2 text-sm text-hc-muted">Odinstalaci se nepodařilo dokončit.</div>
+            <div className="mt-3 rounded-hc-sm border border-hc-danger/40 bg-hc-danger/10 p-3 text-sm text-hc-danger">
+              {uninstallState.error}
+            </div>
+            <details className="mt-3 text-xs text-hc-muted">
+              <summary>Detail chyby</summary>
+              <div className="mt-2 whitespace-pre-wrap">{uninstallState.error}</div>
+            </details>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={resetUninstallState}>
+                Close
+              </Button>
+              <Button variant="danger" onClick={() => void executeUninstall(uninstallState.app)}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

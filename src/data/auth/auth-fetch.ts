@@ -26,17 +26,25 @@ export async function authFetch<T>(path: string, options: RequestInit = {}) {
       const refreshed = await refreshAccessToken();
       if (refreshed) {
         const retryToken = getAccessToken();
-        return apiFetch<T>(path, {
-          ...options,
-          headers: {
-            ...(options.headers ?? {}),
-            ...(retryToken ? { Authorization: `Bearer ${retryToken}` } : {}),
-          },
-        });
+        try {
+          return apiFetch<T>(path, {
+            ...options,
+            headers: {
+              ...(options.headers ?? {}),
+              ...(retryToken ? { Authorization: `Bearer ${retryToken}` } : {}),
+            },
+          });
+        } catch (retryError: any) {
+          if (retryError?.status === 401) {
+            clearTokens();
+          }
+          throw retryError;
+        }
       }
+
+      clearTokens();
     }
 
-    clearTokens();
     throw error;
   }
 }

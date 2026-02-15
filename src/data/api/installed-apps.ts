@@ -94,9 +94,30 @@ export function useUninstallAppMutation() {
       authFetch<void>(`/apps/installed/${encodeURIComponent(appId)}`, {
         method: "DELETE",
       }),
+    onMutate: async (appId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["installed-apps"] });
+      const previousInstalledApps = queryClient.getQueryData<{ items: InstalledApp[] }>(["installed-apps"]);
+
+      if (previousInstalledApps) {
+        queryClient.setQueryData<{ items: InstalledApp[] }>(["installed-apps"], {
+          items: previousInstalledApps.items.filter((item) => item.app_id !== appId),
+        });
+      }
+
+      return { previousInstalledApps };
+    },
+    onError: (error, appId, context) => {
+      if (context?.previousInstalledApps) {
+        queryClient.setQueryData(["installed-apps"], context.previousInstalledApps);
+      }
+      console.error("Uninstall failed", { appId, error });
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
       await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
     },
   });
 }
