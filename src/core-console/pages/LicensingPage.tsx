@@ -26,7 +26,7 @@ export function LicensingPage() {
   const [licenseMode, setLicenseMode] = useState<"portable" | "instance_bound">("portable");
   const [oauthCode, setOauthCode] = useState("");
   const [oauthState, setOauthState] = useState("");
-  const [selectedJti, setSelectedJti] = useState("");
+  const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +40,7 @@ export function LicensingPage() {
   const callbackMutation = useHandleLicenseOAuthCallbackMutation(tenantId);
 
   const selectedLicense = useMemo(
-    () => licensesData?.items.find((item) => item.jti === licensesData.selected_license_jti) ?? null,
+    () => licensesData?.items.find((item) => item.jti === licensesData.selected_entitlement_id) ?? null,
     [licensesData],
   );
 
@@ -67,21 +67,21 @@ export function LicensingPage() {
         author_cert_jws: authorCertJws || undefined,
       });
       setMessage(`Imported: ${result.item.jti} (${result.item.status})`);
-      setSelectedJti(result.item.jti);
+      setSelectedEntitlementId(result.item.jti);
     } catch (e) {
       setError(readErrorMessage(e));
     }
   };
 
   const handleSelect = async () => {
-    if (!selectedJti) {
+    if (!selectedEntitlementId) {
       return;
     }
     setMessage(null);
     setError(null);
     try {
-      await selectMutation.mutateAsync({ app_id: appId, license_jti: selectedJti });
-      setMessage("License selected.");
+      await selectMutation.mutateAsync({ app_id: appId, entitlement_id: selectedEntitlementId });
+      setMessage("Entitlement selected.");
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -110,7 +110,7 @@ export function LicensingPage() {
     try {
       const result = await callbackMutation.mutateAsync({ code: oauthCode, state: oauthState });
       setMessage(`OAuth import OK: ${result.item.jti}`);
-      setSelectedJti(result.item.jti);
+      setSelectedEntitlementId(result.item.jti);
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -137,7 +137,11 @@ export function LicensingPage() {
           <div className="text-sm font-semibold">App + list</div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <Input value={appId} onChange={(event) => setAppId(event.target.value)} placeholder="author_id/slug" />
-            <Input value={selectedJti} onChange={(event) => setSelectedJti(event.target.value)} placeholder="license_jti for selection" />
+            <Input
+              value={selectedEntitlementId}
+              onChange={(event) => setSelectedEntitlementId(event.target.value)}
+              placeholder="entitlement_id for selection"
+            />
           </div>
           <div className="mt-3 text-xs text-hc-muted">Selected active license: {selectedLicense?.jti ?? "none"}</div>
           {isLoading ? (
@@ -155,8 +159,8 @@ export function LicensingPage() {
             </div>
           )}
           <div className="mt-3">
-            <Button onClick={() => void handleSelect()} disabled={!selectedJti || selectMutation.isPending}>
-              Select license
+            <Button onClick={() => void handleSelect()} disabled={!selectedEntitlementId || selectMutation.isPending}>
+              Select entitlement
             </Button>
           </div>
         </Card>

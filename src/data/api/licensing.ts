@@ -22,7 +22,7 @@ export type TenantLicenseItem = {
 
 export type TenantLicensesResponse = {
   app_id: string | null;
-  selected_license_jti: string | null;
+  selected_entitlement_id: string | null;
   items: TenantLicenseItem[];
 };
 
@@ -86,7 +86,7 @@ export function useImportLicenseMutation(tenantId: string | null) {
 export function useSelectLicenseMutation(tenantId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { app_id: string; license_jti: string }) =>
+    mutationFn: (payload: { app_id: string; entitlement_id: string }) =>
       authFetch<void>(`/tenants/${encodeURIComponent(tenantId ?? "")}/licenses/select`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -145,7 +145,6 @@ export function useHandleLicenseOAuthCallbackMutation(tenantId: string | null) {
   });
 }
 
-// Legacy compatibility for existing UI components
 export type EntitlementItem = {
   id: string;
   tenant_id: string;
@@ -176,7 +175,7 @@ export function useAppEntitlementsQuery(appId: string | null, enabled = true) {
       );
       return {
         app_id: response.app_id ?? appId ?? "",
-        selected_entitlement_id: response.selected_license_jti,
+        selected_entitlement_id: response.selected_entitlement_id,
         items: response.items.map((item) => ({
           id: item.jti,
           tenant_id: item.tenant_id,
@@ -197,7 +196,7 @@ export function useAppEntitlementsQuery(appId: string | null, enabled = true) {
 }
 
 export function useSetSelectionMutation() {
-  return useSelectLicenseMutation("tnt_default") as ReturnType<typeof useSelectLicenseMutation>;
+  return useSelectLicenseMutation("tnt_default");
 }
 
 export function useClearSelectionMutation() {
