@@ -17,6 +17,7 @@ import { readErrorMessage } from "../../data/api/read-error-message";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
 function StatusBadge({ children }: { children: React.ReactNode }) {
   return (
@@ -53,6 +54,12 @@ export function TenantConfigPage() {
   const effectiveTenantName = tenantName ?? tenantSettings?.name ?? context?.tenant.name ?? "";
   const effectivePrimaryDomain = primaryDomain ?? tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? "";
   const selectedTenantUser = tenantUsers.find((item) => item.id === selectedTenantUserId) ?? tenantUsers[0];
+  const toastMessage = error ?? message;
+  const toastTone = error ? "danger" : "success";
+  const dismissToast = () => {
+    setMessage(null);
+    setError(null);
+  };
 
   const handleSaveTenant = async () => {
     setMessage(null);
@@ -109,6 +116,8 @@ export function TenantConfigPage() {
 
   return (
     <div className="space-y-5">
+      <ToastNotice message={toastMessage} tone={toastTone} onDismiss={dismissToast} />
+
       <header>
         <div className="text-xs uppercase tracking-wide text-hc-muted">Configuration</div>
         <div className="mt-1 text-2xl font-semibold">Tenant configuration</div>
@@ -116,9 +125,6 @@ export function TenantConfigPage() {
           Tenant-local settings for identity, app access, and license selection.
         </div>
       </header>
-
-      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
-      {error && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{error}</div>}
 
       {(section === "tenant" || section === "") && <section className="grid gap-4 lg:grid-cols-4">
         <Card className="rounded-hc-md">

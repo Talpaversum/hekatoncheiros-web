@@ -32,6 +32,7 @@ import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
 import { Switch } from "../../ui-kit/components/Switch";
+import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
 function StatusBadge({ children }: { children: React.ReactNode }) {
   return (
@@ -85,6 +86,12 @@ export function PlatformConfigPage() {
   const effectiveInstanceName = instanceName ?? platformInstance?.name ?? "";
   const effectivePublicBaseUrl = publicBaseUrl ?? platformInstance?.public_base_url ?? "";
   const selectedUser = identityUsers.find((item) => item.id === selectedUserId) ?? identityUsers[0];
+  const toastMessage = error ?? message;
+  const toastTone = error ? "danger" : "success";
+  const dismissToast = () => {
+    setMessage(null);
+    setError(null);
+  };
 
   const httpOriginDetected = useMemo(() => {
     try {
@@ -256,14 +263,13 @@ export function PlatformConfigPage() {
 
   return (
     <div className="space-y-5">
+      <ToastNotice message={toastMessage} tone={toastTone} onDismiss={dismissToast} />
+
       <div className="mb-6">
         <div className="text-xs uppercase tracking-wide text-hc-muted">Configuration</div>
         <div className="mt-1 text-2xl font-semibold">Platform configuration</div>
         <div className="mt-1 text-sm text-hc-muted">Instance-wide controls for trust, app distribution, and platform governance.</div>
       </div>
-
-      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
-      {error && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{error}</div>}
 
       {(section === "platform" || section === "") && <section className="grid gap-4 lg:grid-cols-4">
         <Card className="rounded-hc-md">
@@ -374,9 +380,6 @@ export function PlatformConfigPage() {
               />
             ))}
           </div>
-
-          {message && <div className="mt-3 text-sm text-hc-primary">{message}</div>}
-          {error && <div className="mt-3 text-sm text-hc-danger">{error}</div>}
         </Card>}
 
         {section === "app-distribution" && <Card className="rounded-hc-md">
