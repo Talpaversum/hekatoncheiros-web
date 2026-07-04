@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "./Button";
 
@@ -34,7 +35,7 @@ export function ToastNotice({ message, tone = "success", onDismiss, timeoutMs = 
       ? "border-hc-danger/35 bg-hc-danger/10 text-hc-danger"
       : "border-hc-success/30 bg-hc-success/10 text-hc-success";
 
-  return (
+  return createPortal(
     <div className="fixed right-4 top-20 z-50 w-[min(420px,calc(100vw-2rem))]">
       <div className={`rounded-hc-md border px-4 py-3 shadow-lg backdrop-blur ${toneClasses}`}>
         <div className="flex items-start justify-between gap-3">
@@ -44,6 +45,7 @@ export function ToastNotice({ message, tone = "success", onDismiss, timeoutMs = 
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

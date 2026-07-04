@@ -30,12 +30,15 @@ import {
   useClearSelectionMutation,
   useOfflineIngestMutation,
   useSetSelectionMutation,
+  useStartLicenseOAuthMutation,
 } from "../../data/api/licensing";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Dialog } from "../../ui-kit/components/Dialog";
 import { Input } from "../../ui-kit/components/Input";
+import { Select } from "../../ui-kit/components/Select";
 import { Table } from "../../ui-kit/components/Table";
+import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
 type Tab = "catalog" | "installed" | "licensing";
 
@@ -97,6 +100,28 @@ function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>) {
   return { label: "Ready", tone: "good" as const, detail: null };
 }
 
+function getCatalogRuntimeStatus(entry: AppCatalogEntry) {
+  if (!entry.installed) {
+    return { label: "Available", tone: "neutral" as const, detail: null };
+  }
+
+  if (!entry.installed.enabled) {
+    return { label: "Disabled", tone: "danger" as const, detail: "Installed, but disabled for runtime use." };
+  }
+
+  if (entry.license_state.required && !entry.license_state.selected_active_license) {
+    return {
+      label: entry.license_state.has_any_license ? "License inactive" : "License missing",
+      tone: "warn" as const,
+      detail: entry.license_state.has_any_license
+        ? "A tenant license exists, but no active license is selected."
+        : "Installed, but runtime use is blocked until a tenant license is selected.",
+    };
+  }
+
+  return { label: "Ready", tone: "good" as const, detail: null };
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) {
     return "-";
@@ -128,10 +153,19 @@ function readTabFromPath(pathname: string): Tab {
   return "catalog";
 }
 
+function formatActionError(error: unknown) {
+  const message = readErrorMessage(error);
+  if (message.includes("base_url must use https")) {
+    return "HTTP manifest URL is allowed only for trusted origins. For local Inventory compose use http://inventory:4010 and add that origin in Platform configuration / Trusted origins.";
+  }
+  return message;
+}
+
 export function AppsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: context } = useContextQuery(true);
+  const tenantId = context?.tenant.id ?? null;
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data: catalogData, isLoading: catalogLoading } = useAppCatalogQuery(canManageApps);
   const { data: catalogSourcesData, isLoading: catalogSourcesLoading } = useAppCatalogSourcesQuery(canManageApps);
@@ -148,9 +182,11 @@ export function AppsPage() {
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
+  const startLicenseOAuth = useStartLicenseOAuthMutation(tenantId);
 
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedInstalledError, setDismissedInstalledError] = useState<string | null>(null);
   const [catalogForm, setCatalogForm] = useState({ base_url: "", summary: "", trust_status: "manual" as "dev" | "manual" | "unverified" });
   const [sourceForm, setSourceForm] = useState({ name: "", feed_url: "", trust_mode: "manual" as AppCatalogSource["trust_mode"] });
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
@@ -172,10 +208,15 @@ export function AppsPage() {
   const installableCount = catalog.filter((item) => !item.installed).length;
   const publishedCount = catalog.filter((item) => item.published).length;
   const activeTab = readTabFromPath(location.pathname);
+  const installedErrorMessage = installedError ? formatActionError(installedError) : null;
+  const visibleInstalledError = installedErrorMessage === dismissedInstalledError ? null : installedErrorMessage;
+  const toastMessage = actionError ?? message ?? visibleInstalledError;
+  const toastTone = actionError || visibleInstalledError ? "danger" : "success";
 
   const resetNotices = () => {
     setMessage(null);
     setActionError(null);
+    setDismissedInstalledError(null);
   };
 
   const handleCreateCatalogEntry = async () => {
@@ -189,7 +230,7 @@ export function AppsPage() {
       setMessage(`Catalog entry ${entry.app_id} was refreshed.`);
       setCatalogForm((prev) => ({ ...prev, base_url: "", summary: "" }));
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
     }
   };
 
@@ -204,7 +245,7 @@ export function AppsPage() {
       setMessage(`Catalog feed ${source.name} was saved.`);
       setSourceForm((prev) => ({ ...prev, name: "", feed_url: "" }));
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
     }
   };
 
@@ -215,7 +256,7 @@ export function AppsPage() {
       const suffix = result.skipped > 0 ? `, ${result.skipped} failed` : "";
       setMessage(`Catalog feed ${source.name} synced: ${result.imported}/${result.total} imported${suffix}.`);
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
     }
   };
 
@@ -225,7 +266,7 @@ export function AppsPage() {
       await setCatalogSourceEnabled.mutateAsync({ id: source.id, isEnabled });
       setMessage(`${source.name} was ${isEnabled ? "enabled" : "disabled"}.`);
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
     }
   };
 
@@ -269,7 +310,9 @@ export function AppsPage() {
       setInstallDialog({ status: "result", entry, message, plan: result.deployment_plan });
       setMessage(message);
     } catch (error) {
-      setInstallDialog({ status: "error", entry, mode, error: readErrorMessage(error), plan });
+      const formatted = formatActionError(error);
+      setActionError(formatted);
+      setInstallDialog({ status: "error", entry, mode, error: formatted, plan });
     }
   };
 
@@ -279,7 +322,7 @@ export function AppsPage() {
       await deleteCatalogEntry.mutateAsync(entry.app_id);
       setMessage(`${entry.app_name} was removed from catalog.`);
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
     }
   };
 
@@ -289,7 +332,28 @@ export function AppsPage() {
       const updated = await setCatalogEntryPublication.mutateAsync({ appId: entry.app_id, published });
       setMessage(`${updated.app_name} was ${updated.published ? "published to" : "removed from"} this instance feed.`);
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setActionError(formatActionError(error));
+    }
+  };
+
+  const handleActivateLicense = async (entry: AppCatalogEntry) => {
+    resetNotices();
+    if (!entry.license_issuer_url) {
+      setSelectedAppId(entry.app_id);
+      navigate("/core/apps/licensing");
+      return;
+    }
+
+    try {
+      const result = await startLicenseOAuth.mutateAsync({
+        issuer: entry.license_issuer_url,
+        app_id: entry.app_id,
+        license_mode: "instance_bound",
+        auto_select: true,
+      });
+      window.location.assign(result.redirect_url);
+    } catch (error) {
+      setActionError(formatActionError(error));
     }
   };
 
@@ -302,7 +366,9 @@ export function AppsPage() {
       setUninstallState({ status: "success" });
       setMessage(`${pickAppDisplayName(app)} was uninstalled.`);
     } catch (error) {
-      setUninstallState({ status: "error", app, error: readErrorMessage(error) });
+      const formatted = formatActionError(error);
+      setActionError(formatted);
+      setUninstallState({ status: "error", app, error: formatted });
     }
   };
 
@@ -318,25 +384,40 @@ export function AppsPage() {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
     }
-    await setSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId, entitlement_id: selectedEntitlementId });
-    setMessage("License selection was updated.");
+    resetNotices();
+    try {
+      await setSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId, entitlement_id: selectedEntitlementId });
+      setMessage("License selection was updated.");
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
   };
 
   const handleClearSelection = async () => {
     if (!effectiveSelectedAppId) {
       return;
     }
-    await clearSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId });
-    setMessage("License selection was cleared.");
+    resetNotices();
+    try {
+      await clearSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId });
+      setMessage("License selection was cleared.");
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
   };
 
   const handleIngestOffline = async () => {
     if (!offlineToken.trim()) {
       return;
     }
-    const result = await offlineIngestMutation.mutateAsync({ token: offlineToken.trim() });
-    setOfflineToken("");
-    setMessage(`Offline token ingest OK (${result.verification_result}).`);
+    resetNotices();
+    try {
+      const result = await offlineIngestMutation.mutateAsync({ token: offlineToken.trim() });
+      setOfflineToken("");
+      setMessage(`Offline token ingest OK (${result.verification_result}).`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
   };
 
   if (!canManageApps) {
@@ -350,6 +431,18 @@ export function AppsPage() {
 
   return (
     <div className="space-y-6">
+      <ToastNotice
+        message={toastMessage}
+        tone={toastTone}
+        onDismiss={() => {
+          if (toastMessage && toastMessage === installedErrorMessage) {
+            setDismissedInstalledError(installedErrorMessage);
+          }
+          setMessage(null);
+          setActionError(null);
+        }}
+      />
+
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">Admin</div>
@@ -382,9 +475,6 @@ export function AppsPage() {
           </button>
         ))}
       </div>
-
-      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
-      {actionError && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{actionError}</div>}
 
       {activeTab === "catalog" && (
         <div className="space-y-5">
@@ -419,8 +509,7 @@ export function AppsPage() {
               </div>
               <div>
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Trust</label>
-                <select
-                  className="h-10 rounded-hc-md border border-hc-outline bg-hc-surface px-3 text-sm text-hc-text"
+                <Select
                   value={catalogForm.trust_status}
                   onChange={(event) =>
                     setCatalogForm((prev) => ({ ...prev, trust_status: event.target.value as "dev" | "manual" | "unverified" }))
@@ -429,7 +518,7 @@ export function AppsPage() {
                   <option value="manual">manual</option>
                   <option value="dev">dev</option>
                   <option value="unverified">unverified</option>
-                </select>
+                </Select>
               </div>
               <Button
                 onClick={() => void handleCreateCatalogEntry()}
@@ -453,9 +542,19 @@ export function AppsPage() {
               installedByAppId={installedByAppId}
               isLoading={catalogLoading}
               onInstall={openInstallDialog}
+              onLicense={(appId) => {
+                setSelectedAppId(appId);
+                navigate("/core/apps/licensing");
+              }}
+              onActivateLicense={handleActivateLicense}
               onDelete={handleDeleteCatalogEntry}
               onSetPublication={handleSetCatalogEntryPublication}
-              isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending || setCatalogEntryPublication.isPending}
+              isMutating={
+                installCatalogEntry.isPending ||
+                deleteCatalogEntry.isPending ||
+                setCatalogEntryPublication.isPending ||
+                startLicenseOAuth.isPending
+              }
             />
           </Card>
         </div>
@@ -483,7 +582,6 @@ export function AppsPage() {
               setUninstallState({ status: "confirm", app });
             }}
           />
-          {installedError && <div className="px-5 pb-5 text-sm text-hc-danger">{readErrorMessage(installedError)}</div>}
         </Card>
       )}
 
@@ -494,8 +592,7 @@ export function AppsPage() {
               <div className="text-sm font-semibold">Tenant license selection</div>
               <div className="mt-3">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Application</label>
-                <select
-                  className="w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text"
+                <Select
                   value={effectiveSelectedAppId ?? ""}
                   onChange={(event) => {
                     setSelectedAppId(event.target.value || null);
@@ -508,12 +605,11 @@ export function AppsPage() {
                       {pickAppDisplayName(app)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div className="mt-3">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Stored license</label>
-                <select
-                  className="w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text"
+                <Select
                   value={selectedEntitlementId}
                   onChange={(event) => setSelectedEntitlementId(event.target.value)}
                 >
@@ -524,7 +620,7 @@ export function AppsPage() {
                       {entitlementsData?.selected_entitlement_id === item.id ? " [selected]" : ""}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => void handleSetSelection()} disabled={!selectedEntitlementId || setSelectionMutation.isPending}>
@@ -678,6 +774,8 @@ function CatalogTable({
   installedByAppId,
   isLoading,
   onInstall,
+  onLicense,
+  onActivateLicense,
   onDelete,
   onSetPublication,
   isMutating,
@@ -686,6 +784,8 @@ function CatalogTable({
   installedByAppId: Map<string, InstalledApp>;
   isLoading: boolean;
   onInstall: (entry: AppCatalogEntry) => void;
+  onLicense: (appId: string) => void;
+  onActivateLicense: (entry: AppCatalogEntry) => Promise<void>;
   onDelete: (entry: AppCatalogEntry) => Promise<void>;
   onSetPublication: (entry: AppCatalogEntry, published: boolean) => Promise<void>;
   isMutating: boolean;
@@ -712,6 +812,9 @@ function CatalogTable({
       <tbody>
         {entries.map((entry) => {
           const installed = installedByAppId.get(entry.app_id);
+          const runtimeStatus = getCatalogRuntimeStatus(entry);
+          const needsLicenseAction =
+            Boolean(entry.installed) && entry.license_state.required && !entry.license_state.selected_active_license;
           const canPublish = Boolean(installed?.enabled !== false && installed);
           return (
             <tr key={entry.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
@@ -732,15 +835,40 @@ function CatalogTable({
                   <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>
                     {entry.trust_status}
                   </Badge>
-                  {installed ? <Badge tone="good">installed</Badge> : <Badge>available</Badge>}
+                  <div>
+                    <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
+                    {runtimeStatus.detail && <div className="mt-1 max-w-48 text-xs text-hc-muted">{runtimeStatus.detail}</div>}
+                  </div>
                   {entry.published ? <Badge tone="good">feed</Badge> : <Badge>{entry.publish_status}</Badge>}
                 </div>
               </td>
               <td className="px-5 py-4">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outlined" disabled={Boolean(installed) || isMutating} onClick={() => onInstall(entry)}>
-                    Install...
-                  </Button>
+                  {installed ? (
+                    needsLicenseAction ? (
+                      <Button
+                        variant="tonal"
+                        disabled={isMutating}
+                        onClick={() => {
+                          if (entry.license_issuer_url) {
+                            void onActivateLicense(entry);
+                            return;
+                          }
+                          onLicense(entry.app_id);
+                        }}
+                      >
+                        {entry.license_issuer_url ? "Activate" : "Licensing"}
+                      </Button>
+                    ) : (
+                      <Button variant="outlined" disabled>
+                        Installed
+                      </Button>
+                    )
+                  ) : (
+                    <Button variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>
+                      Install...
+                    </Button>
+                  )}
                   <Button
                     variant={entry.published ? "tonal" : "outlined"}
                     disabled={isMutating || (!entry.published && !canPublish)}
@@ -909,18 +1037,6 @@ function CatalogInstallDialog({
 
         {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">Installation is running...</div>}
 
-        {state.status === "result" && (
-          <div className="mt-4 rounded-hc-md border border-hc-success/25 bg-hc-success/10 p-3 text-sm text-hc-success">
-            {state.message}
-          </div>
-        )}
-
-        {state.status === "error" && (
-          <div className="mt-4 rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 p-3 text-sm text-hc-danger">
-            {state.error}
-          </div>
-        )}
-
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={isRunning}>
             {state.status === "result" ? "Close" : "Cancel"}
@@ -1001,9 +1117,6 @@ function UninstallDialog({
       {state.status === "error" && (
         <div>
           <div className="text-lg font-semibold text-hc-danger">Uninstall failed</div>
-          <div className="mt-3 rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 p-3 text-sm text-hc-danger">
-            {state.error}
-          </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               Close
