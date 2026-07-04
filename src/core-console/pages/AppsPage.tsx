@@ -5,11 +5,13 @@ import {
   useAppCatalogQuery,
   useCreateCatalogEntryFromManifestMutation,
   useDeleteCatalogEntryMutation,
+  useInstallCatalogEntryMutation,
   type AppCatalogEntry,
+  type CatalogDeploymentPlan,
+  type InstallCatalogEntryMode,
 } from "../../data/api/app-catalog";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
-  useInstallAppMutation,
   useInstalledAppsQuery,
   useUninstallAppMutation,
   type InstalledApp,
@@ -36,6 +38,13 @@ type UninstallState =
   | { status: "running"; app: InstalledApp }
   | { status: "success" }
   | { status: "error"; app: InstalledApp; error: string };
+
+type InstallDialogState =
+  | { status: "idle" }
+  | { status: "confirm"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
+  | { status: "running"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
+  | { status: "result"; entry: AppCatalogEntry; message: string; plan: CatalogDeploymentPlan }
+  | { status: "error"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; error: string; plan: CatalogDeploymentPlan };
 
 function Badge({ tone = "neutral", children }: { tone?: "neutral" | "good" | "warn" | "danger"; children: React.ReactNode }) {
   const toneClass = {
@@ -88,6 +97,20 @@ function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleString();
 }
 
+function buildCatalogDeploymentPlan(entry: AppCatalogEntry, mode: InstallCatalogEntryMode = "external"): CatalogDeploymentPlan {
+  return {
+    app_id: entry.app_id,
+    mode,
+    service_name: entry.deployment.service_name ?? entry.slug,
+    internal_base_url: entry.deployment.internal_base_url ?? entry.deployment.base_url ?? entry.base_url,
+    compose_project: entry.deployment.compose_project ?? "hekatoncheiros-core",
+    compose_file: entry.deployment.compose_file ?? null,
+    published_ports_allowed: false,
+    host_mounts_allowed: false,
+    requires_approval: true,
+  };
+}
+
 export function AppsPage() {
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
@@ -96,7 +119,7 @@ export function AppsPage() {
   const { data: registryData } = useAppRegistryQuery(canManageApps);
   const createCatalogEntry = useCreateCatalogEntryFromManifestMutation();
   const deleteCatalogEntry = useDeleteCatalogEntryMutation();
-  const installMutation = useInstallAppMutation();
+  const installCatalogEntry = useInstallCatalogEntryMutation();
   const uninstallMutation = useUninstallAppMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
@@ -109,6 +132,7 @@ export function AppsPage() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
   const [offlineToken, setOfflineToken] = useState("");
+  const [installDialog, setInstallDialog] = useState<InstallDialogState>({ status: "idle" });
   const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
 
@@ -143,13 +167,47 @@ export function AppsPage() {
     }
   };
 
-  const handleInstallFromCatalog = async (entry: AppCatalogEntry) => {
+  const openInstallDialog = (entry: AppCatalogEntry) => {
     resetNotices();
+    const mode = "external";
+    setInstallDialog({ status: "confirm", entry, mode, plan: buildCatalogDeploymentPlan(entry, mode) });
+  };
+
+  const setInstallMode = (mode: InstallCatalogEntryMode) => {
+    setInstallDialog((prev) => {
+      if (prev.status !== "confirm") {
+        return prev;
+      }
+      return { ...prev, mode, plan: buildCatalogDeploymentPlan(prev.entry, mode) };
+    });
+  };
+
+  const closeInstallDialog = () => {
+    if (installDialog.status === "running") {
+      return;
+    }
+    setInstallDialog({ status: "idle" });
+  };
+
+  const executeCatalogInstall = async () => {
+    if (installDialog.status !== "confirm" && installDialog.status !== "error") {
+      return;
+    }
+
+    const { entry, mode, plan } = installDialog;
+    resetNotices();
+    setInstallDialog({ status: "running", entry, mode, plan });
+
     try {
-      await installMutation.mutateAsync(entry.install_payload);
-      setMessage(`${entry.app_name} was installed.`);
+      const result = await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode });
+      const message =
+        result.status === "staged"
+          ? `${entry.app_name} was staged for installation.`
+          : `${entry.app_name} was installed.`;
+      setInstallDialog({ status: "result", entry, message, plan: result.deployment_plan });
+      setMessage(message);
     } catch (error) {
-      setActionError(readErrorMessage(error));
+      setInstallDialog({ status: "error", entry, mode, error: readErrorMessage(error), plan });
     }
   };
 
@@ -311,9 +369,9 @@ export function AppsPage() {
               entries={catalog}
               installedByAppId={installedByAppId}
               isLoading={catalogLoading}
-              onInstall={handleInstallFromCatalog}
+              onInstall={openInstallDialog}
               onDelete={handleDeleteCatalogEntry}
-              isMutating={installMutation.isPending || deleteCatalogEntry.isPending}
+              isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending}
             />
           </Card>
         </div>
@@ -419,6 +477,12 @@ export function AppsPage() {
         onClose={resetUninstallState}
         onConfirm={executeUninstall}
       />
+      <CatalogInstallDialog
+        state={installDialog}
+        onModeChange={setInstallMode}
+        onClose={closeInstallDialog}
+        onConfirm={executeCatalogInstall}
+      />
     </div>
   );
 }
@@ -443,7 +507,7 @@ function CatalogTable({
   entries: AppCatalogEntry[];
   installedByAppId: Map<string, InstalledApp>;
   isLoading: boolean;
-  onInstall: (entry: AppCatalogEntry) => Promise<void>;
+  onInstall: (entry: AppCatalogEntry) => void;
   onDelete: (entry: AppCatalogEntry) => Promise<void>;
   isMutating: boolean;
 }) {
@@ -493,8 +557,8 @@ function CatalogTable({
               </td>
               <td className="px-5 py-4">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outlined" disabled={Boolean(installed) || isMutating} onClick={() => void onInstall(entry)}>
-                    Install
+                  <Button variant="outlined" disabled={Boolean(installed) || isMutating} onClick={() => onInstall(entry)}>
+                    Install...
                   </Button>
                   <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry)}>
                     Remove
@@ -578,6 +642,118 @@ function InstalledTable({
         })}
       </tbody>
     </Table>
+  );
+}
+
+function CatalogInstallDialog({
+  state,
+  onModeChange,
+  onClose,
+  onConfirm,
+}: {
+  state: InstallDialogState;
+  onModeChange: (mode: InstallCatalogEntryMode) => void;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  const entry = state.entry;
+  const plan = state.plan;
+  const mode = state.status === "result" ? undefined : state.mode;
+  const isRunning = state.status === "running";
+
+  return (
+    <Dialog open title="Install app" disableClose={isRunning} onClose={onClose}>
+      <div>
+        <div className="text-lg font-semibold">Install {entry.app_name}</div>
+        <div className="mt-3 rounded-hc-md border border-hc-outline bg-hc-surface-variant p-3">
+          <div className="text-sm font-medium">{entry.app_id}</div>
+          <div className="mt-1 text-xs text-hc-muted">{entry.base_url}</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {entry.license_required ? <Badge tone="warn">license required</Badge> : <Badge tone="good">free</Badge>}
+            <Badge>{entry.trust_status}</Badge>
+          </div>
+        </div>
+
+        {state.status !== "result" && (
+          <div className="mt-4 grid gap-2">
+            {[
+              ["external", "External service", "Install the app registry record and use its existing base URL."],
+              ["stage_only", "Stage only", "Save the selected plan without installing the runtime registry entry."],
+              ["compose", "Core-managed compose", "Let Core approve and run the app compose bundle when runtime support exists."],
+            ].map(([value, label, description]) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-start gap-3 rounded-hc-md border p-3 text-sm transition ${
+                  mode === value ? "border-hc-primary bg-hc-primary/5" : "border-hc-outline bg-hc-surface"
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="mt-1"
+                  checked={mode === value}
+                  onChange={() => onModeChange(value as InstallCatalogEntryMode)}
+                  disabled={isRunning}
+                />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="mt-1 block text-xs text-hc-muted">{description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 rounded-hc-md border border-hc-outline bg-hc-surface p-3 text-xs">
+          <div className="font-semibold uppercase tracking-wide text-hc-muted">Deployment plan</div>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <PlanItem label="Mode" value={plan.mode} />
+            <PlanItem label="Service" value={plan.service_name} />
+            <PlanItem label="Internal URL" value={plan.internal_base_url} />
+            <PlanItem label="Compose project" value={plan.compose_project} />
+            <PlanItem label="Compose file" value={plan.compose_file ?? "not declared"} />
+            <PlanItem label="Host access" value={plan.host_mounts_allowed ? "allowed" : "blocked"} />
+          </dl>
+        </div>
+
+        {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">Installation is running...</div>}
+
+        {state.status === "result" && (
+          <div className="mt-4 rounded-hc-md border border-hc-success/25 bg-hc-success/10 p-3 text-sm text-hc-success">
+            {state.message}
+          </div>
+        )}
+
+        {state.status === "error" && (
+          <div className="mt-4 rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 p-3 text-sm text-hc-danger">
+            {state.error}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={isRunning}>
+            {state.status === "result" ? "Close" : "Cancel"}
+          </Button>
+          {state.status !== "result" && (
+            <Button onClick={() => void onConfirm()} disabled={isRunning}>
+              {isRunning ? "Running..." : "Approve"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+function PlanItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-hc-muted">{label}</dt>
+      <dd className="mt-1 break-words font-medium text-hc-text">{value}</dd>
+    </div>
   );
 }
 
