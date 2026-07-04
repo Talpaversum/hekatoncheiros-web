@@ -17,6 +17,7 @@ import { readErrorMessage } from "../../data/api/read-error-message";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { Select } from "../../ui-kit/components/Select";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
 function StatusBadge({ children }: { children: React.ReactNode }) {
@@ -191,13 +192,13 @@ export function TenantConfigPage() {
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>
+            <Select value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>
               {tenantUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-            </select>
-            <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}>
+            </Select>
+            <Select value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}>
               <option value="">Select tenant privilege</option>
               {tenantPrivilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
-            </select>
+            </Select>
             <Button onClick={() => void handleAddTenantGrant()} disabled={!selectedTenantUser || !tenantGrantPrivilege || replaceTenantUserPrivileges.isPending}>
               Add privilege
             </Button>

@@ -31,6 +31,7 @@ import {
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { Select } from "../../ui-kit/components/Select";
 import { Switch } from "../../ui-kit/components/Switch";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
@@ -464,17 +465,17 @@ export function PlatformConfigPage() {
               <StatusBadge>{privilegeCatalog.length} privileges</StatusBadge>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={selectedUser?.id ?? ""} onChange={(event) => setSelectedUserId(event.target.value)}>
+              <Select value={selectedUser?.id ?? ""} onChange={(event) => setSelectedUserId(event.target.value)}>
                 {identityUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-              </select>
-              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={grantPrivilege} onChange={(event) => setGrantPrivilege(event.target.value)}>
+              </Select>
+              <Select value={grantPrivilege} onChange={(event) => setGrantPrivilege(event.target.value)}>
                 <option value="">Select privilege</option>
                 {privilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
-              </select>
-              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={grantTenantId} onChange={(event) => setGrantTenantId(event.target.value)}>
+              </Select>
+              <Select value={grantTenantId} onChange={(event) => setGrantTenantId(event.target.value)}>
                 <option value="">Platform / all tenants</option>
                 {identityTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-              </select>
+              </Select>
               <Button onClick={() => void handleAddGrant()} disabled={!selectedUser || !grantPrivilege || replaceUserPrivileges.isPending}>
                 Add grant
               </Button>
@@ -560,10 +561,10 @@ function IdentityUserRow({
       <div className="mt-3 grid gap-3 md:grid-cols-5">
         <Input value={email} onChange={(event) => setEmail(event.target.value)} />
         <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" />
-        <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <Select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="active">active</option>
           <option value="disabled">disabled</option>
-        </select>
+        </Select>
         <Button variant="tonal" onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, status })} disabled={busy || !email.trim()}>
           Save
         </Button>
@@ -610,10 +611,10 @@ function IdentityTenantRow({
       <div className="mt-3 grid gap-3 md:grid-cols-4">
         <Input value={name} onChange={(event) => setName(event.target.value)} />
         <Input value={primaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder="Primary domain" />
-        <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <Select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="active">active</option>
           <option value="disabled">disabled</option>
-        </select>
+        </Select>
         <Button variant="tonal" onClick={() => void onSave({ id: tenant.id, name: name.trim(), primary_domain: primaryDomain.trim() || null, status })} disabled={busy || !name.trim()}>
           Save tenant
         </Button>
