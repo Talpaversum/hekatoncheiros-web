@@ -72,6 +72,7 @@ export function useInstallAppMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
       await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
     },
   });
 }
@@ -115,9 +116,11 @@ export function useUninstallAppMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
       await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
     },
   });
 }

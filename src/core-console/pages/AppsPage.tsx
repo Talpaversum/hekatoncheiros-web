@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
 
 import { hasPrivilege } from "../../access/privileges";
+import {
+  useAppCatalogQuery,
+  useCreateCatalogEntryFromManifestMutation,
+  useDeleteCatalogEntryMutation,
+  type AppCatalogEntry,
+} from "../../data/api/app-catalog";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
-  useFetchInstallManifestMutation,
   useInstallAppMutation,
   useInstalledAppsQuery,
   useUninstallAppMutation,
-  type FetchManifestResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
 import { readErrorMessage } from "../../data/api/read-error-message";
@@ -24,6 +28,8 @@ import { Dialog } from "../../ui-kit/components/Dialog";
 import { Input } from "../../ui-kit/components/Input";
 import { Table } from "../../ui-kit/components/Table";
 
+type Tab = "catalog" | "installed" | "licensing";
+
 type UninstallState =
   | { status: "idle" }
   | { status: "confirm"; app: InstalledApp }
@@ -31,89 +37,143 @@ type UninstallState =
   | { status: "success" }
   | { status: "error"; app: InstalledApp; error: string };
 
-function pickAppDisplayName(app: InstalledApp) {
-  const displayName = app.manifest?.["display_name"];
-  if (typeof displayName === "string" && displayName.trim().length > 0) {
-    return displayName;
-  }
+function Badge({ tone = "neutral", children }: { tone?: "neutral" | "good" | "warn" | "danger"; children: React.ReactNode }) {
+  const toneClass = {
+    neutral: "border-hc-outline bg-hc-surface-variant text-hc-muted",
+    good: "border-hc-success/30 bg-hc-success/10 text-hc-success",
+    warn: "border-hc-warning/35 bg-hc-warning/10 text-hc-warning",
+    danger: "border-hc-danger/35 bg-hc-danger/10 text-hc-danger",
+  }[tone];
 
-  const appName = app.manifest?.["app_name"];
-  if (typeof appName === "string" && appName.trim().length > 0) {
-    return appName;
-  }
-
-  if (app.app_id?.trim()) {
-    return app.app_id;
-  }
-
-  return app.slug;
+  return (
+    <span className={`inline-flex items-center rounded-hc-sm border px-2 py-1 text-xs font-medium ${toneClass}`}>
+      {children}
+    </span>
+  );
 }
 
-function getStatus(app: InstalledApp, registrySlugs: Set<string>) {
-  if (!app.ui_url || app.ui_url.trim().length === 0) {
-    return { label: "Error", reason: "Missing ui_url (core-managed field)." };
+function pickAppDisplayName(app: InstalledApp) {
+  const appName = app.manifest?.["app_name"];
+  return typeof appName === "string" && appName.trim().length > 0 ? appName : app.app_name ?? app.app_id;
+}
+
+function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>) {
+  const licensing = app.manifest?.["licensing"] as { required?: boolean } | undefined;
+
+  if (app.ui_url.trim().length === 0) {
+    return { label: "Broken", tone: "danger" as const, detail: "Missing Core-hosted UI artifact." };
   }
 
-  if (!app.resolved_entitlement) {
+  if (licensing?.required === true && !app.resolved_entitlement) {
     return {
-      label: app.has_any_entitlement ? "Entitlement unavailable" : "Unlicensed",
-      reason: app.has_any_entitlement
-        ? "Tenant má entitlementy, ale žádný není aktuálně validní."
-        : "App je nainstalovaná, ale tenant pro ni nemá žádný entitlement.",
+      label: app.has_any_entitlement ? "License inactive" : "License missing",
+      tone: "warn" as const,
+      detail: app.has_any_entitlement
+        ? "Tenant has licenses, but none is selected and active."
+        : "Installed and staged, but runtime use is blocked.",
     };
   }
 
   if (!registrySlugs.has(app.slug)) {
-    return {
-      label: "No access",
-      reason: "App je licencovaná, ale aktuální uživatel ji nevidí v registry (chybějící oprávnění).",
-    };
+    return { label: "Hidden", tone: "neutral" as const, detail: "Current user cannot see it in runtime navigation." };
   }
 
-  return { label: "Installed" as const, reason: null };
+  return { label: "Ready", tone: "good" as const, detail: null };
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+  return new Date(value).toLocaleString();
 }
 
 export function AppsPage() {
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
-  const { data, isLoading, error: installedQueryError } = useInstalledAppsQuery(canManageApps);
+  const { data: catalogData, isLoading: catalogLoading } = useAppCatalogQuery(canManageApps);
+  const { data: installedData, isLoading: installedLoading, error: installedError } = useInstalledAppsQuery(canManageApps);
   const { data: registryData } = useAppRegistryQuery(canManageApps);
-  const fetchManifestMutation = useFetchInstallManifestMutation();
+  const createCatalogEntry = useCreateCatalogEntryFromManifestMutation();
+  const deleteCatalogEntry = useDeleteCatalogEntryMutation();
   const installMutation = useInstallAppMutation();
   const uninstallMutation = useUninstallAppMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
 
+  const [activeTab, setActiveTab] = useState<Tab>("catalog");
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [installOpen, setInstallOpen] = useState(false);
+  const [catalogForm, setCatalogForm] = useState({ base_url: "", summary: "", trust_status: "manual" as "dev" | "manual" | "unverified" });
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
-  const [selectedEntitlementId, setSelectedEntitlementId] = useState<string>("");
-  const [offlineToken, setOfflineToken] = useState<string>("");
-  const [installForm, setInstallForm] = useState({
-    base_url: "",
-  });
-  const [fetchedManifest, setFetchedManifest] = useState<FetchManifestResponse | null>(null);
+  const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
+  const [offlineToken, setOfflineToken] = useState("");
   const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
 
-  const installed = data?.items ?? [];
-  const effectiveSelectedAppId = selectedAppId ?? (installed.length > 0 ? installed[0].app_id : null);
-  const { data: entitlementsData } = useAppEntitlementsQuery(effectiveSelectedAppId, canManageApps);
+  const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
+  const installed = useMemo(() => installedData?.items ?? [], [installedData?.items]);
+  const installedByAppId = useMemo(() => new Map(installed.map((app) => [app.app_id, app])), [installed]);
   const registrySlugs = useMemo(() => new Set((registryData?.items ?? []).map((item) => item.slug)), [registryData?.items]);
-  const installedQueryErrorMessage =
-    installedQueryError instanceof Error
-      ? installedQueryError.message
-      : "Nelze načíst seznam nainstalovaných aplikací.";
-  const canFetchManifest = installForm.base_url.trim().length > 0;
-  const canInstall = fetchedManifest !== null;
-  const uninstallDialogOpen = uninstallState.status !== "idle";
-  const uninstallRunning = uninstallState.status === "running";
+  const effectiveSelectedAppId = selectedAppId ?? installed[0]?.app_id ?? null;
+  const { data: entitlementsData } = useAppEntitlementsQuery(effectiveSelectedAppId, canManageApps);
 
-  const readString = (obj: Record<string, unknown>, key: string): string | null => {
-    const value = obj[key];
-    return typeof value === "string" && value.trim().length > 0 ? value : null;
+  const licensedCatalogCount = catalog.filter((item) => item.license_required).length;
+  const installedReadyCount = installed.filter((item) => getInstalledStatus(item, registrySlugs).label === "Ready").length;
+  const installableCount = catalog.filter((item) => !item.installed).length;
+
+  const resetNotices = () => {
+    setMessage(null);
+    setActionError(null);
+  };
+
+  const handleCreateCatalogEntry = async () => {
+    resetNotices();
+    try {
+      const entry = await createCatalogEntry.mutateAsync({
+        base_url: catalogForm.base_url.trim(),
+        summary: catalogForm.summary.trim() || null,
+        trust_status: catalogForm.trust_status,
+      });
+      setMessage(`Catalog entry ${entry.app_id} was refreshed.`);
+      setCatalogForm((prev) => ({ ...prev, base_url: "", summary: "" }));
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const handleInstallFromCatalog = async (entry: AppCatalogEntry) => {
+    resetNotices();
+    try {
+      await installMutation.mutateAsync(entry.install_payload);
+      setMessage(`${entry.app_name} was installed.`);
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const handleDeleteCatalogEntry = async (entry: AppCatalogEntry) => {
+    resetNotices();
+    try {
+      await deleteCatalogEntry.mutateAsync(entry.app_id);
+      setMessage(`${entry.app_name} was removed from catalog.`);
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const executeUninstall = async (app: InstalledApp) => {
+    resetNotices();
+    setUninstallState({ status: "running", app });
+
+    try {
+      await uninstallMutation.mutateAsync(app.app_id);
+      setUninstallState({ status: "success" });
+      setMessage(`${pickAppDisplayName(app)} was uninstalled.`);
+    } catch (error) {
+      setUninstallState({ status: "error", app, error: readErrorMessage(error) });
+    }
   };
 
   const resetUninstallState = () => {
@@ -124,79 +184,12 @@ export function AppsPage() {
     setUninstallConfirmChecked(false);
   };
 
-  const executeUninstall = async (app: InstalledApp) => {
-    setMessage(null);
-    setActionError(null);
-    setUninstallState({ status: "running", app });
-
-    try {
-      await uninstallMutation.mutateAsync(app.app_id);
-      setUninstallState({ status: "success" });
-      setMessage(`App ${app.app_id} byla odinstalována.`);
-    } catch (error) {
-      console.error("Uninstall failed", { appId: app.app_id, error });
-      setUninstallState({
-        status: "error",
-        app,
-        error: readErrorMessage(error),
-      });
-    }
-  };
-
-  const handleFetchManifest = async () => {
-    setMessage(null);
-    setActionError(null);
-    setFetchedManifest(null);
-
-    try {
-      const fetched = await fetchManifestMutation.mutateAsync({
-        base_url: installForm.base_url.trim(),
-      });
-
-      setFetchedManifest(fetched);
-      setInstallForm({ base_url: fetched.normalized_base_url });
-    } catch (err) {
-      setActionError(readErrorMessage(err));
-    }
-  };
-
-  const handleInstall = async () => {
-    setMessage(null);
-    setActionError(null);
-
-    if (!fetchedManifest) {
-      setActionError("Nejprve načti a validuj manifest.");
-      return;
-    }
-
-    try {
-      await installMutation.mutateAsync({
-        base_url: installForm.base_url.trim(),
-        expected_manifest_hash: fetchedManifest.manifest_hash,
-      });
-      setMessage(`App ${fetchedManifest.app_id} byla nainstalována.`);
-      setInstallForm({ base_url: "" });
-      setFetchedManifest(null);
-      setInstallOpen(false);
-    } catch (err) {
-      setActionError(readErrorMessage(err));
-    }
-  };
-
-  const handleUninstall = (app: InstalledApp) => {
-    setUninstallConfirmChecked(false);
-    setUninstallState({ status: "confirm", app });
-  };
-
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
     }
-    await setSelectionMutation.mutateAsync({
-      app_id: effectiveSelectedAppId,
-      entitlement_id: selectedEntitlementId,
-    });
-    setMessage("Selection byla nastavena.");
+    await setSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId, entitlement_id: selectedEntitlementId });
+    setMessage("License selection was updated.");
   };
 
   const handleClearSelection = async () => {
@@ -204,7 +197,7 @@ export function AppsPage() {
       return;
     }
     await clearSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId });
-    setMessage("Selection byla vyčištěna.");
+    setMessage("License selection was cleared.");
   };
 
   const handleIngestOffline = async () => {
@@ -212,319 +205,451 @@ export function AppsPage() {
       return;
     }
     const result = await offlineIngestMutation.mutateAsync({ token: offlineToken.trim() });
-    setMessage(`Offline token ingest OK (${result.verification_result}).`);
     setOfflineToken("");
+    setMessage(`Offline token ingest OK (${result.verification_result}).`);
   };
 
   if (!canManageApps) {
     return (
       <Card>
-        <div className="text-lg font-semibold">Manage Apps</div>
+        <div className="text-lg font-semibold">Apps</div>
         <div className="mt-2 text-sm text-hc-muted">Nemáš oprávnění pro správu aplikací.</div>
       </Card>
     );
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <div className="text-xs uppercase tracking-wide text-hc-muted">Admin</div>
-        <div className="mt-1 text-2xl font-semibold">Manage Apps</div>
-        <div className="mt-1 text-sm text-hc-muted">Install/uninstall apps and inspect platform runtime status.</div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">Admin</div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-normal">Applications</h1>
+          <p className="mt-1 text-sm text-hc-muted">Catalog discovery, instance installation, and tenant license activation.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-right">
+          <Metric label="Catalog" value={catalog.length} />
+          <Metric label="Installable" value={installableCount} />
+          <Metric label="Ready" value={installedReadyCount} />
+        </div>
+      </header>
+
+      <div className="flex flex-wrap gap-2 border-b border-hc-outline">
+        {([
+          ["catalog", "Catalog"],
+          ["installed", "Installed"],
+          ["licensing", "Licensing"],
+        ] as Array<[Tab, string]>).map(([tab, label]) => (
+          <button
+            key={tab}
+            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+              activeTab === tab
+                ? "border-hc-primary text-hc-text"
+                : "border-transparent text-hc-muted hover:text-hc-text"
+            }`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div className="grid gap-6">
-        <Card>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold">Installed apps</div>
-            <Button variant={installOpen ? "tonal" : "filled"} onClick={() => setInstallOpen((prev) => !prev)}>
-              {installOpen ? "Close install" : "Install app"}
+      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
+      {actionError && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{actionError}</div>}
+
+      {activeTab === "catalog" && (
+        <div className="space-y-5">
+          <Card className="rounded-hc-md">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-72 flex-1">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Manifest base URL</label>
+                <Input
+                  placeholder="https://apps.example.com/inventory"
+                  value={catalogForm.base_url}
+                  onChange={(event) => setCatalogForm((prev) => ({ ...prev, base_url: event.target.value }))}
+                />
+              </div>
+              <div className="min-w-64 flex-1">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Summary</label>
+                <Input
+                  placeholder="Short operator-facing note"
+                  value={catalogForm.summary}
+                  onChange={(event) => setCatalogForm((prev) => ({ ...prev, summary: event.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Trust</label>
+                <select
+                  className="h-10 rounded-hc-md border border-hc-outline bg-hc-surface px-3 text-sm text-hc-text"
+                  value={catalogForm.trust_status}
+                  onChange={(event) =>
+                    setCatalogForm((prev) => ({ ...prev, trust_status: event.target.value as "dev" | "manual" | "unverified" }))
+                  }
+                >
+                  <option value="manual">manual</option>
+                  <option value="dev">dev</option>
+                  <option value="unverified">unverified</option>
+                </select>
+              </div>
+              <Button
+                onClick={() => void handleCreateCatalogEntry()}
+                disabled={!catalogForm.base_url.trim() || createCatalogEntry.isPending}
+              >
+                {createCatalogEntry.isPending ? "Fetching..." : "Add to catalog"}
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="rounded-hc-md p-0">
+            <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
+              <div>
+                <div className="text-sm font-semibold">Available applications</div>
+                <div className="mt-1 text-xs text-hc-muted">{licensedCatalogCount} require a tenant license.</div>
+              </div>
+              <Badge>{catalogLoading ? "Loading" : `${catalog.length} entries`}</Badge>
+            </div>
+            <CatalogTable
+              entries={catalog}
+              installedByAppId={installedByAppId}
+              isLoading={catalogLoading}
+              onInstall={handleInstallFromCatalog}
+              onDelete={handleDeleteCatalogEntry}
+              isMutating={installMutation.isPending || deleteCatalogEntry.isPending}
+            />
+          </Card>
+        </div>
+      )}
+
+      {activeTab === "installed" && (
+        <Card className="rounded-hc-md p-0">
+          <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
+            <div>
+              <div className="text-sm font-semibold">Installed applications</div>
+              <div className="mt-1 text-xs text-hc-muted">Runtime state for this Core instance.</div>
+            </div>
+            <Badge>{installedLoading ? "Loading" : `${installed.length} installed`}</Badge>
+          </div>
+          <InstalledTable
+            apps={installed}
+            registrySlugs={registrySlugs}
+            isLoading={installedLoading}
+            onLicense={(appId) => {
+              setSelectedAppId(appId);
+              setActiveTab("licensing");
+            }}
+            onUninstall={(app) => {
+              setUninstallConfirmChecked(false);
+              setUninstallState({ status: "confirm", app });
+            }}
+          />
+          {installedError && <div className="px-5 pb-5 text-sm text-hc-danger">{readErrorMessage(installedError)}</div>}
+        </Card>
+      )}
+
+      {activeTab === "licensing" && (
+        <Card className="rounded-hc-md">
+          <div className="grid gap-5 lg:grid-cols-[minmax(260px,360px)_1fr]">
+            <section>
+              <div className="text-sm font-semibold">Tenant license selection</div>
+              <div className="mt-3">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Application</label>
+                <select
+                  className="w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text"
+                  value={effectiveSelectedAppId ?? ""}
+                  onChange={(event) => {
+                    setSelectedAppId(event.target.value || null);
+                    setSelectedEntitlementId("");
+                  }}
+                >
+                  <option value="">Select app</option>
+                  {installed.map((app) => (
+                    <option key={app.app_id} value={app.app_id}>
+                      {pickAppDisplayName(app)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Stored license</label>
+                <select
+                  className="w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text"
+                  value={selectedEntitlementId}
+                  onChange={(event) => setSelectedEntitlementId(event.target.value)}
+                >
+                  <option value="">Fallback selection</option>
+                  {(entitlementsData?.items ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.source} / {item.tier} / {formatDate(item.valid_to)}
+                      {entitlementsData?.selected_entitlement_id === item.id ? " [selected]" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={() => void handleSetSelection()} disabled={!selectedEntitlementId || setSelectionMutation.isPending}>
+                  Set selection
+                </Button>
+                <Button variant="outlined" onClick={() => void handleClearSelection()} disabled={!effectiveSelectedAppId || clearSelectionMutation.isPending}>
+                  Clear
+                </Button>
+              </div>
+            </section>
+
+            <section>
+              <div className="text-sm font-semibold">Offline import</div>
+              <textarea
+                className="mt-3 min-h-40 w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text placeholder:text-hc-muted focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/20"
+                value={offlineToken}
+                onChange={(event) => setOfflineToken(event.target.value)}
+                placeholder="Paste license bundle or token"
+              />
+              <div className="mt-3 flex justify-end">
+                <Button onClick={() => void handleIngestOffline()} disabled={!offlineToken.trim() || offlineIngestMutation.isPending}>
+                  {offlineIngestMutation.isPending ? "Importing..." : "Import license"}
+                </Button>
+              </div>
+            </section>
+          </div>
+        </Card>
+      )}
+
+      <UninstallDialog
+        state={uninstallState}
+        confirmChecked={uninstallConfirmChecked}
+        setConfirmChecked={setUninstallConfirmChecked}
+        onClose={resetUninstallState}
+        onConfirm={executeUninstall}
+      />
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-24 rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2">
+      <div className="text-lg font-semibold leading-none">{value}</div>
+      <div className="mt-1 text-xs text-hc-muted">{label}</div>
+    </div>
+  );
+}
+
+function CatalogTable({
+  entries,
+  installedByAppId,
+  isLoading,
+  onInstall,
+  onDelete,
+  isMutating,
+}: {
+  entries: AppCatalogEntry[];
+  installedByAppId: Map<string, InstalledApp>;
+  isLoading: boolean;
+  onInstall: (entry: AppCatalogEntry) => Promise<void>;
+  onDelete: (entry: AppCatalogEntry) => Promise<void>;
+  isMutating: boolean;
+}) {
+  if (isLoading) {
+    return <div className="px-5 py-6 text-sm text-hc-muted">Loading catalog...</div>;
+  }
+
+  if (entries.length === 0) {
+    return <div className="px-5 py-6 text-sm text-hc-muted">No catalog entries yet.</div>;
+  }
+
+  return (
+    <Table className="rounded-none shadow-none">
+      <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
+        <tr>
+          <th className="px-5 py-3 font-semibold">Application</th>
+          <th className="px-5 py-3 font-semibold">Source</th>
+          <th className="px-5 py-3 font-semibold">License</th>
+          <th className="px-5 py-3 font-semibold">Status</th>
+          <th className="px-5 py-3 font-semibold">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((entry) => {
+          const installed = installedByAppId.get(entry.app_id);
+          return (
+            <tr key={entry.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
+              <td className="px-5 py-4">
+                <div className="font-medium">{entry.app_name}</div>
+                <div className="mt-1 text-xs text-hc-muted">{entry.app_id}</div>
+                {entry.summary && <div className="mt-2 max-w-xl text-xs text-hc-muted">{entry.summary}</div>}
+              </td>
+              <td className="px-5 py-4 text-sm">
+                <div>{entry.source_type}</div>
+                <div className="mt-1 text-xs text-hc-muted">{entry.namespace ?? "no namespace"}</div>
+              </td>
+              <td className="px-5 py-4">
+                {entry.license_required ? <Badge tone="warn">required</Badge> : <Badge tone="good">free</Badge>}
+              </td>
+              <td className="px-5 py-4">
+                <div className="flex flex-col gap-2">
+                  <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>
+                    {entry.trust_status}
+                  </Badge>
+                  {installed ? <Badge tone="good">installed</Badge> : <Badge>available</Badge>}
+                </div>
+              </td>
+              <td className="px-5 py-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outlined" disabled={Boolean(installed) || isMutating} onClick={() => void onInstall(entry)}>
+                    Install
+                  </Button>
+                  <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry)}>
+                    Remove
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </Table>
+  );
+}
+
+function InstalledTable({
+  apps,
+  registrySlugs,
+  isLoading,
+  onLicense,
+  onUninstall,
+}: {
+  apps: InstalledApp[];
+  registrySlugs: Set<string>;
+  isLoading: boolean;
+  onLicense: (appId: string) => void;
+  onUninstall: (app: InstalledApp) => void;
+}) {
+  if (isLoading) {
+    return <div className="px-5 py-6 text-sm text-hc-muted">Loading installed apps...</div>;
+  }
+
+  if (apps.length === 0) {
+    return <div className="px-5 py-6 text-sm text-hc-muted">No installed apps.</div>;
+  }
+
+  return (
+    <Table className="rounded-none shadow-none">
+      <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
+        <tr>
+          <th className="px-5 py-3 font-semibold">Application</th>
+          <th className="px-5 py-3 font-semibold">Runtime</th>
+          <th className="px-5 py-3 font-semibold">Entitlement</th>
+          <th className="px-5 py-3 font-semibold">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {apps.map((app) => {
+          const status = getInstalledStatus(app, registrySlugs);
+          return (
+            <tr key={app.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
+              <td className="px-5 py-4">
+                <div className="font-medium">{pickAppDisplayName(app)}</div>
+                <div className="mt-1 text-xs text-hc-muted">{app.app_id}</div>
+              </td>
+              <td className="px-5 py-4">
+                <Badge tone={status.tone}>{status.label}</Badge>
+                {status.detail && <div className="mt-2 max-w-md text-xs text-hc-muted">{status.detail}</div>}
+              </td>
+              <td className="px-5 py-4 text-sm">
+                {app.resolved_entitlement ? (
+                  <div>
+                    <div>{app.resolved_entitlement.tier}</div>
+                    <div className="mt-1 text-xs text-hc-muted">valid to {formatDate(app.resolved_entitlement.valid_to)}</div>
+                  </div>
+                ) : (
+                  <span className="text-hc-muted">none selected</span>
+                )}
+              </td>
+              <td className="px-5 py-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="tonal" onClick={() => onLicense(app.app_id)}>
+                    Licensing
+                  </Button>
+                  <Button variant="outlined" onClick={() => onUninstall(app)}>
+                    Uninstall
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </Table>
+  );
+}
+
+function UninstallDialog({
+  state,
+  confirmChecked,
+  setConfirmChecked,
+  onClose,
+  onConfirm,
+}: {
+  state: UninstallState;
+  confirmChecked: boolean;
+  setConfirmChecked: (value: boolean) => void;
+  onClose: () => void;
+  onConfirm: (app: InstalledApp) => Promise<void>;
+}) {
+  return (
+    <Dialog open={state.status !== "idle"} title="Uninstall app" disableClose={state.status === "running"} onClose={onClose}>
+      {state.status === "confirm" && (
+        <div>
+          <div className="text-lg font-semibold">Confirm uninstall</div>
+          <div className="mt-3 rounded-hc-md border border-hc-outline bg-hc-surface-variant p-3 text-sm">
+            <div className="font-medium">{pickAppDisplayName(state.app)}</div>
+            <div className="mt-1 text-xs text-hc-muted">{state.app.app_id}</div>
+          </div>
+          <label className="mt-4 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={confirmChecked}
+              onChange={(event) => setConfirmChecked(event.target.checked)}
+            />
+            <span>Remove this app from the runtime installation registry.</span>
+          </label>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="danger" disabled={!confirmChecked} onClick={() => void onConfirm(state.app)}>
+              Uninstall
             </Button>
           </div>
+        </div>
+      )}
 
-          {installOpen && (
-            <div className="mb-5 rounded-hc-md border border-hc-outline bg-hc-surface-variant/40 p-4">
-              <div className="text-sm font-semibold">Install app</div>
-              <div className="mt-3 rounded-hc-sm border border-hc-outline bg-hc-surface px-3 py-2 text-xs text-hc-muted">
-                Instalace probíhá pouze přes HTTPS Base URL. Core si manifest načte a validuje automaticky.
-              </div>
+      {state.status === "running" && <div className="text-sm text-hc-muted">Uninstall is running...</div>}
 
-              <div className="mt-4 grid gap-3">
-                <div>
-                  <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">Base URL</label>
-                  <Input
-                    placeholder="https://example.com"
-                    value={installForm.base_url}
-                    onChange={(event) => {
-                      setInstallForm((prev) => ({ ...prev, base_url: event.target.value }));
-                      setFetchedManifest(null);
-                    }}
-                  />
-                </div>
-
-                <div className="flex justify-between gap-2">
-                  <Button onClick={handleFetchManifest} disabled={!canFetchManifest || fetchManifestMutation.isPending}>
-                    {fetchManifestMutation.isPending ? "Fetching manifest…" : "Fetch manifest"}
-                  </Button>
-                  <Button onClick={handleInstall} disabled={!canInstall || installMutation.isPending}>
-                    {installMutation.isPending ? "Installing…" : "Install"}
-                  </Button>
-                </div>
-
-                {fetchedManifest && (
-                  <div className="rounded-hc-sm border border-hc-outline bg-hc-surface p-3 text-sm">
-                    <div className="mb-2 text-xs uppercase tracking-wide text-hc-muted">Manifest preview (read-only)</div>
-                    <div><strong>Base URL:</strong> {fetchedManifest.normalized_base_url}</div>
-                    <div><strong>App ID:</strong> {fetchedManifest.app_id}</div>
-                    <div><strong>App name:</strong> {readString(fetchedManifest.manifest, "app_name") ?? "—"}</div>
-                    <div><strong>Version:</strong> {fetchedManifest.app_version}</div>
-                    <div><strong>Slug:</strong> {fetchedManifest.slug ?? "—"}</div>
-                    <div>
-                      <strong>Scopes:</strong>{" "}
-                      {Array.isArray((fetchedManifest.manifest["privileges"] as { required?: unknown } | undefined)?.required)
-                        ? ((fetchedManifest.manifest["privileges"] as { required?: string[] }).required ?? []).join(", ")
-                        : "—"}
-                    </div>
-                    <div>
-                      <strong>Routes:</strong>{" "}
-                      {Array.isArray(
-                        ((fetchedManifest.manifest["integration"] as { ui?: { nav_entries?: unknown } } | undefined)?.ui
-                          ?.nav_entries as unknown[] | undefined) ?? [],
-                      )
-                        ? ((((fetchedManifest.manifest["integration"] as { ui?: { nav_entries?: Array<{ path?: string }> } })
-                            .ui?.nav_entries ?? []) as Array<{ path?: string }>)
-                            .map((entry) => entry.path)
-                            .filter((value): value is string => typeof value === "string")
-                            .join(", ") || "—")
-                        : "—"}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="text-sm text-hc-muted">Načítám seznam aplikací…</div>
-          ) : installed.length === 0 ? (
-            <div className="text-sm text-hc-muted">Žádné aplikace nejsou nainstalované.</div>
-          ) : (
-            <Table>
-              <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
-                <tr>
-                  <th className="px-4 py-3 font-medium">App name</th>
-                  <th className="px-4 py-3 font-medium">Slug</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">UI</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {installed.map((app) => {
-                  const status = getStatus(app, registrySlugs);
-                  return (
-                    <tr key={app.app_id} className="border-b border-hc-outline/60 align-top">
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium">{pickAppDisplayName(app)}</div>
-                        <div className="text-xs text-hc-muted">{app.app_id}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{app.slug}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <div
-                          className={
-                            status.label === "Installed"
-                              ? "text-hc-text"
-                              : status.label === "Error"
-                                ? "text-hc-danger"
-                                : "text-hc-muted"
-                          }
-                        >
-                          {status.label}
-                        </div>
-                        {status.reason && <div className="mt-1 text-xs text-hc-muted">{status.reason}</div>}
-                        {app.resolved_entitlement && (
-                          <div className="mt-1 text-xs text-hc-muted">
-                            {app.resolved_entitlement.source} / {app.resolved_entitlement.tier}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">{app.ui_url ? "✓" : "—"}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <Button variant="outlined" onClick={() => handleUninstall(app)} disabled={uninstallRunning}>
-                            Uninstall
-                          </Button>
-                          <Button variant="tonal" onClick={() => setSelectedAppId(app.app_id)}>
-                            Licensing
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          )}
-
-          {installedQueryError && (
-            <div className="mt-3 text-sm text-hc-danger">
-              {installedQueryErrorMessage}
-            </div>
-          )}
-          <div className="mt-3 text-xs text-hc-muted">
-            Uninstall removes app from platform UI. App data schemas are not deleted.
+      {state.status === "success" && (
+        <div>
+          <div className="text-lg font-semibold">Uninstall completed</div>
+          <div className="mt-5 flex justify-end">
+            <Button onClick={onClose}>Close</Button>
           </div>
-        </Card>
+        </div>
+      )}
 
-        <Card>
-          <div className="text-sm font-semibold">Licensing management</div>
-          <div className="mt-2 text-xs text-hc-muted">Vyber app a nastav selection nebo vlož offline token.</div>
-
-          <div className="mt-3">
-            <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">App</label>
-            <select
-              className="w-full rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm"
-              value={effectiveSelectedAppId ?? ""}
-              onChange={(event) => setSelectedAppId(event.target.value || null)}
-            >
-              <option value="">-- vyber app --</option>
-              {installed.map((app) => (
-                <option key={app.app_id} value={app.app_id}>
-                  {pickAppDisplayName(app)} ({app.app_id})
-                </option>
-              ))}
-            </select>
+      {state.status === "error" && (
+        <div>
+          <div className="text-lg font-semibold text-hc-danger">Uninstall failed</div>
+          <div className="mt-3 rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 p-3 text-sm text-hc-danger">
+            {state.error}
           </div>
-
-          <div className="mt-3">
-            <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">Entitlements</label>
-            <select
-              className="w-full rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm"
-              value={selectedEntitlementId}
-              onChange={(event) => setSelectedEntitlementId(event.target.value)}
-            >
-              <option value="">-- fallback (bez selection) --</option>
-              {(entitlementsData?.items ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.source} / {item.tier} / do {new Date(item.valid_to).toLocaleString()}
-                  {entitlementsData?.selected_entitlement_id === item.id ? " [selected]" : ""}
-                </option>
-              ))}
-            </select>
-            <div className="mt-2 flex gap-2">
-              <Button onClick={() => void handleSetSelection()} disabled={!selectedEntitlementId || setSelectionMutation.isPending}>
-                Set selection
-              </Button>
-              <Button variant="outlined" onClick={() => void handleClearSelection()} disabled={clearSelectionMutation.isPending}>
-                Clear selection
-              </Button>
-            </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+            <Button variant="danger" onClick={() => void onConfirm(state.app)}>
+              Retry
+            </Button>
           </div>
-
-          <div className="mt-4">
-            <label className="mb-2 block text-xs uppercase tracking-wide text-hc-muted">Offline token (JWT/JWS)</label>
-            <textarea
-              className="min-h-[140px] w-full rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm"
-              value={offlineToken}
-              onChange={(event) => setOfflineToken(event.target.value)}
-            />
-            <div className="mt-2 flex justify-end">
-              <Button onClick={() => void handleIngestOffline()} disabled={!offlineToken.trim() || offlineIngestMutation.isPending}>
-                Ingest offline token
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {message && <div className="text-sm text-hc-primary">{message}</div>}
-        {actionError && <div className="text-sm text-hc-danger">{actionError}</div>}
-      </div>
-
-      <Dialog
-        open={uninstallDialogOpen}
-        title="Uninstall app"
-        disableClose={uninstallState.status === "running"}
-        onClose={resetUninstallState}
-      >
-        {uninstallState.status === "confirm" && (
-          <div>
-            <div className="text-lg font-semibold">Confirm uninstall</div>
-            <div className="mt-2 text-sm text-hc-muted">Tato akce odstraní aplikaci z runtime instalací platformy.</div>
-
-            <div className="mt-4 rounded-hc-sm border border-hc-outline bg-hc-surface-variant/30 p-3 text-sm">
-              <div><strong>App:</strong> {pickAppDisplayName(uninstallState.app)}</div>
-              <div><strong>App ID:</strong> {uninstallState.app.app_id}</div>
-              <div><strong>Base URL:</strong> {uninstallState.app.base_url}</div>
-            </div>
-
-            <label className="mt-4 flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={uninstallConfirmChecked}
-                onChange={(event) => setUninstallConfirmChecked(event.target.checked)}
-              />
-              <span>Rozumím dopadu odinstalace.</span>
-            </label>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={resetUninstallState}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                disabled={!uninstallConfirmChecked}
-                onClick={() => void executeUninstall(uninstallState.app)}
-              >
-                Confirm uninstall
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {uninstallState.status === "running" && (
-          <div>
-            <div className="text-lg font-semibold">Uninstall in progress</div>
-            <div className="mt-2 text-sm text-hc-muted">Odinstalace aplikace právě probíhá. Prosím čekej…</div>
-            <div className="mt-4 flex items-center gap-3 text-sm">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-hc-outline border-t-hc-primary" />
-              <span>Running uninstall for {uninstallState.app.app_id}</span>
-            </div>
-          </div>
-        )}
-
-        {uninstallState.status === "success" && (
-          <div>
-            <div className="text-lg font-semibold">Uninstall completed</div>
-            <div className="mt-2 text-sm text-hc-muted">Aplikace byla úspěšně odinstalována.</div>
-            <div className="mt-5 flex justify-end">
-              <Button onClick={resetUninstallState}>Close</Button>
-            </div>
-          </div>
-        )}
-
-        {uninstallState.status === "error" && (
-          <div>
-            <div className="text-lg font-semibold text-hc-danger">Uninstall failed</div>
-            <div className="mt-2 text-sm text-hc-muted">Odinstalaci se nepodařilo dokončit.</div>
-            <div className="mt-3 rounded-hc-sm border border-hc-danger/40 bg-hc-danger/10 p-3 text-sm text-hc-danger">
-              {uninstallState.error}
-            </div>
-            <details className="mt-3 text-xs text-hc-muted">
-              <summary>Detail chyby</summary>
-              <div className="mt-2 whitespace-pre-wrap">{uninstallState.error}</div>
-            </details>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={resetUninstallState}>
-                Close
-              </Button>
-              <Button variant="danger" onClick={() => void executeUninstall(uninstallState.app)}>
-                Retry
-              </Button>
-            </div>
-          </div>
-        )}
-      </Dialog>
-    </div>
+        </div>
+      )}
+    </Dialog>
   );
 }

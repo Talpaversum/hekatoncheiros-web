@@ -10,37 +10,43 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
-    --hc-bg: #e6ded3;
-    --hc-surface: #fbf9f6;
-    --hc-surface-variant: #e7ddd1;
-    --hc-rail: #bfae9e;
-    --hc-topbar: #9a806a;
-    --hc-text: #27221a;
-    --hc-muted: #6d6358;
-    --hc-primary: #8b5d2e;
-    --hc-on-primary: #fbf6ef;
-    --hc-danger: #b4472f;
-    --hc-on-danger: #fbf6ef;
-    --hc-shadow: rgba(39, 34, 26, 0.12);
-    --hc-topbar-glow: rgba(255, 255, 255, 0.45);
-    --hc-topbar-depth: rgba(39, 34, 26, 0.35);
+    --hc-bg: #f4f6f8;
+    --hc-surface: #ffffff;
+    --hc-surface-variant: #eef2f6;
+    --hc-rail: #e7edf3;
+    --hc-topbar: #ffffff;
+    --hc-text: #17202a;
+    --hc-muted: #667485;
+    --hc-outline: #d8e0e8;
+    --hc-primary: #2563eb;
+    --hc-on-primary: #ffffff;
+    --hc-success: #047857;
+    --hc-warning: #a16207;
+    --hc-danger: #c2410c;
+    --hc-on-danger: #ffffff;
+    --hc-shadow: rgba(18, 35, 55, 0.10);
+    --hc-topbar-glow: rgba(255, 255, 255, 0.9);
+    --hc-topbar-depth: rgba(37, 99, 235, 0.08);
   }
 
   :root[data-theme="dark"] {
-    --hc-bg: #1b1611;
-    --hc-surface: #2d241c;
-    --hc-surface-variant: #443a2f;
-    --hc-rail: #19130e;
-    --hc-topbar: #120d09;
-    --hc-text: #f2ede5;
-    --hc-muted: #c0b3a3;
-    --hc-primary: #d6a06b;
-    --hc-on-primary: #1d1914;
-    --hc-danger: #d77b5a;
-    --hc-on-danger: #1d1914;
-    --hc-shadow: rgba(0, 0, 0, 0.5);
-    --hc-topbar-glow: rgba(255, 255, 255, 0.1);
-    --hc-topbar-depth: rgba(0, 0, 0, 0.65);
+    --hc-bg: #111418;
+    --hc-surface: #191f26;
+    --hc-surface-variant: #242c35;
+    --hc-rail: #151a20;
+    --hc-topbar: #171c22;
+    --hc-text: #eef3f8;
+    --hc-muted: #9ba8b5;
+    --hc-outline: #33404d;
+    --hc-primary: #60a5fa;
+    --hc-on-primary: #08111f;
+    --hc-success: #34d399;
+    --hc-warning: #fbbf24;
+    --hc-danger: #fb923c;
+    --hc-on-danger: #1b0d05;
+    --hc-shadow: rgba(0, 0, 0, 0.35);
+    --hc-topbar-glow: rgba(255, 255, 255, 0.06);
+    --hc-topbar-depth: rgba(0, 0, 0, 0.28);
   }
 }
 
@@ -52,18 +58,21 @@
   --color-hc-topbar: var(--hc-topbar);
   --color-hc-text: var(--hc-text);
   --color-hc-muted: var(--hc-muted);
+  --color-hc-outline: var(--hc-outline);
   --color-hc-primary: var(--hc-primary);
   --color-hc-on-primary: var(--hc-on-primary);
+  --color-hc-success: var(--hc-success);
+  --color-hc-warning: var(--hc-warning);
   --color-hc-danger: var(--hc-danger);
   --color-hc-on-danger: var(--hc-on-danger);
   --color-hc-topbar-glow: var(--hc-topbar-glow);
   --color-hc-topbar-depth: var(--hc-topbar-depth);
-  --shadow-hc-card: 0 12px 24px var(--hc-shadow);
-  --shadow-hc-elevation: 0 16px 40px var(--hc-shadow);
-  --shadow-hc-topbar: 0 12px 30px var(--hc-shadow);
-  --radius-hc-sm: 6px;
-  --radius-hc-md: 10px;
-  --radius-hc-lg: 16px;
+  --shadow-hc-card: 0 1px 2px var(--hc-shadow), 0 8px 24px rgba(18, 35, 55, 0.06);
+  --shadow-hc-elevation: 0 18px 48px var(--hc-shadow);
+  --shadow-hc-topbar: 0 1px 0 var(--hc-outline);
+  --radius-hc-sm: 4px;
+  --radius-hc-md: 8px;
+  --radius-hc-lg: 8px;
 }
 
 body {
