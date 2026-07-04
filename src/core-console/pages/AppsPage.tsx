@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { hasPrivilege } from "../../access/privileges";
 import {
@@ -117,7 +118,19 @@ function buildCatalogDeploymentPlan(entry: AppCatalogEntry, mode: InstallCatalog
   };
 }
 
+function readTabFromHash(hash: string): Tab {
+  if (hash === "#installed") {
+    return "installed";
+  }
+  if (hash === "#licensing") {
+    return "licensing";
+  }
+  return "catalog";
+}
+
 export function AppsPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data: catalogData, isLoading: catalogLoading } = useAppCatalogQuery(canManageApps);
@@ -136,7 +149,6 @@ export function AppsPage() {
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
 
-  const [activeTab, setActiveTab] = useState<Tab>("catalog");
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [catalogForm, setCatalogForm] = useState({ base_url: "", summary: "", trust_status: "manual" as "dev" | "manual" | "unverified" });
@@ -159,6 +171,7 @@ export function AppsPage() {
   const licensedCatalogCount = catalog.filter((item) => item.license_required).length;
   const installableCount = catalog.filter((item) => !item.installed).length;
   const publishedCount = catalog.filter((item) => item.published).length;
+  const activeTab = readTabFromHash(location.hash);
 
   const resetNotices = () => {
     setMessage(null);
@@ -363,7 +376,7 @@ export function AppsPage() {
                 ? "border-hc-primary text-hc-text"
                 : "border-transparent text-hc-muted hover:text-hc-text"
             }`}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => navigate(tab === "catalog" ? "/core/apps" : `/core/apps#${tab}`)}
           >
             {label}
           </button>
@@ -427,7 +440,7 @@ export function AppsPage() {
             </div>
           </Card>
 
-          <Card className="rounded-hc-md p-0">
+          <Card id="catalog" className="rounded-hc-md p-0">
             <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
               <div>
                 <div className="text-sm font-semibold">Available applications</div>
@@ -449,7 +462,7 @@ export function AppsPage() {
       )}
 
       {activeTab === "installed" && (
-        <Card className="rounded-hc-md p-0">
+        <Card id="installed" className="rounded-hc-md p-0">
           <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
             <div>
               <div className="text-sm font-semibold">Installed applications</div>
@@ -463,7 +476,7 @@ export function AppsPage() {
             isLoading={installedLoading}
             onLicense={(appId) => {
               setSelectedAppId(appId);
-              setActiveTab("licensing");
+              navigate("/core/apps#licensing");
             }}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);
@@ -475,7 +488,7 @@ export function AppsPage() {
       )}
 
       {activeTab === "licensing" && (
-        <Card className="rounded-hc-md">
+        <Card id="licensing" className="rounded-hc-md">
           <div className="grid gap-5 lg:grid-cols-[minmax(260px,360px)_1fr]">
             <section>
               <div className="text-sm font-semibold">Tenant license selection</div>
@@ -587,7 +600,7 @@ function CatalogSourcesPanel({
   isMutating: boolean;
 }) {
   return (
-    <Card className="rounded-hc-md p-0">
+    <Card id="catalog-feeds" className="rounded-hc-md p-0">
       <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
         <div>
           <div className="text-sm font-semibold">Catalog feeds</div>

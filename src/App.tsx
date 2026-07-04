@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./app/AppShell";
 import { RequirePrivilege } from "./app/RequirePrivilege";
+import { AccountPage } from "./core-console/pages/AccountPage";
 import { LoginPage } from "./core-console/pages/LoginPage";
 import { DashboardPage } from "./core-console/pages/DashboardPage";
 import { AppsPage } from "./core-console/pages/AppsPage";
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/core" element={<AppShell />}>
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="account" element={<AccountPage />} />
         <Route path="apps" element={<AppsPage />} />
         <Route path="licensing" element={<LicensingPage />} />
         <Route

@@ -13,7 +13,13 @@ import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
 import { Switch } from "../../ui-kit/components/Switch";
 
-const sections = ["Users", "Tenants", "Licenses & Entitlements", "Installed Apps Moderation"];
+function StatusBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-hc-sm border border-hc-outline bg-hc-surface-variant px-2 py-1 text-xs text-hc-muted">
+      {children}
+    </span>
+  );
+}
 
 export function PlatformConfigPage() {
   const { data, isLoading } = useTrustedOriginsQuery(true);
@@ -94,14 +100,38 @@ export function PlatformConfigPage() {
   };
 
   return (
-    <div>
+    <div className="space-y-5">
       <div className="mb-6">
         <div className="text-xs uppercase tracking-wide text-hc-muted">Configuration</div>
         <div className="mt-1 text-2xl font-semibold">Platform configuration</div>
+        <div className="mt-1 text-sm text-hc-muted">Instance-wide controls for trust, app distribution, and platform governance.</div>
       </div>
 
+      <section id="dashboard" className="grid gap-4 lg:grid-cols-4">
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Trusted origins</div>
+          <div className="mt-3 text-2xl font-semibold">{origins.length}</div>
+          <div className="mt-1 text-xs text-hc-muted">Origins allowed for local/dev HTTP app metadata.</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Feed export</div>
+          <div className="mt-3 text-2xl font-semibold">Active</div>
+          <div className="mt-1 text-xs text-hc-muted">Public feed is served from `/.well-known/hc/app-catalog.json`.</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Publish tokens</div>
+          <div className="mt-3 text-2xl font-semibold">Planned</div>
+          <div className="mt-1 text-xs text-hc-muted">Future pre-approval for trusted submitters and CI.</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Tenant mode</div>
+          <div className="mt-3 text-2xl font-semibold">Core-owned</div>
+          <div className="mt-1 text-xs text-hc-muted">Configured by deployment and backend policy.</div>
+        </Card>
+      </section>
+
       <div className="grid gap-4">
-        <Card>
+        <Card id="trusted-origins" className="rounded-hc-md">
           <div className="text-sm font-semibold">Trusted install origins</div>
           <div className="mt-2 text-xs text-hc-muted">
             Exact-match allowlist originů (scheme+host+port) pro install/fetch manifest.
@@ -151,13 +181,65 @@ export function PlatformConfigPage() {
           {error && <div className="mt-3 text-sm text-hc-danger">{error}</div>}
         </Card>
 
-        {sections.map((section) => (
-          <Card key={section}>
-            <div className="text-sm font-semibold">{section}</div>
-            <div className="mt-2 text-xs text-hc-muted">Placeholder section</div>
-          </Card>
-        ))}
+        <Card id="app-distribution" className="rounded-hc-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">App distribution governance</div>
+              <div className="mt-2 text-xs text-hc-muted">
+                Catalog feed import/export is managed in Applications. This platform area owns the policy around it.
+              </div>
+            </div>
+            <StatusBadge>partly active</StatusBadge>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <ConfigTile title="Public feed" status="active" detail="Only admin-published installed apps are exported." />
+            <ConfigTile title="Publish requests" status="planned" detail="User/developer proposals awaiting admin approval." />
+            <ConfigTile title="Publish tokens" status="planned" detail="Admin-issued pre-approval for namespaces, apps, or CI pipelines." />
+          </div>
+        </Card>
+
+        <Card id="identity" className="rounded-hc-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Identity and tenancy</div>
+              <div className="mt-2 text-xs text-hc-muted">Instance tenants, users, and delegation policies will live here once backend APIs exist.</div>
+            </div>
+            <StatusBadge>planned</StatusBadge>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <ConfigTile title="Users" status="planned" detail="Create, disable, and inspect platform users." />
+            <ConfigTile title="Tenants" status="planned" detail="Manage tenant records and primary domains." />
+            <ConfigTile title="Delegation" status="planned" detail="Control impersonation and delegated administration." />
+          </div>
+        </Card>
+
+        <Card id="automation" className="rounded-hc-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Automation</div>
+              <div className="mt-2 text-xs text-hc-muted">Scheduled feed sync and controlled runtime actions belong here.</div>
+            </div>
+            <StatusBadge>planned</StatusBadge>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <ConfigTile title="Scheduled feed sync" status="planned" detail="Periodic sync for selected catalog sources." />
+            <ConfigTile title="Compose runtime manager" status="planned" detail="Start/stop/update app compose bundles with audit." />
+            <ConfigTile title="Policy audit" status="planned" detail="Review feed and runtime decisions over time." />
+          </div>
+        </Card>
       </div>
+    </div>
+  );
+}
+
+function ConfigTile({ title, status, detail }: { title: string; status: string; detail: string }) {
+  return (
+    <div className="rounded-hc-md border border-hc-outline bg-hc-surface p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium">{title}</div>
+        <StatusBadge>{status}</StatusBadge>
+      </div>
+      <div className="mt-2 text-xs text-hc-muted">{detail}</div>
     </div>
   );
 }

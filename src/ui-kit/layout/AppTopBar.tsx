@@ -39,6 +39,11 @@ export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProp
     navigate("/login");
   };
 
+  const openAccount = () => {
+    setUserOpen(false);
+    navigate("/core/account");
+  };
+
   const openPlatformConfig = () => {
     setSettingsOpen(false);
     navigate("/core/platform");
@@ -119,12 +124,9 @@ export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProp
         </div>
 
         <div className="relative flex items-center gap-3">
-          <IconButton aria-label="Messaging">
-            💬
-          </IconButton>
           <div className="relative">
             <IconButton aria-label="Settings" onClick={() => setSettingsOpen((prev) => !prev)}>
-              ⚙️
+              ⚙
             </IconButton>
             <Menu open={settingsOpen} onClose={() => setSettingsOpen(false)} className="w-64">
               {hasPrivilege(privileges, "platform.superadmin") && (
@@ -166,8 +168,14 @@ export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProp
             <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
               <div className="px-3 py-2">
                 <div className="text-sm font-medium">{userId ?? "Uživatel"}</div>
-                <div className="text-xs text-hc-muted">Profil & účet</div>
+                <div className="text-xs text-hc-muted">Session account</div>
               </div>
+              <button
+                onClick={openAccount}
+                className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+              >
+                Account context
+              </button>
               <button
                 onClick={handleLogout}
                 className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"

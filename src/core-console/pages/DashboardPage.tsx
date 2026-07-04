@@ -15,7 +15,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+        <Card id="context">
           <div className="text-sm text-hc-muted">Context snapshot</div>
           {isLoading ? (
             <div className="mt-4 text-sm">Načítám…</div>
