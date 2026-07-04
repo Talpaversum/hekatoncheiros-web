@@ -9,6 +9,7 @@ import {
   useDeleteCatalogEntryMutation,
   useInstallCatalogEntryMutation,
   useSetCatalogSourceEnabledMutation,
+  useSetCatalogEntryPublicationMutation,
   useSyncCatalogSourceMutation,
   type AppCatalogEntry,
   type AppCatalogSource,
@@ -129,6 +130,7 @@ export function AppsPage() {
   const syncCatalogSource = useSyncCatalogSourceMutation();
   const deleteCatalogEntry = useDeleteCatalogEntryMutation();
   const installCatalogEntry = useInstallCatalogEntryMutation();
+  const setCatalogEntryPublication = useSetCatalogEntryPublicationMutation();
   const uninstallMutation = useUninstallAppMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
@@ -155,8 +157,8 @@ export function AppsPage() {
   const { data: entitlementsData } = useAppEntitlementsQuery(effectiveSelectedAppId, canManageApps);
 
   const licensedCatalogCount = catalog.filter((item) => item.license_required).length;
-  const installedReadyCount = installed.filter((item) => getInstalledStatus(item, registrySlugs).label === "Ready").length;
   const installableCount = catalog.filter((item) => !item.installed).length;
+  const publishedCount = catalog.filter((item) => item.published).length;
 
   const resetNotices = () => {
     setMessage(null);
@@ -268,6 +270,16 @@ export function AppsPage() {
     }
   };
 
+  const handleSetCatalogEntryPublication = async (entry: AppCatalogEntry, published: boolean) => {
+    resetNotices();
+    try {
+      const updated = await setCatalogEntryPublication.mutateAsync({ appId: entry.app_id, published });
+      setMessage(`${updated.app_name} was ${updated.published ? "published to" : "removed from"} this instance feed.`);
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
   const executeUninstall = async (app: InstalledApp) => {
     resetNotices();
     setUninstallState({ status: "running", app });
@@ -334,7 +346,7 @@ export function AppsPage() {
         <div className="grid grid-cols-3 gap-2 text-right">
           <Metric label="Catalog" value={catalog.length} />
           <Metric label="Installable" value={installableCount} />
-          <Metric label="Ready" value={installedReadyCount} />
+          <Metric label="Published" value={publishedCount} />
         </div>
       </header>
 
@@ -429,7 +441,8 @@ export function AppsPage() {
               isLoading={catalogLoading}
               onInstall={openInstallDialog}
               onDelete={handleDeleteCatalogEntry}
-              isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending}
+              onSetPublication={handleSetCatalogEntryPublication}
+              isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending || setCatalogEntryPublication.isPending}
             />
           </Card>
         </div>
@@ -653,6 +666,7 @@ function CatalogTable({
   isLoading,
   onInstall,
   onDelete,
+  onSetPublication,
   isMutating,
 }: {
   entries: AppCatalogEntry[];
@@ -660,6 +674,7 @@ function CatalogTable({
   isLoading: boolean;
   onInstall: (entry: AppCatalogEntry) => void;
   onDelete: (entry: AppCatalogEntry) => Promise<void>;
+  onSetPublication: (entry: AppCatalogEntry, published: boolean) => Promise<void>;
   isMutating: boolean;
 }) {
   if (isLoading) {
@@ -684,6 +699,7 @@ function CatalogTable({
       <tbody>
         {entries.map((entry) => {
           const installed = installedByAppId.get(entry.app_id);
+          const canPublish = Boolean(installed?.enabled !== false && installed);
           return (
             <tr key={entry.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
               <td className="px-5 py-4">
@@ -704,12 +720,20 @@ function CatalogTable({
                     {entry.trust_status}
                   </Badge>
                   {installed ? <Badge tone="good">installed</Badge> : <Badge>available</Badge>}
+                  {entry.published ? <Badge tone="good">feed</Badge> : <Badge>{entry.publish_status}</Badge>}
                 </div>
               </td>
               <td className="px-5 py-4">
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outlined" disabled={Boolean(installed) || isMutating} onClick={() => onInstall(entry)}>
                     Install...
+                  </Button>
+                  <Button
+                    variant={entry.published ? "tonal" : "outlined"}
+                    disabled={isMutating || (!entry.published && !canPublish)}
+                    onClick={() => void onSetPublication(entry, !entry.published)}
+                  >
+                    {entry.published ? "Unpublish" : "Publish"}
                   </Button>
                   <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry)}>
                     Remove

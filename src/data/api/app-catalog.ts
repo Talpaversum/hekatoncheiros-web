@@ -28,6 +28,11 @@ export type AppCatalogEntry = {
     compose_file?: string;
     base_url?: string;
   } & Record<string, unknown>;
+  published: boolean;
+  publish_status: "draft" | "pending" | "published" | "rejected";
+  published_at: string | null;
+  published_by: string | null;
+  publish_note: string | null;
   created_by: string | null;
   fetched_at: string;
   created_at: string;
@@ -53,6 +58,12 @@ export type CreateCatalogEntryPayload = {
   base_url: string;
   summary?: string | null;
   trust_status?: "dev" | "manual" | "unverified";
+};
+
+export type SetCatalogEntryPublicationPayload = {
+  appId: string;
+  published: boolean;
+  note?: string | null;
 };
 
 export type AppCatalogSource = {
@@ -200,6 +211,21 @@ export function useInstallCatalogEntryMutation() {
         queryClient.invalidateQueries({ queryKey: ["installed-apps"] }),
         queryClient.invalidateQueries({ queryKey: ["app-registry"] }),
       ]);
+    },
+  });
+}
+
+export function useSetCatalogEntryPublicationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ appId, published, note }: SetCatalogEntryPublicationPayload) =>
+      authFetch<AppCatalogEntry>(`/apps/catalog/entries/${encodeURIComponent(appId)}/publication`, {
+        method: "PATCH",
+        body: JSON.stringify({ published, note: note ?? null }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
     },
   });
 }
