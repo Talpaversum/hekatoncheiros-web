@@ -1,10 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { hasPrivilege } from "../../access/privileges";
 import { useContextQuery } from "../../data/api/context";
 import { useAppCatalogQuery } from "../../data/api/app-catalog";
+import { useTenantSettingsQuery, useUpdateTenantSettingsMutation } from "../../data/api/configuration";
 import { useInstalledAppsQuery } from "../../data/api/installed-apps";
+import { readErrorMessage } from "../../data/api/read-error-message";
+import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
+import { Input } from "../../ui-kit/components/Input";
 
 function StatusBadge({ children }: { children: React.ReactNode }) {
   return (
@@ -15,14 +20,40 @@ function StatusBadge({ children }: { children: React.ReactNode }) {
 }
 
 export function TenantConfigPage() {
+  const location = useLocation();
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data: catalogData } = useAppCatalogQuery(canManageApps);
   const { data: installedData } = useInstalledAppsQuery(canManageApps);
+  const { data: tenantSettings } = useTenantSettingsQuery(true);
+  const updateTenant = useUpdateTenantSettingsMutation();
+  const [tenantName, setTenantName] = useState<string | null>(null);
+  const [primaryDomain, setPrimaryDomain] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
   const installed = useMemo(() => installedData?.items ?? [], [installedData?.items]);
   const licenseRequired = catalog.filter((item) => item.license_required).length;
+  const section = location.pathname.split("/").pop() ?? "";
+  const effectiveTenantName = tenantName ?? tenantSettings?.name ?? context?.tenant.name ?? "";
+  const effectivePrimaryDomain = primaryDomain ?? tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? "";
+
+  const handleSaveTenant = async () => {
+    setMessage(null);
+    setError(null);
+    try {
+      await updateTenant.mutateAsync({
+        name: effectiveTenantName.trim(),
+        primary_domain: effectivePrimaryDomain.trim() || null,
+      });
+      setTenantName(null);
+      setPrimaryDomain(null);
+      setMessage("Tenant details were updated.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -34,10 +65,13 @@ export function TenantConfigPage() {
         </div>
       </header>
 
-      <section id="dashboard" className="grid gap-4 lg:grid-cols-4">
+      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
+      {error && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{error}</div>}
+
+      {(section === "tenant" || section === "") && <section className="grid gap-4 lg:grid-cols-4">
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Tenant</div>
-          <div className="mt-3 text-2xl font-semibold">{context?.tenant.id ?? "-"}</div>
+          <div className="mt-3 text-2xl font-semibold">{tenantSettings?.name ?? context?.tenant.name ?? context?.tenant.id ?? "-"}</div>
           <div className="mt-1 text-xs text-hc-muted">Mode: {context?.tenant.mode ?? "-"}</div>
         </Card>
         <Card className="rounded-hc-md">
@@ -55,27 +89,39 @@ export function TenantConfigPage() {
           <div className="mt-3 text-2xl font-semibold">Planned</div>
           <div className="mt-1 text-xs text-hc-muted">Tenant user and role APIs are not implemented yet.</div>
         </Card>
-      </section>
+      </section>}
 
       <div className="grid gap-4">
-        <Card id="tenant-details" className="rounded-hc-md">
+        {section === "details" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Tenant details</div>
-              <div className="mt-2 text-xs text-hc-muted">
-                This area should eventually manage tenant name, domains, locale, and operational contacts.
-              </div>
+              <div className="mt-2 text-xs text-hc-muted">Edit the tenant display name and primary domain used for tenant resolution.</div>
             </div>
-            <StatusBadge>planned</StatusBadge>
+            <StatusBadge>{tenantSettings?.status ?? "active"}</StatusBadge>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ConfigTile title="Primary domain" status="planned" detail="Domain ownership and tenant resolution controls." />
-            <ConfigTile title="Tenant profile" status="planned" detail="Name, contact, locale, and billing-facing metadata." />
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Tenant name</label>
+              <Input value={effectiveTenantName} onChange={(event) => setTenantName(event.target.value)} />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Primary domain</label>
+              <Input value={effectivePrimaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder="example.com" />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={() => void handleSaveTenant()} disabled={!effectiveTenantName.trim() || updateTenant.isPending}>
+              Save tenant
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <ConfigTile title="Data policy" status="planned" detail="Tenant-level retention and isolation policy summary." />
+            <ConfigTile title="Operational contacts" status="planned" detail="People and addresses responsible for tenant operations." />
           </div>
-        </Card>
+        </Card>}
 
-        <Card id="users" className="rounded-hc-md">
+        {section === "users" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Users and roles</div>
@@ -90,9 +136,9 @@ export function TenantConfigPage() {
             <ConfigTile title="Roles" status="planned" detail="Reusable tenant role bundles." />
             <ConfigTile title="Delegation" status="planned" detail="Per-tenant delegation approvals and expiry." />
           </div>
-        </Card>
+        </Card>}
 
-        <Card id="apps" className="rounded-hc-md">
+        {section === "apps" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Apps and licenses</div>
@@ -107,9 +153,9 @@ export function TenantConfigPage() {
             <ConfigTile title="License-required apps" status={`${licenseRequired}`} detail="Catalog entries that need tenant license selection." />
             <ConfigTile title="Feed publishing" status="admin gated" detail="Only installed apps can be published to this instance feed." />
           </div>
-        </Card>
+        </Card>}
 
-        <Card id="audit" className="rounded-hc-md">
+        {section === "audit" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Audit context</div>
@@ -124,7 +170,7 @@ export function TenantConfigPage() {
             <ConfigTile title="License events" status="planned" detail="License import, activation, and selection history." />
             <ConfigTile title="Export" status="planned" detail="Tenant evidence bundle for audits and operations." />
           </div>
-        </Card>
+        </Card>}
       </div>
     </div>
   );

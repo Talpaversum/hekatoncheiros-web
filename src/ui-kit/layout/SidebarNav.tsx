@@ -23,7 +23,7 @@ const sidebarConfig = [
     title: "Account",
     items: [
       { to: "/core/account", label: "Session" },
-      { to: "/core/account#privileges", label: "Privileges" },
+      { to: "/core/account/security", label: "Security" },
     ],
   },
   {
@@ -31,9 +31,9 @@ const sidebarConfig = [
     title: "Apps",
     items: [
       { to: "/core/apps", label: "Catalog" },
-      { to: "/core/apps#catalog-feeds", label: "Feed sources" },
-      { to: "/core/apps#installed", label: "Installed apps" },
-      { to: "/core/apps#licensing", label: "Tenant licensing" },
+      { to: "/core/apps/feeds", label: "Feed sources" },
+      { to: "/core/apps/installed", label: "Installed apps" },
+      { to: "/core/apps/licensing", label: "Tenant licensing" },
     ],
   },
   {
@@ -49,10 +49,11 @@ const sidebarConfig = [
     title: "Platform configuration",
     items: [
       { to: "/core/platform", label: "Dashboard" },
-      { to: "/core/platform#trusted-origins", label: "Trusted origins" },
-      { to: "/core/platform#app-distribution", label: "App distribution" },
-      { to: "/core/platform#identity", label: "Identity & tenancy" },
-      { to: "/core/platform#automation", label: "Automation" },
+      { to: "/core/platform/instance", label: "Instance" },
+      { to: "/core/platform/trusted-origins", label: "Trusted origins" },
+      { to: "/core/platform/app-distribution", label: "App distribution" },
+      { to: "/core/platform/identity", label: "Identity & tenancy" },
+      { to: "/core/platform/automation", label: "Automation" },
     ],
   },
   {
@@ -60,10 +61,10 @@ const sidebarConfig = [
     title: "Tenant configuration",
     items: [
       { to: "/core/tenant", label: "Dashboard" },
-      { to: "/core/tenant#tenant-details", label: "Tenant details" },
-      { to: "/core/tenant#users", label: "Users & roles" },
-      { to: "/core/tenant#apps", label: "Apps & licenses" },
-      { to: "/core/tenant#audit", label: "Audit context" },
+      { to: "/core/tenant/details", label: "Tenant details" },
+      { to: "/core/tenant/users", label: "Users & roles" },
+      { to: "/core/tenant/apps", label: "Apps & licenses" },
+      { to: "/core/tenant/audit", label: "Audit context" },
     ],
   },
   {
@@ -89,17 +90,6 @@ export function SidebarNav({ children, privileges }: SidebarNavProps) {
       }
     : filteredConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? fallbackSection;
 
-  const isItemActive = (to: string, navActive: boolean) => {
-    const [path, hash = ""] = to.split("#");
-    if (location.pathname !== path) {
-      return false;
-    }
-    if (hash) {
-      return location.hash === `#${hash}`;
-    }
-    return navActive || location.hash === "";
-  };
-
   return (
     <>
       <aside className="w-64 bg-hc-rail px-5 py-6 shadow-hc-card">
@@ -111,7 +101,7 @@ export function SidebarNav({ children, privileges }: SidebarNavProps) {
               to={item.to}
               className={({ isActive }) =>
                 `rounded-hc-sm px-3 py-2 text-sm transition ${
-                  isItemActive(item.to, isActive)
+                  isActive
                     ? "bg-hc-surface text-hc-text shadow-hc-card"
                     : "text-hc-muted hover:bg-hc-surface-variant hover:text-hc-text"
                 }`

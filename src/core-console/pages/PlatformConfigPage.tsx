@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
+import {
+  usePlatformInstanceSettingsQuery,
+  useUpdatePlatformInstanceSettingsMutation,
+} from "../../data/api/configuration";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import {
   useCreateTrustedOriginMutation,
@@ -22,7 +27,10 @@ function StatusBadge({ children }: { children: React.ReactNode }) {
 }
 
 export function PlatformConfigPage() {
+  const location = useLocation();
   const { data, isLoading } = useTrustedOriginsQuery(true);
+  const { data: platformInstance } = usePlatformInstanceSettingsQuery(true);
+  const updatePlatformInstance = useUpdatePlatformInstanceSettingsMutation();
   const createMutation = useCreateTrustedOriginMutation();
   const updateMutation = useUpdateTrustedOriginMutation();
   const deleteMutation = useDeleteTrustedOriginMutation();
@@ -30,10 +38,15 @@ export function PlatformConfigPage() {
   const [origin, setOrigin] = useState("");
   const [note, setNote] = useState("");
   const [allowHttp, setAllowHttp] = useState(false);
+  const [instanceName, setInstanceName] = useState<string | null>(null);
+  const [publicBaseUrl, setPublicBaseUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const origins = data?.items ?? [];
+  const section = location.pathname.split("/").pop() ?? "";
+  const effectiveInstanceName = instanceName ?? platformInstance?.name ?? "";
+  const effectivePublicBaseUrl = publicBaseUrl ?? platformInstance?.public_base_url ?? "";
 
   const httpOriginDetected = useMemo(() => {
     try {
@@ -64,6 +77,22 @@ export function PlatformConfigPage() {
       setOrigin("");
       setNote("");
       setAllowHttp(false);
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleSaveInstance = async () => {
+    setMessage(null);
+    setError(null);
+    try {
+      await updatePlatformInstance.mutateAsync({
+        name: effectiveInstanceName.trim(),
+        public_base_url: effectivePublicBaseUrl.trim() || null,
+      });
+      setInstanceName(null);
+      setPublicBaseUrl(null);
+      setMessage("Platform instance settings were updated.");
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -107,11 +136,16 @@ export function PlatformConfigPage() {
         <div className="mt-1 text-sm text-hc-muted">Instance-wide controls for trust, app distribution, and platform governance.</div>
       </div>
 
-      <section id="dashboard" className="grid gap-4 lg:grid-cols-4">
+      {(section === "platform" || section === "") && <section className="grid gap-4 lg:grid-cols-4">
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Trusted origins</div>
           <div className="mt-3 text-2xl font-semibold">{origins.length}</div>
           <div className="mt-1 text-xs text-hc-muted">Origins allowed for local/dev HTTP app metadata.</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Instance</div>
+          <div className="mt-3 text-2xl font-semibold">{platformInstance?.name ?? "Core"}</div>
+          <div className="mt-1 text-xs text-hc-muted">{platformInstance?.instance_id ?? "Loading..."}</div>
         </Card>
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Feed export</div>
@@ -128,10 +162,35 @@ export function PlatformConfigPage() {
           <div className="mt-3 text-2xl font-semibold">Core-owned</div>
           <div className="mt-1 text-xs text-hc-muted">Configured by deployment and backend policy.</div>
         </Card>
-      </section>
+      </section>}
 
       <div className="grid gap-4">
-        <Card id="trusted-origins" className="rounded-hc-md">
+        {section === "instance" && <Card className="rounded-hc-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Platform instance</div>
+              <div className="mt-2 text-xs text-hc-muted">Public identity used by feeds, operators, and future trust metadata.</div>
+            </div>
+            <StatusBadge>active</StatusBadge>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Instance name</label>
+              <Input value={effectiveInstanceName} onChange={(event) => setInstanceName(event.target.value)} />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Public base URL</label>
+              <Input value={effectivePublicBaseUrl} onChange={(event) => setPublicBaseUrl(event.target.value)} placeholder="https://core.example.com" />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={() => void handleSaveInstance()} disabled={!effectiveInstanceName.trim() || updatePlatformInstance.isPending}>
+              Save instance
+            </Button>
+          </div>
+        </Card>}
+
+        {section === "trusted-origins" && <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Trusted install origins</div>
           <div className="mt-2 text-xs text-hc-muted">
             Exact-match allowlist originů (scheme+host+port) pro install/fetch manifest.
@@ -179,9 +238,9 @@ export function PlatformConfigPage() {
 
           {message && <div className="mt-3 text-sm text-hc-primary">{message}</div>}
           {error && <div className="mt-3 text-sm text-hc-danger">{error}</div>}
-        </Card>
+        </Card>}
 
-        <Card id="app-distribution" className="rounded-hc-md">
+        {section === "app-distribution" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">App distribution governance</div>
@@ -196,9 +255,9 @@ export function PlatformConfigPage() {
             <ConfigTile title="Publish requests" status="planned" detail="User/developer proposals awaiting admin approval." />
             <ConfigTile title="Publish tokens" status="planned" detail="Admin-issued pre-approval for namespaces, apps, or CI pipelines." />
           </div>
-        </Card>
+        </Card>}
 
-        <Card id="identity" className="rounded-hc-md">
+        {section === "identity" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Identity and tenancy</div>
@@ -211,9 +270,9 @@ export function PlatformConfigPage() {
             <ConfigTile title="Tenants" status="planned" detail="Manage tenant records and primary domains." />
             <ConfigTile title="Delegation" status="planned" detail="Control impersonation and delegated administration." />
           </div>
-        </Card>
+        </Card>}
 
-        <Card id="automation" className="rounded-hc-md">
+        {section === "automation" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Automation</div>
@@ -226,7 +285,7 @@ export function PlatformConfigPage() {
             <ConfigTile title="Compose runtime manager" status="planned" detail="Start/stop/update app compose bundles with audit." />
             <ConfigTile title="Policy audit" status="planned" detail="Review feed and runtime decisions over time." />
           </div>
-        </Card>
+        </Card>}
       </div>
     </div>
   );

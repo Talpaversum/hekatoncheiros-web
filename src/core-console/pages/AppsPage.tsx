@@ -118,11 +118,11 @@ function buildCatalogDeploymentPlan(entry: AppCatalogEntry, mode: InstallCatalog
   };
 }
 
-function readTabFromHash(hash: string): Tab {
-  if (hash === "#installed") {
+function readTabFromPath(pathname: string): Tab {
+  if (pathname.endsWith("/installed")) {
     return "installed";
   }
-  if (hash === "#licensing") {
+  if (pathname.endsWith("/licensing")) {
     return "licensing";
   }
   return "catalog";
@@ -171,7 +171,7 @@ export function AppsPage() {
   const licensedCatalogCount = catalog.filter((item) => item.license_required).length;
   const installableCount = catalog.filter((item) => !item.installed).length;
   const publishedCount = catalog.filter((item) => item.published).length;
-  const activeTab = readTabFromHash(location.hash);
+  const activeTab = readTabFromPath(location.pathname);
 
   const resetNotices = () => {
     setMessage(null);
@@ -376,7 +376,7 @@ export function AppsPage() {
                 ? "border-hc-primary text-hc-text"
                 : "border-transparent text-hc-muted hover:text-hc-text"
             }`}
-            onClick={() => navigate(tab === "catalog" ? "/core/apps" : `/core/apps#${tab}`)}
+            onClick={() => navigate(tab === "catalog" ? "/core/apps" : `/core/apps/${tab}`)}
           >
             {label}
           </button>
@@ -476,7 +476,7 @@ export function AppsPage() {
             isLoading={installedLoading}
             onLicense={(appId) => {
               setSelectedAppId(appId);
-              navigate("/core/apps#licensing");
+              navigate("/core/apps/licensing");
             }}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);

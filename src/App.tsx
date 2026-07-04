@@ -18,11 +18,11 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/core" element={<AppShell />}>
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="account" element={<AccountPage />} />
-        <Route path="apps" element={<AppsPage />} />
+        <Route path="account/*" element={<AccountPage />} />
+        <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing" element={<LicensingPage />} />
         <Route
-          path="platform"
+          path="platform/*"
           element={
             <RequirePrivilege required="platform.superadmin">
               <PlatformConfigPage />
@@ -30,7 +30,7 @@ export default function App() {
           }
         />
         <Route
-          path="tenant"
+          path="tenant/*"
           element={
             <RequirePrivilege required="tenant.config.manage">
               <TenantConfigPage />

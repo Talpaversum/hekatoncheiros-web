@@ -12,11 +12,12 @@ import { useTheme } from "../theme/useTheme";
 
 type AppTopBarProps = {
   userId?: string;
+  displayName?: string;
   privileges?: string[];
   tenantMode?: string;
 };
 
-export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProps) {
+export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: AppTopBarProps) {
   const navigate = useNavigate();
   const { isDark, toggle } = useTheme();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
@@ -25,14 +26,15 @@ export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProp
   const [userOpen, setUserOpen] = useState(false);
 
   const initials = useMemo(() => {
-    if (!userId) return "U";
-    return userId
+    const source = displayName || userId;
+    if (!source) return "U";
+    return source
       .split(/[^a-zA-Z0-9]/)
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("");
-  }, [userId]);
+  }, [displayName, userId]);
 
   const handleLogout = () => {
     clearTokens();
@@ -167,7 +169,7 @@ export function AppTopBar({ userId, privileges = [], tenantMode }: AppTopBarProp
             </button>
             <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
               <div className="px-3 py-2">
-                <div className="text-sm font-medium">{userId ?? "Uživatel"}</div>
+                <div className="text-sm font-medium">{displayName ?? userId ?? "Uživatel"}</div>
                 <div className="text-xs text-hc-muted">Session account</div>
               </div>
               <button
