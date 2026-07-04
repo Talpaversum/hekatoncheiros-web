@@ -3,10 +3,15 @@ import { useMemo, useState } from "react";
 import { hasPrivilege } from "../../access/privileges";
 import {
   useAppCatalogQuery,
+  useAppCatalogSourcesQuery,
   useCreateCatalogEntryFromManifestMutation,
+  useCreateCatalogSourceMutation,
   useDeleteCatalogEntryMutation,
   useInstallCatalogEntryMutation,
+  useSetCatalogSourceEnabledMutation,
+  useSyncCatalogSourceMutation,
   type AppCatalogEntry,
+  type AppCatalogSource,
   type CatalogDeploymentPlan,
   type InstallCatalogEntryMode,
 } from "../../data/api/app-catalog";
@@ -115,9 +120,13 @@ export function AppsPage() {
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data: catalogData, isLoading: catalogLoading } = useAppCatalogQuery(canManageApps);
+  const { data: catalogSourcesData, isLoading: catalogSourcesLoading } = useAppCatalogSourcesQuery(canManageApps);
   const { data: installedData, isLoading: installedLoading, error: installedError } = useInstalledAppsQuery(canManageApps);
   const { data: registryData } = useAppRegistryQuery(canManageApps);
   const createCatalogEntry = useCreateCatalogEntryFromManifestMutation();
+  const createCatalogSource = useCreateCatalogSourceMutation();
+  const setCatalogSourceEnabled = useSetCatalogSourceEnabledMutation();
+  const syncCatalogSource = useSyncCatalogSourceMutation();
   const deleteCatalogEntry = useDeleteCatalogEntryMutation();
   const installCatalogEntry = useInstallCatalogEntryMutation();
   const uninstallMutation = useUninstallAppMutation();
@@ -129,6 +138,7 @@ export function AppsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [catalogForm, setCatalogForm] = useState({ base_url: "", summary: "", trust_status: "manual" as "dev" | "manual" | "unverified" });
+  const [sourceForm, setSourceForm] = useState({ name: "", feed_url: "", trust_mode: "manual" as AppCatalogSource["trust_mode"] });
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
   const [offlineToken, setOfflineToken] = useState("");
@@ -137,6 +147,7 @@ export function AppsPage() {
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
 
   const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
+  const catalogSources = useMemo(() => catalogSourcesData?.items ?? [], [catalogSourcesData?.items]);
   const installed = useMemo(() => installedData?.items ?? [], [installedData?.items]);
   const installedByAppId = useMemo(() => new Map(installed.map((app) => [app.app_id, app])), [installed]);
   const registrySlugs = useMemo(() => new Set((registryData?.items ?? []).map((item) => item.slug)), [registryData?.items]);
@@ -162,6 +173,42 @@ export function AppsPage() {
       });
       setMessage(`Catalog entry ${entry.app_id} was refreshed.`);
       setCatalogForm((prev) => ({ ...prev, base_url: "", summary: "" }));
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const handleCreateCatalogSource = async () => {
+    resetNotices();
+    try {
+      const source = await createCatalogSource.mutateAsync({
+        name: sourceForm.name.trim(),
+        feed_url: sourceForm.feed_url.trim(),
+        trust_mode: sourceForm.trust_mode,
+      });
+      setMessage(`Catalog feed ${source.name} was saved.`);
+      setSourceForm((prev) => ({ ...prev, name: "", feed_url: "" }));
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const handleSyncCatalogSource = async (source: AppCatalogSource) => {
+    resetNotices();
+    try {
+      const result = await syncCatalogSource.mutateAsync(source.id);
+      const suffix = result.skipped > 0 ? `, ${result.skipped} failed` : "";
+      setMessage(`Catalog feed ${source.name} synced: ${result.imported}/${result.total} imported${suffix}.`);
+    } catch (error) {
+      setActionError(readErrorMessage(error));
+    }
+  };
+
+  const handleSetCatalogSourceEnabled = async (source: AppCatalogSource, isEnabled: boolean) => {
+    resetNotices();
+    try {
+      await setCatalogSourceEnabled.mutateAsync({ id: source.id, isEnabled });
+      setMessage(`${source.name} was ${isEnabled ? "enabled" : "disabled"}.`);
     } catch (error) {
       setActionError(readErrorMessage(error));
     }
@@ -316,6 +363,17 @@ export function AppsPage() {
 
       {activeTab === "catalog" && (
         <div className="space-y-5">
+          <CatalogSourcesPanel
+            sources={catalogSources}
+            isLoading={catalogSourcesLoading}
+            form={sourceForm}
+            setForm={setSourceForm}
+            onCreate={handleCreateCatalogSource}
+            onSync={handleSyncCatalogSource}
+            onSetEnabled={handleSetCatalogSourceEnabled}
+            isMutating={createCatalogSource.isPending || syncCatalogSource.isPending || setCatalogSourceEnabled.isPending}
+          />
+
           <Card className="rounded-hc-md">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-72 flex-1">
@@ -493,6 +551,99 @@ function Metric({ label, value }: { label: string; value: number }) {
       <div className="text-lg font-semibold leading-none">{value}</div>
       <div className="mt-1 text-xs text-hc-muted">{label}</div>
     </div>
+  );
+}
+
+function CatalogSourcesPanel({
+  sources,
+  isLoading,
+  form,
+  setForm,
+  onCreate,
+  onSync,
+  onSetEnabled,
+  isMutating,
+}: {
+  sources: AppCatalogSource[];
+  isLoading: boolean;
+  form: { name: string; feed_url: string; trust_mode: AppCatalogSource["trust_mode"] };
+  setForm: React.Dispatch<React.SetStateAction<{ name: string; feed_url: string; trust_mode: AppCatalogSource["trust_mode"] }>>;
+  onCreate: () => Promise<void>;
+  onSync: (source: AppCatalogSource) => Promise<void>;
+  onSetEnabled: (source: AppCatalogSource, isEnabled: boolean) => Promise<void>;
+  isMutating: boolean;
+}) {
+  return (
+    <Card className="rounded-hc-md p-0">
+      <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
+        <div>
+          <div className="text-sm font-semibold">Catalog feeds</div>
+          <div className="mt-1 text-xs text-hc-muted">Remote feeds that can populate the local catalog.</div>
+        </div>
+        <Badge>{isLoading ? "Loading" : `${sources.length} sources`}</Badge>
+      </div>
+
+      <div className="grid gap-3 border-b border-hc-outline px-5 py-4 lg:grid-cols-[minmax(180px,260px)_1fr_auto_auto]">
+        <Input
+          placeholder="Feed name"
+          value={form.name}
+          onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+        />
+        <Input
+          placeholder="https://catalog.example/.well-known/hc/app-catalog.json"
+          value={form.feed_url}
+          onChange={(event) => setForm((prev) => ({ ...prev, feed_url: event.target.value }))}
+        />
+        <select
+          className="h-10 rounded-hc-md border border-hc-outline bg-hc-surface px-3 text-sm text-hc-text"
+          value={form.trust_mode}
+          onChange={(event) => setForm((prev) => ({ ...prev, trust_mode: event.target.value as AppCatalogSource["trust_mode"] }))}
+        >
+          <option value="manual">manual</option>
+          <option value="dev">dev</option>
+          <option value="verified">verified</option>
+          <option value="official">official</option>
+        </select>
+        <Button onClick={() => void onCreate()} disabled={!form.name.trim() || !form.feed_url.trim() || isMutating}>
+          Add feed
+        </Button>
+      </div>
+
+      {sources.length === 0 ? (
+        <div className="px-5 py-5 text-sm text-hc-muted">No feed sources yet.</div>
+      ) : (
+        <div className="divide-y divide-hc-outline/70">
+          {sources.map((source) => (
+            <div key={source.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium">{source.name}</div>
+                  <Badge tone={source.is_enabled ? "good" : "neutral"}>{source.is_enabled ? "enabled" : "disabled"}</Badge>
+                  <Badge>{source.trust_mode}</Badge>
+                </div>
+                <div className="mt-1 break-all text-xs text-hc-muted">{source.feed_url}</div>
+                <div className="mt-1 text-xs text-hc-muted">
+                  Last sync: {formatDate(source.last_sync_at)}
+                  {source.last_error ? ` / ${source.last_error}` : ""}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outlined" disabled={!source.is_enabled || isMutating} onClick={() => void onSync(source)}>
+                  Sync
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={isMutating}
+                  onClick={() => void onSetEnabled(source, !source.is_enabled)}
+                >
+                  {source.is_enabled ? "Disable" : "Enable"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -55,6 +55,37 @@ export type CreateCatalogEntryPayload = {
   trust_status?: "dev" | "manual" | "unverified";
 };
 
+export type AppCatalogSource = {
+  id: string;
+  name: string;
+  source_type: "manual" | "feed";
+  feed_url: string | null;
+  trust_mode: "dev" | "manual" | "verified" | "official";
+  is_enabled: boolean;
+  last_sync_at: string | null;
+  last_error: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateCatalogSourcePayload = {
+  name: string;
+  feed_url: string;
+  trust_mode?: AppCatalogSource["trust_mode"];
+};
+
+export type SyncCatalogSourceResponse = {
+  source: AppCatalogSource;
+  feed_url: string;
+  fetched_at: string;
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: Array<{ manifest_url: string; message: string }>;
+  items: AppCatalogEntry[];
+};
+
 export type InstallCatalogEntryMode = "external" | "stage_only" | "compose";
 
 export type CatalogDeploymentPlan = {
@@ -95,6 +126,61 @@ export function useCreateCatalogEntryFromManifestMutation() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
+    },
+  });
+}
+
+export function useAppCatalogSourcesQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["app-catalog-sources"],
+    queryFn: () => authFetch<{ items: AppCatalogSource[] }>("/apps/catalog/sources"),
+    enabled,
+  });
+}
+
+export function useCreateCatalogSourceMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateCatalogSourcePayload) =>
+      authFetch<AppCatalogSource>("/apps/catalog/sources", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog-sources"] });
+    },
+  });
+}
+
+export function useSetCatalogSourceEnabledMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, isEnabled }: { id: string; isEnabled: boolean }) =>
+      authFetch<AppCatalogSource>(`/apps/catalog/sources/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_enabled: isEnabled }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog-sources"] });
+    },
+  });
+}
+
+export function useSyncCatalogSourceMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      authFetch<SyncCatalogSourceResponse>(`/apps/catalog/sources/${encodeURIComponent(id)}/sync`, {
+        method: "POST",
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["app-catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["app-catalog-sources"] }),
+      ]);
     },
   });
 }
