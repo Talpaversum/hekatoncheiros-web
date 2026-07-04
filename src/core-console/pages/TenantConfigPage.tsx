@@ -5,6 +5,13 @@ import { hasPrivilege } from "../../access/privileges";
 import { useContextQuery } from "../../data/api/context";
 import { useAppCatalogQuery } from "../../data/api/app-catalog";
 import { useTenantSettingsQuery, useUpdateTenantSettingsMutation } from "../../data/api/configuration";
+import {
+  usePrivilegeCatalogQuery,
+  useReplaceTenantUserPrivilegesMutation,
+  useTenantUsersQuery,
+  type IdentityUser,
+  type PrivilegeGrant,
+} from "../../data/api/identity";
 import { useInstalledAppsQuery } from "../../data/api/installed-apps";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { Button } from "../../ui-kit/components/Button";
@@ -26,18 +33,26 @@ export function TenantConfigPage() {
   const { data: catalogData } = useAppCatalogQuery(canManageApps);
   const { data: installedData } = useInstalledAppsQuery(canManageApps);
   const { data: tenantSettings } = useTenantSettingsQuery(true);
+  const { data: tenantUsersData } = useTenantUsersQuery(true);
+  const { data: privilegeCatalogData } = usePrivilegeCatalogQuery(true);
   const updateTenant = useUpdateTenantSettingsMutation();
+  const replaceTenantUserPrivileges = useReplaceTenantUserPrivilegesMutation();
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [primaryDomain, setPrimaryDomain] = useState<string | null>(null);
+  const [selectedTenantUserId, setSelectedTenantUserId] = useState("");
+  const [tenantGrantPrivilege, setTenantGrantPrivilege] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
   const installed = useMemo(() => installedData?.items ?? [], [installedData?.items]);
+  const tenantUsers = tenantUsersData?.items ?? [];
+  const tenantPrivilegeCatalog = (privilegeCatalogData?.items ?? []).filter((item) => item.scope === "tenant");
   const licenseRequired = catalog.filter((item) => item.license_required).length;
   const section = location.pathname.split("/").pop() ?? "";
   const effectiveTenantName = tenantName ?? tenantSettings?.name ?? context?.tenant.name ?? "";
   const effectivePrimaryDomain = primaryDomain ?? tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? "";
+  const selectedTenantUser = tenantUsers.find((item) => item.id === selectedTenantUserId) ?? tenantUsers[0];
 
   const handleSaveTenant = async () => {
     setMessage(null);
@@ -50,6 +65,43 @@ export function TenantConfigPage() {
       setTenantName(null);
       setPrimaryDomain(null);
       setMessage("Tenant details were updated.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleAddTenantGrant = async () => {
+    if (!selectedTenantUser || !tenantGrantPrivilege) {
+      return;
+    }
+    const exists = selectedTenantUser.privileges.some((item) => item.privilege === tenantGrantPrivilege);
+    if (exists) {
+      setError("This user already has that tenant privilege.");
+      return;
+    }
+    setMessage(null);
+    setError(null);
+    try {
+      await replaceTenantUserPrivileges.mutateAsync({
+        id: selectedTenantUser.id,
+        grants: [...selectedTenantUser.privileges, { privilege: tenantGrantPrivilege, tenant_id: tenantSettings?.id ?? context?.tenant.id ?? null }],
+      });
+      setTenantGrantPrivilege("");
+      setMessage("Tenant privilege was added.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleRemoveTenantGrant = async (user: IdentityUser, grant: PrivilegeGrant) => {
+    setMessage(null);
+    setError(null);
+    try {
+      await replaceTenantUserPrivileges.mutateAsync({
+        id: user.id,
+        grants: user.privileges.filter((item) => item.privilege !== grant.privilege),
+      });
+      setMessage("Tenant privilege was removed.");
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -86,8 +138,8 @@ export function TenantConfigPage() {
         </Card>
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">User management</div>
-          <div className="mt-3 text-2xl font-semibold">Planned</div>
-          <div className="mt-1 text-xs text-hc-muted">Tenant user and role APIs are not implemented yet.</div>
+          <div className="mt-3 text-2xl font-semibold">{tenantUsers.length}</div>
+          <div className="mt-1 text-xs text-hc-muted">Users with tenant-scoped privileges.</div>
         </Card>
       </section>}
 
@@ -126,15 +178,37 @@ export function TenantConfigPage() {
             <div>
               <div className="text-sm font-semibold">Users and roles</div>
               <div className="mt-2 text-xs text-hc-muted">
-                Tenant admins should be able to invite users and assign tenant-scoped privileges here.
+                Manage tenant-scoped privileges for users already known to the platform.
               </div>
             </div>
-            <StatusBadge>planned</StatusBadge>
+            <StatusBadge>{tenantUsers.length} users</StatusBadge>
           </div>
+
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ConfigTile title="Users" status="planned" detail="Invite, disable, and review tenant users." />
-            <ConfigTile title="Roles" status="planned" detail="Reusable tenant role bundles." />
-            <ConfigTile title="Delegation" status="planned" detail="Per-tenant delegation approvals and expiry." />
+            <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>
+              {tenantUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
+            </select>
+            <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}>
+              <option value="">Select tenant privilege</option>
+              {tenantPrivilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
+            </select>
+            <Button onClick={() => void handleAddTenantGrant()} disabled={!selectedTenantUser || !tenantGrantPrivilege || replaceTenantUserPrivileges.isPending}>
+              Add privilege
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {tenantUsers.length === 0 && <div className="text-sm text-hc-muted">No tenant users yet. Platform admin can create users and grant the first tenant privilege from Platform configuration.</div>}
+            {tenantUsers.map((user) => (
+              <TenantUserRow
+                key={user.id}
+                user={user}
+                selected={selectedTenantUser?.id === user.id}
+                onSelect={() => setSelectedTenantUserId(user.id)}
+                onRemove={(grant) => void handleRemoveTenantGrant(user, grant)}
+                busy={replaceTenantUserPrivileges.isPending}
+              />
+            ))}
           </div>
         </Card>}
 
@@ -184,6 +258,42 @@ function ConfigTile({ title, status, detail }: { title: string; status: string; 
         <StatusBadge>{status}</StatusBadge>
       </div>
       <div className="mt-2 text-xs text-hc-muted">{detail}</div>
+    </div>
+  );
+}
+
+function TenantUserRow({
+  user,
+  selected,
+  onSelect,
+  onRemove,
+  busy,
+}: {
+  user: IdentityUser;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: (grant: PrivilegeGrant) => void;
+  busy: boolean;
+}) {
+  return (
+    <div className={`rounded-hc-md border p-3 ${selected ? "border-hc-primary bg-hc-primary/5" : "border-hc-outline"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" className="text-left" onClick={onSelect}>
+          <div className="text-sm font-semibold">{user.display_name || user.email}</div>
+          <div className="mt-1 text-xs text-hc-muted">{user.email} · {user.id}</div>
+        </button>
+        <StatusBadge>{user.status}</StatusBadge>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {user.privileges.map((grant) => (
+          <div key={`${grant.privilege}:${grant.tenant_id ?? "tenant"}`} className="flex flex-wrap items-center justify-between gap-3 rounded-hc-sm border border-hc-outline bg-hc-surface p-2">
+            <div className="text-sm">{grant.privilege}</div>
+            <Button variant="ghost" onClick={() => onRemove(grant)} disabled={busy}>
+              Remove
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

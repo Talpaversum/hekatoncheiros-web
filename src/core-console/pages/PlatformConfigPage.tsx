@@ -5,6 +5,21 @@ import {
   usePlatformInstanceSettingsQuery,
   useUpdatePlatformInstanceSettingsMutation,
 } from "../../data/api/configuration";
+import {
+  useCreateIdentityTenantMutation,
+  useCreateIdentityUserMutation,
+  useIdentityTenantsQuery,
+  useIdentityUsersQuery,
+  usePrivilegeCatalogQuery,
+  useReplaceIdentityUserPrivilegesMutation,
+  useResetIdentityUserPasswordMutation,
+  useUpdateIdentityTenantMutation,
+  useUpdateIdentityUserMutation,
+  type IdentityTenant,
+  type IdentityUser,
+  type PrivilegeDefinition,
+  type PrivilegeGrant,
+} from "../../data/api/identity";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import {
   useCreateTrustedOriginMutation,
@@ -28,9 +43,19 @@ function StatusBadge({ children }: { children: React.ReactNode }) {
 
 export function PlatformConfigPage() {
   const location = useLocation();
+  const section = location.pathname.split("/").pop() ?? "";
   const { data, isLoading } = useTrustedOriginsQuery(true);
   const { data: platformInstance } = usePlatformInstanceSettingsQuery(true);
+  const { data: identityUsersData } = useIdentityUsersQuery(section === "identity" || section === "platform" || section === "");
+  const { data: identityTenantsData } = useIdentityTenantsQuery(section === "identity" || section === "platform" || section === "");
+  const { data: privilegeCatalogData } = usePrivilegeCatalogQuery(section === "identity");
   const updatePlatformInstance = useUpdatePlatformInstanceSettingsMutation();
+  const createUser = useCreateIdentityUserMutation();
+  const updateUser = useUpdateIdentityUserMutation();
+  const resetPassword = useResetIdentityUserPasswordMutation();
+  const replaceUserPrivileges = useReplaceIdentityUserPrivilegesMutation();
+  const createTenant = useCreateIdentityTenantMutation();
+  const updateTenant = useUpdateIdentityTenantMutation();
   const createMutation = useCreateTrustedOriginMutation();
   const updateMutation = useUpdateTrustedOriginMutation();
   const deleteMutation = useDeleteTrustedOriginMutation();
@@ -40,13 +65,26 @@ export function PlatformConfigPage() {
   const [allowHttp, setAllowHttp] = useState(false);
   const [instanceName, setInstanceName] = useState<string | null>(null);
   const [publicBaseUrl, setPublicBaseUrl] = useState<string | null>(null);
+  const [newUserId, setNewUserId] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [grantPrivilege, setGrantPrivilege] = useState("");
+  const [grantTenantId, setGrantTenantId] = useState("");
+  const [newTenantId, setNewTenantId] = useState("");
+  const [newTenantName, setNewTenantName] = useState("");
+  const [newTenantDomain, setNewTenantDomain] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const origins = data?.items ?? [];
-  const section = location.pathname.split("/").pop() ?? "";
+  const identityUsers = identityUsersData?.items ?? [];
+  const identityTenants = identityTenantsData?.items ?? [];
+  const privilegeCatalog = privilegeCatalogData?.items ?? [];
   const effectiveInstanceName = instanceName ?? platformInstance?.name ?? "";
   const effectivePublicBaseUrl = publicBaseUrl ?? platformInstance?.public_base_url ?? "";
+  const selectedUser = identityUsers.find((item) => item.id === selectedUserId) ?? identityUsers[0];
 
   const httpOriginDetected = useMemo(() => {
     try {
@@ -98,6 +136,94 @@ export function PlatformConfigPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    setMessage(null);
+    setError(null);
+    try {
+      const created = await createUser.mutateAsync({
+        id: newUserId.trim(),
+        email: newUserEmail.trim(),
+        display_name: newUserName.trim() || null,
+        password: newUserPassword,
+        status: "active",
+      });
+      setNewUserId("");
+      setNewUserEmail("");
+      setNewUserName("");
+      setNewUserPassword("");
+      setSelectedUserId(created.id);
+      setMessage("User was created.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleCreateTenant = async () => {
+    setMessage(null);
+    setError(null);
+    try {
+      await createTenant.mutateAsync({
+        id: newTenantId.trim(),
+        name: newTenantName.trim(),
+        primary_domain: newTenantDomain.trim() || null,
+        status: "active",
+      });
+      setNewTenantId("");
+      setNewTenantName("");
+      setNewTenantDomain("");
+      setMessage("Tenant was created.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleAddGrant = async () => {
+    if (!selectedUser || !grantPrivilege) {
+      return;
+    }
+    const nextGrant = {
+      privilege: grantPrivilege,
+      tenant_id: grantTenantId || null,
+    };
+    const definition = privilegeCatalog.find((item) => item.id === grantPrivilege);
+    if (definition?.scope === "platform" && nextGrant.tenant_id) {
+      setError("Platform privilege cannot be scoped to a tenant.");
+      return;
+    }
+    const exists = selectedUser.privileges.some(
+      (item) => item.privilege === nextGrant.privilege && item.tenant_id === nextGrant.tenant_id,
+    );
+    if (exists) {
+      setError("This privilege grant already exists.");
+      return;
+    }
+
+    setMessage(null);
+    setError(null);
+    try {
+      await replaceUserPrivileges.mutateAsync({ id: selectedUser.id, grants: [...selectedUser.privileges, nextGrant] });
+      setGrantPrivilege("");
+      setGrantTenantId("");
+      setMessage("Privilege grant was added.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
+  const handleRemoveGrant = async (user: IdentityUser, grant: PrivilegeGrant) => {
+    setMessage(null);
+    setError(null);
+    try {
+      await replaceUserPrivileges.mutateAsync({
+        id: user.id,
+        grants: user.privileges.filter((item) => item.privilege !== grant.privilege || item.tenant_id !== grant.tenant_id),
+      });
+      setMessage("Privilege grant was removed.");
+    } catch (err) {
+      setError(readErrorMessage(err));
+    }
+  };
+
   const handleToggle = async (item: TrustedOrigin) => {
     setMessage(null);
     setError(null);
@@ -136,6 +262,9 @@ export function PlatformConfigPage() {
         <div className="mt-1 text-sm text-hc-muted">Instance-wide controls for trust, app distribution, and platform governance.</div>
       </div>
 
+      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
+      {error && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{error}</div>}
+
       {(section === "platform" || section === "") && <section className="grid gap-4 lg:grid-cols-4">
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Trusted origins</div>
@@ -146,6 +275,16 @@ export function PlatformConfigPage() {
           <div className="text-sm font-semibold">Instance</div>
           <div className="mt-3 text-2xl font-semibold">{platformInstance?.name ?? "Core"}</div>
           <div className="mt-1 text-xs text-hc-muted">{platformInstance?.instance_id ?? "Loading..."}</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Users</div>
+          <div className="mt-3 text-2xl font-semibold">{identityUsers.length}</div>
+          <div className="mt-1 text-xs text-hc-muted">Platform identities known to Core.</div>
+        </Card>
+        <Card className="rounded-hc-md">
+          <div className="text-sm font-semibold">Tenants</div>
+          <div className="mt-3 text-2xl font-semibold">{identityTenants.length}</div>
+          <div className="mt-1 text-xs text-hc-muted">Tenant records managed by the platform.</div>
         </Card>
         <Card className="rounded-hc-md">
           <div className="text-sm font-semibold">Feed export</div>
@@ -257,20 +396,103 @@ export function PlatformConfigPage() {
           </div>
         </Card>}
 
-        {section === "identity" && <Card className="rounded-hc-md">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Identity and tenancy</div>
-              <div className="mt-2 text-xs text-hc-muted">Instance tenants, users, and delegation policies will live here once backend APIs exist.</div>
+        {section === "identity" && <div className="grid gap-4">
+          <Card className="rounded-hc-md">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">Users</div>
+                <div className="mt-2 text-xs text-hc-muted">Create platform users, edit basic fields, and reset passwords.</div>
+              </div>
+              <StatusBadge>{identityUsers.length} users</StatusBadge>
             </div>
-            <StatusBadge>planned</StatusBadge>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <ConfigTile title="Users" status="planned" detail="Create, disable, and inspect platform users." />
-            <ConfigTile title="Tenants" status="planned" detail="Manage tenant records and primary domains." />
-            <ConfigTile title="Delegation" status="planned" detail="Control impersonation and delegated administration." />
-          </div>
-        </Card>}
+            <div className="mt-4 grid gap-3 md:grid-cols-5">
+              <Input placeholder="usr_jana" value={newUserId} onChange={(event) => setNewUserId(event.target.value)} />
+              <Input placeholder="jana@example.com" value={newUserEmail} onChange={(event) => setNewUserEmail(event.target.value)} />
+              <Input placeholder="Display name" value={newUserName} onChange={(event) => setNewUserName(event.target.value)} />
+              <Input type="password" placeholder="Initial password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} />
+              <Button onClick={() => void handleCreateUser()} disabled={createUser.isPending || !newUserId.trim() || !newUserEmail.trim() || newUserPassword.length < 8}>
+                Create user
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {identityUsers.map((user) => (
+                <IdentityUserRow
+                  key={user.id}
+                  user={user}
+                  onSelect={() => setSelectedUserId(user.id)}
+                  selected={selectedUser?.id === user.id}
+                  onSave={(payload) => updateUser.mutateAsync(payload)}
+                  onPasswordReset={(password) => resetPassword.mutateAsync({ id: user.id, password })}
+                  busy={updateUser.isPending || resetPassword.isPending}
+                />
+              ))}
+            </div>
+          </Card>
+
+          <Card className="rounded-hc-md">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">Tenants</div>
+                <div className="mt-2 text-xs text-hc-muted">Manage tenant records and primary domains.</div>
+              </div>
+              <StatusBadge>{identityTenants.length} tenants</StatusBadge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <Input placeholder="tnt_partner" value={newTenantId} onChange={(event) => setNewTenantId(event.target.value)} />
+              <Input placeholder="Tenant name" value={newTenantName} onChange={(event) => setNewTenantName(event.target.value)} />
+              <Input placeholder="primary.example.com" value={newTenantDomain} onChange={(event) => setNewTenantDomain(event.target.value)} />
+              <Button onClick={() => void handleCreateTenant()} disabled={createTenant.isPending || !newTenantId.trim() || !newTenantName.trim()}>
+                Create tenant
+              </Button>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {identityTenants.map((tenant) => (
+                <IdentityTenantRow key={tenant.id} tenant={tenant} onSave={(payload) => updateTenant.mutateAsync(payload)} busy={updateTenant.isPending} />
+              ))}
+            </div>
+          </Card>
+
+          <Card className="rounded-hc-md">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">RBAC grants</div>
+                <div className="mt-2 text-xs text-hc-muted">Assign platform-scoped and tenant-scoped privileges directly to users.</div>
+              </div>
+              <StatusBadge>{privilegeCatalog.length} privileges</StatusBadge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={selectedUser?.id ?? ""} onChange={(event) => setSelectedUserId(event.target.value)}>
+                {identityUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
+              </select>
+              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={grantPrivilege} onChange={(event) => setGrantPrivilege(event.target.value)}>
+                <option value="">Select privilege</option>
+                {privilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
+              </select>
+              <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={grantTenantId} onChange={(event) => setGrantTenantId(event.target.value)}>
+                <option value="">Platform / all tenants</option>
+                {identityTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+              </select>
+              <Button onClick={() => void handleAddGrant()} disabled={!selectedUser || !grantPrivilege || replaceUserPrivileges.isPending}>
+                Add grant
+              </Button>
+            </div>
+            {selectedUser && (
+              <div className="mt-4 grid gap-2">
+                {selectedUser.privileges.length === 0 && <div className="text-sm text-hc-muted">Selected user has no grants.</div>}
+                {selectedUser.privileges.map((grant) => (
+                  <PrivilegeGrantRow
+                    key={`${grant.privilege}:${grant.tenant_id ?? "platform"}`}
+                    grant={grant}
+                    catalog={privilegeCatalog}
+                    tenants={identityTenants}
+                    onRemove={() => void handleRemoveGrant(selectedUser, grant)}
+                    busy={replaceUserPrivileges.isPending}
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>}
 
         {section === "automation" && <Card className="rounded-hc-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -299,6 +521,127 @@ function ConfigTile({ title, status, detail }: { title: string; status: string; 
         <StatusBadge>{status}</StatusBadge>
       </div>
       <div className="mt-2 text-xs text-hc-muted">{detail}</div>
+    </div>
+  );
+}
+
+function IdentityUserRow({
+  user,
+  selected,
+  onSelect,
+  onSave,
+  onPasswordReset,
+  busy,
+}: {
+  user: IdentityUser;
+  selected: boolean;
+  onSelect: () => void;
+  onSave: (payload: { id: string; email?: string; display_name?: string | null; status?: string }) => Promise<unknown>;
+  onPasswordReset: (password: string) => Promise<unknown>;
+  busy: boolean;
+}) {
+  const [email, setEmail] = useState(user.email);
+  const [displayName, setDisplayName] = useState(user.display_name ?? "");
+  const [status, setStatus] = useState(user.status);
+  const [password, setPassword] = useState("");
+
+  return (
+    <div className={`rounded-hc-md border p-3 ${selected ? "border-hc-primary bg-hc-primary/5" : "border-hc-outline"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" className="text-left" onClick={onSelect}>
+          <div className="text-sm font-semibold">{user.id}</div>
+          <div className="mt-1 text-xs text-hc-muted">{user.privileges.length} privilege grants</div>
+        </button>
+        <StatusBadge>{user.status}</StatusBadge>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-5">
+        <Input value={email} onChange={(event) => setEmail(event.target.value)} />
+        <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" />
+        <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="active">active</option>
+          <option value="disabled">disabled</option>
+        </select>
+        <Button variant="tonal" onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, status })} disabled={busy || !email.trim()}>
+          Save
+        </Button>
+        <Button variant="outlined" onClick={onSelect}>Manage grants</Button>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+        <Input type="password" placeholder="New password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <Button
+          variant="outlined"
+          onClick={() => {
+            void onPasswordReset(password).then(() => setPassword(""));
+          }}
+          disabled={busy || password.length < 8}
+        >
+          Reset password
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function IdentityTenantRow({
+  tenant,
+  onSave,
+  busy,
+}: {
+  tenant: IdentityTenant;
+  onSave: (payload: { id: string; name?: string; primary_domain?: string | null; status?: string }) => Promise<unknown>;
+  busy: boolean;
+}) {
+  const [name, setName] = useState(tenant.name);
+  const [primaryDomain, setPrimaryDomain] = useState(tenant.primary_domain ?? "");
+  const [status, setStatus] = useState(tenant.status);
+
+  return (
+    <div className="rounded-hc-md border border-hc-outline p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">{tenant.id}</div>
+          <div className="mt-1 text-xs text-hc-muted">Created {new Date(tenant.created_at).toLocaleString()}</div>
+        </div>
+        <StatusBadge>{tenant.status}</StatusBadge>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <Input value={name} onChange={(event) => setName(event.target.value)} />
+        <Input value={primaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder="Primary domain" />
+        <select className="rounded-hc-md border border-hc-outline bg-transparent px-3 py-2 text-sm text-hc-text" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="active">active</option>
+          <option value="disabled">disabled</option>
+        </select>
+        <Button variant="tonal" onClick={() => void onSave({ id: tenant.id, name: name.trim(), primary_domain: primaryDomain.trim() || null, status })} disabled={busy || !name.trim()}>
+          Save tenant
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PrivilegeGrantRow({
+  grant,
+  catalog,
+  tenants,
+  onRemove,
+  busy,
+}: {
+  grant: PrivilegeGrant;
+  catalog: PrivilegeDefinition[];
+  tenants: IdentityTenant[];
+  onRemove: () => void;
+  busy: boolean;
+}) {
+  const definition = catalog.find((item) => item.id === grant.privilege);
+  const tenant = tenants.find((item) => item.id === grant.tenant_id);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-hc-md border border-hc-outline p-3">
+      <div>
+        <div className="text-sm font-semibold">{grant.privilege}</div>
+        <div className="mt-1 text-xs text-hc-muted">{definition?.label ?? "Custom privilege"} · {tenant?.name ?? grant.tenant_id ?? "platform"}</div>
+      </div>
+      <Button variant="ghost" onClick={onRemove} disabled={busy}>Remove</Button>
     </div>
   );
 }
