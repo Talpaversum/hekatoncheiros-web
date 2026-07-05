@@ -19,6 +19,7 @@ import {
 } from "../../data/api/app-catalog";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
+  useCheckInstalledAppUpdateMutation,
   useInstalledAppsQuery,
   useRefreshInstalledAppArtifactMutation,
   useUninstallAppMutation,
@@ -181,6 +182,7 @@ export function AppsPage() {
   const setCatalogEntryPublication = useSetCatalogEntryPublicationMutation();
   const uninstallMutation = useUninstallAppMutation();
   const refreshArtifactMutation = useRefreshInstalledAppArtifactMutation();
+  const checkUpdateMutation = useCheckInstalledAppUpdateMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
@@ -392,6 +394,24 @@ export function AppsPage() {
     }
   };
 
+  const handleCheckUpdate = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      const result = await checkUpdateMutation.mutateAsync(app.app_id);
+      if (result.update_available === true) {
+        setMessage(
+          `${pickAppDisplayName(app)} has an update available (${result.installed.app_version ?? "unknown"} -> ${result.fetched.app_version}).`,
+        );
+      } else if (result.update_available === false) {
+        setMessage(`${pickAppDisplayName(app)} is up to date (${result.fetched.app_version}).`);
+      } else {
+        setMessage(`${pickAppDisplayName(app)} update state is unknown. Refresh artifact once to store a baseline manifest hash.`);
+      }
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
@@ -589,12 +609,13 @@ export function AppsPage() {
               setSelectedAppId(appId);
               navigate("/core/apps/licensing");
             }}
+            onCheckUpdate={handleCheckUpdate}
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);
               setUninstallState({ status: "confirm", app });
             }}
-            isMutating={refreshArtifactMutation.isPending}
+            isMutating={checkUpdateMutation.isPending || refreshArtifactMutation.isPending}
           />
         </Card>
       )}
@@ -908,6 +929,7 @@ function InstalledTable({
   registrySlugs,
   isLoading,
   onLicense,
+  onCheckUpdate,
   onRefreshArtifact,
   onUninstall,
   isMutating,
@@ -916,6 +938,7 @@ function InstalledTable({
   registrySlugs: Set<string>;
   isLoading: boolean;
   onLicense: (appId: string) => void;
+  onCheckUpdate: (app: InstalledApp) => Promise<void>;
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
   isMutating: boolean;
@@ -965,6 +988,9 @@ function InstalledTable({
                 <div className="flex flex-wrap gap-2">
                   <Button variant="tonal" onClick={() => onLicense(app.app_id)}>
                     Licensing
+                  </Button>
+                  <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>
+                    Check update
                   </Button>
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>
                     Refresh artifact

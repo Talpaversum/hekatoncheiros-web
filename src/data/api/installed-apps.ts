@@ -8,6 +8,7 @@ export type InstalledApp = {
   app_name?: string;
   base_url: string;
   app_version?: string;
+  manifest_hash?: string;
   manifest_version?: string;
   fetched_at?: string;
   ui_url: string;
@@ -50,6 +51,23 @@ export type FetchManifestResponse = {
   app_id: string;
   app_version: string;
   slug: string | null;
+};
+
+export type CheckInstalledAppUpdateResponse = {
+  app_id: string;
+  checked_at: string;
+  update_available: boolean | null;
+  installed: {
+    app_version: string | null;
+    manifest_hash: string | null;
+    fetched_at: string | null;
+  };
+  fetched: {
+    app_version: string;
+    manifest_hash: string;
+    fetched_at: string;
+    fetched_from_url: string;
+  };
 };
 
 export function useInstalledAppsQuery(enabled = true) {
@@ -142,5 +160,18 @@ export function useRefreshInstalledAppArtifactMutation() {
       await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
       await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
     },
+  });
+}
+
+export function useCheckInstalledAppUpdateMutation() {
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<CheckInstalledAppUpdateResponse>(
+        `/apps/installed/${encodeURIComponent(appId)}/check-update`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      ),
   });
 }
