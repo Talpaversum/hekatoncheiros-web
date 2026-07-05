@@ -19,6 +19,13 @@ const sidebarConfig = [
     ],
   },
   {
+    prefix: "/core/help",
+    title: "Help",
+    items: [
+      { to: "/core/help", label: "Help center" },
+    ],
+  },
+  {
     prefix: "/core/account",
     title: "Account",
     items: [

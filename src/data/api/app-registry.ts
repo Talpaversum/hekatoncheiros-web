@@ -12,6 +12,15 @@ export type AppRegistryEntry = {
     path: string;
     required_privileges?: string[];
   }>;
+  help_entries?: Array<{
+    title: string;
+    summary: string;
+    outcome?: string;
+    category?: string;
+    steps: string[];
+    path: string;
+    required_privileges?: string[];
+  }>;
 };
 
 export function useAppRegistryQuery(enabled = true) {

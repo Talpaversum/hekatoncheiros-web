@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { hasPrivilege } from "../../access/privileges";
+import { getHelpCategoryPath, getVisiblePlatformHelpGuides } from "../../core-console/pages/help-guides";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { clearTokens } from "../../data/auth/storage";
 import { Avatar } from "../components/Avatar";
@@ -19,9 +20,11 @@ type AppTopBarProps = {
 
 export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: AppTopBarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDark, toggle } = useTheme();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
   const [appsOpen, setAppsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
 
@@ -56,7 +59,12 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
     navigate("/core/tenant");
   };
 
-  const appGroups = registry?.items ?? [];
+  const appGroups = useMemo(() => registry?.items ?? [], [registry?.items]);
+  const helpCategories = useMemo(() => {
+    const platformCategories = getVisiblePlatformHelpGuides(privileges).map((guide) => guide.category);
+    const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? "Aplikace"));
+    return Array.from(new Set([...platformCategories, ...appCategories])).sort((a, b) => a.localeCompare(b));
+  }, [appGroups, privileges]);
 
   return (
     <header className="sticky top-0 z-40 bg-hc-topbar shadow-hc-topbar">
@@ -77,7 +85,10 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
             </NavLink>
             <div className="relative">
               <button
-                onClick={() => setAppsOpen((prev) => !prev)}
+                onClick={() => {
+                  setHelpOpen(false);
+                  setAppsOpen((prev) => !prev);
+                }}
                 className="rounded-hc-sm px-3 py-2 text-hc-muted transition hover:text-hc-text"
                 aria-expanded={appsOpen}
               >
@@ -122,6 +133,44 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
             >
               Licensing
             </NavLink>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setAppsOpen(false);
+                  setHelpOpen((prev) => !prev);
+                }}
+                className={`rounded-hc-sm px-3 py-2 transition ${
+                  location.pathname.startsWith("/core/help")
+                    ? "bg-hc-surface text-hc-text"
+                    : "text-hc-muted hover:text-hc-text"
+                }`}
+                aria-expanded={helpOpen}
+              >
+                Help ▾
+              </button>
+              <Menu open={helpOpen} onClose={() => setHelpOpen(false)} className="w-72">
+                <NavLink
+                  to="/core/help"
+                  onClick={() => setHelpOpen(false)}
+                  className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
+                >
+                  Všechny návody
+                </NavLink>
+                {helpCategories.length > 0 && <div className="my-2 border-t border-hc-outline" />}
+                <div className="max-h-[24rem] overflow-auto pr-1">
+                  {helpCategories.map((category) => (
+                    <NavLink
+                      key={category}
+                      to={getHelpCategoryPath(category)}
+                      onClick={() => setHelpOpen(false)}
+                      className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
+                    >
+                      {category}
+                    </NavLink>
+                  ))}
+                </div>
+              </Menu>
+            </div>
           </nav>
         </div>
 

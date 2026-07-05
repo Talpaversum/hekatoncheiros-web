@@ -5,6 +5,7 @@ import { RequirePrivilege } from "./app/RequirePrivilege";
 import { AccountPage } from "./core-console/pages/AccountPage";
 import { LoginPage } from "./core-console/pages/LoginPage";
 import { DashboardPage } from "./core-console/pages/DashboardPage";
+import { HelpPage } from "./core-console/pages/HelpPage";
 import { AppsPage } from "./core-console/pages/AppsPage";
 import { LicensingPage } from "./core-console/pages/LicensingPage";
 import { PlatformConfigPage } from "./core-console/pages/PlatformConfigPage";
@@ -18,6 +19,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/core" element={<AppShell />}>
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="help" element={<HelpPage />} />
+        <Route path="help/:categorySlug" element={<HelpPage />} />
         <Route path="account/*" element={<AccountPage />} />
         <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing" element={<LicensingPage />} />

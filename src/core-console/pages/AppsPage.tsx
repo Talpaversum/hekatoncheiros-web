@@ -20,6 +20,7 @@ import {
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
   useInstalledAppsQuery,
+  useRefreshInstalledAppArtifactMutation,
   useUninstallAppMutation,
   type InstalledApp,
 } from "../../data/api/installed-apps";
@@ -179,6 +180,7 @@ export function AppsPage() {
   const installCatalogEntry = useInstallCatalogEntryMutation();
   const setCatalogEntryPublication = useSetCatalogEntryPublicationMutation();
   const uninstallMutation = useUninstallAppMutation();
+  const refreshArtifactMutation = useRefreshInstalledAppArtifactMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
@@ -380,6 +382,16 @@ export function AppsPage() {
     setUninstallConfirmChecked(false);
   };
 
+  const handleRefreshArtifact = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      await refreshArtifactMutation.mutateAsync(app.app_id);
+      setMessage(`${pickAppDisplayName(app)} artifact was refreshed.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
@@ -577,10 +589,12 @@ export function AppsPage() {
               setSelectedAppId(appId);
               navigate("/core/apps/licensing");
             }}
+            onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);
               setUninstallState({ status: "confirm", app });
             }}
+            isMutating={refreshArtifactMutation.isPending}
           />
         </Card>
       )}
@@ -894,13 +908,17 @@ function InstalledTable({
   registrySlugs,
   isLoading,
   onLicense,
+  onRefreshArtifact,
   onUninstall,
+  isMutating,
 }: {
   apps: InstalledApp[];
   registrySlugs: Set<string>;
   isLoading: boolean;
   onLicense: (appId: string) => void;
+  onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
+  isMutating: boolean;
 }) {
   if (isLoading) {
     return <div className="px-5 py-6 text-sm text-hc-muted">Loading installed apps...</div>;
@@ -947,6 +965,9 @@ function InstalledTable({
                 <div className="flex flex-wrap gap-2">
                   <Button variant="tonal" onClick={() => onLicense(app.app_id)}>
                     Licensing
+                  </Button>
+                  <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>
+                    Refresh artifact
                   </Button>
                   <Button variant="outlined" onClick={() => onUninstall(app)}>
                     Uninstall

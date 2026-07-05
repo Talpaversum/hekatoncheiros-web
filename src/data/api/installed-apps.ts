@@ -124,3 +124,23 @@ export function useUninstallAppMutation() {
     },
   });
 }
+
+export function useRefreshInstalledAppArtifactMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<{ status: string; app_id: string; refreshed_at: string }>(
+        `/apps/installed/${encodeURIComponent(appId)}/refresh-artifact`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
+      await queryClient.invalidateQueries({ queryKey: ["app-registry"] });
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog"] });
+    },
+  });
+}
