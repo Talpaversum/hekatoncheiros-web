@@ -88,6 +88,13 @@ export type CheckInstalledAppUpdateResponse = {
   };
 };
 
+export type IssueInstalledAppTokenResponse = {
+  app_id: string;
+  token_type: "Bearer";
+  access_token: string;
+  expires_at: string;
+};
+
 export function useInstalledAppsQuery(enabled = true) {
   return useQuery({
     queryKey: ["installed-apps"],
@@ -186,6 +193,19 @@ export function useCheckInstalledAppUpdateMutation() {
     mutationFn: (appId: string) =>
       authFetch<CheckInstalledAppUpdateResponse>(
         `/apps/installed/${encodeURIComponent(appId)}/check-update`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      ),
+  });
+}
+
+export function useIssueInstalledAppTokenMutation() {
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<IssueInstalledAppTokenResponse>(
+        `/apps/installed/${encodeURIComponent(appId)}/app-token`,
         {
           method: "POST",
           body: JSON.stringify({}),

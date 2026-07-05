@@ -22,9 +22,11 @@ import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
   useCheckInstalledAppUpdateMutation,
   useClearInstalledAppUpdateSignalMutation,
+  useIssueInstalledAppTokenMutation,
   useInstalledAppsQuery,
   useRefreshInstalledAppArtifactMutation,
   useUninstallAppMutation,
+  type IssueInstalledAppTokenResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
 import { readErrorMessage } from "../../data/api/read-error-message";
@@ -59,6 +61,10 @@ type InstallDialogState =
   | { status: "running"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
   | { status: "result"; entry: AppCatalogEntry; message: string; plan: CatalogDeploymentPlan }
   | { status: "error"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; error: string; plan: CatalogDeploymentPlan };
+
+type AppTokenDialogState =
+  | { status: "idle" }
+  | { status: "issued"; app: InstalledApp; token: IssueInstalledAppTokenResponse };
 
 function Badge({ tone = "neutral", children }: { tone?: "neutral" | "good" | "warn" | "danger"; children: React.ReactNode }) {
   const toneClass = {
@@ -187,6 +193,7 @@ export function AppsPage() {
   const refreshArtifactMutation = useRefreshInstalledAppArtifactMutation();
   const checkUpdateMutation = useCheckInstalledAppUpdateMutation();
   const clearUpdateSignalMutation = useClearInstalledAppUpdateSignalMutation();
+  const issueAppTokenMutation = useIssueInstalledAppTokenMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
@@ -201,6 +208,7 @@ export function AppsPage() {
   const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
   const [offlineToken, setOfflineToken] = useState("");
   const [installDialog, setInstallDialog] = useState<InstallDialogState>({ status: "idle" });
+  const [appTokenDialog, setAppTokenDialog] = useState<AppTokenDialogState>({ status: "idle" });
   const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
 
@@ -441,6 +449,17 @@ export function AppsPage() {
     }
   };
 
+  const handleIssueAppToken = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      const token = await issueAppTokenMutation.mutateAsync(app.app_id);
+      setAppTokenDialog({ status: "issued", app, token });
+      setMessage(`${pickAppDisplayName(app)} app token was issued.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
@@ -668,6 +687,7 @@ export function AppsPage() {
             }}
             onCheckUpdate={handleCheckUpdate}
             onClearUpdateSignal={handleClearUpdateSignal}
+            onIssueAppToken={handleIssueAppToken}
             onRefreshCatalog={handleRefreshCatalogFromInstalled}
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => {
@@ -677,6 +697,7 @@ export function AppsPage() {
             isMutating={
               checkUpdateMutation.isPending ||
               clearUpdateSignalMutation.isPending ||
+              issueAppTokenMutation.isPending ||
               refreshArtifactMutation.isPending ||
               refreshCatalogFromInstalled.isPending
             }
@@ -761,6 +782,10 @@ export function AppsPage() {
         onModeChange={setInstallMode}
         onClose={closeInstallDialog}
         onConfirm={executeCatalogInstall}
+      />
+      <AppTokenDialog
+        state={appTokenDialog}
+        onClose={() => setAppTokenDialog({ status: "idle" })}
       />
     </div>
   );
@@ -995,6 +1020,7 @@ function InstalledTable({
   onLicense,
   onCheckUpdate,
   onClearUpdateSignal,
+  onIssueAppToken,
   onRefreshCatalog,
   onRefreshArtifact,
   onUninstall,
@@ -1006,6 +1032,7 @@ function InstalledTable({
   onLicense: (appId: string) => void;
   onCheckUpdate: (app: InstalledApp) => Promise<void>;
   onClearUpdateSignal: (app: InstalledApp) => Promise<void>;
+  onIssueAppToken: (app: InstalledApp) => Promise<void>;
   onRefreshCatalog: (app: InstalledApp) => Promise<void>;
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
@@ -1096,6 +1123,9 @@ function InstalledTable({
                       Clear signal
                     </Button>
                   )}
+                  <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>
+                    Issue token
+                  </Button>
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>
                     Refresh catalog
                   </Button>
@@ -1112,6 +1142,46 @@ function InstalledTable({
         })}
       </tbody>
     </Table>
+  );
+}
+
+function AppTokenDialog({
+  state,
+  onClose,
+}: {
+  state: AppTokenDialogState;
+  onClose: () => void;
+}) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  const copyToken = () => {
+    void navigator.clipboard?.writeText(state.token.access_token);
+  };
+
+  return (
+    <Dialog open title="App token" onClose={onClose}>
+      <div className="space-y-4">
+        <div>
+          <div className="text-lg font-semibold">{pickAppDisplayName(state.app)}</div>
+          <div className="mt-1 text-sm text-hc-muted">
+            Short-lived app token for Core app-auth endpoints. Expires {formatDate(state.token.expires_at)}.
+          </div>
+        </div>
+        <textarea
+          readOnly
+          className="min-h-36 w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 font-mono text-xs text-hc-text focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/20"
+          value={state.token.access_token}
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="outlined" onClick={copyToken}>
+            Copy token
+          </Button>
+          <Button onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 
