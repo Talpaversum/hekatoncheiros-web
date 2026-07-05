@@ -9,6 +9,7 @@ import {
   useCreateCatalogSourceMutation,
   useDeleteCatalogEntryMutation,
   useInstallCatalogEntryMutation,
+  useRefreshCatalogEntryFromInstalledMutation,
   useSetCatalogSourceEnabledMutation,
   useSetCatalogEntryPublicationMutation,
   useSyncCatalogSourceMutation,
@@ -174,6 +175,7 @@ export function AppsPage() {
   const { data: installedData, isLoading: installedLoading, error: installedError } = useInstalledAppsQuery(canManageApps);
   const { data: registryData } = useAppRegistryQuery(canManageApps);
   const createCatalogEntry = useCreateCatalogEntryFromManifestMutation();
+  const refreshCatalogFromInstalled = useRefreshCatalogEntryFromInstalledMutation();
   const createCatalogSource = useCreateCatalogSourceMutation();
   const setCatalogSourceEnabled = useSetCatalogSourceEnabledMutation();
   const syncCatalogSource = useSyncCatalogSourceMutation();
@@ -412,6 +414,16 @@ export function AppsPage() {
     }
   };
 
+  const handleRefreshCatalogFromInstalled = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      const entry = await refreshCatalogFromInstalled.mutateAsync(app.app_id);
+      setMessage(`${entry.app_name} catalog entry was refreshed from installed app.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
@@ -610,12 +622,13 @@ export function AppsPage() {
               navigate("/core/apps/licensing");
             }}
             onCheckUpdate={handleCheckUpdate}
+            onRefreshCatalog={handleRefreshCatalogFromInstalled}
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);
               setUninstallState({ status: "confirm", app });
             }}
-            isMutating={checkUpdateMutation.isPending || refreshArtifactMutation.isPending}
+            isMutating={checkUpdateMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending}
           />
         </Card>
       )}
@@ -930,6 +943,7 @@ function InstalledTable({
   isLoading,
   onLicense,
   onCheckUpdate,
+  onRefreshCatalog,
   onRefreshArtifact,
   onUninstall,
   isMutating,
@@ -939,6 +953,7 @@ function InstalledTable({
   isLoading: boolean;
   onLicense: (appId: string) => void;
   onCheckUpdate: (app: InstalledApp) => Promise<void>;
+  onRefreshCatalog: (app: InstalledApp) => Promise<void>;
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
   isMutating: boolean;
@@ -1009,6 +1024,9 @@ function InstalledTable({
                   </Button>
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>
                     Check update
+                  </Button>
+                  <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>
+                    Refresh catalog
                   </Button>
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>
                     Refresh artifact

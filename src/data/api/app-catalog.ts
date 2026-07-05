@@ -141,6 +141,24 @@ export function useCreateCatalogEntryFromManifestMutation() {
   });
 }
 
+export function useRefreshCatalogEntryFromInstalledMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<AppCatalogEntry>(`/apps/catalog/entries/${encodeURIComponent(appId)}/refresh-from-installed`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["app-catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["installed-apps"] }),
+      ]);
+    },
+  });
+}
+
 export function useAppCatalogSourcesQuery(enabled = true) {
   return useQuery({
     queryKey: ["app-catalog-sources"],
