@@ -21,6 +21,7 @@ import {
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import {
   useCheckInstalledAppUpdateMutation,
+  useClearInstalledAppUpdateSignalMutation,
   useInstalledAppsQuery,
   useRefreshInstalledAppArtifactMutation,
   useUninstallAppMutation,
@@ -185,6 +186,7 @@ export function AppsPage() {
   const uninstallMutation = useUninstallAppMutation();
   const refreshArtifactMutation = useRefreshInstalledAppArtifactMutation();
   const checkUpdateMutation = useCheckInstalledAppUpdateMutation();
+  const clearUpdateSignalMutation = useClearInstalledAppUpdateSignalMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
@@ -215,7 +217,9 @@ export function AppsPage() {
   const publishedCount = catalog.filter((item) => item.published).length;
   const availableCatalogUpdates = installed.filter((item) => item.catalog_update?.state === "available");
   const staleCatalogSnapshots = installed.filter((item) => item.catalog_update?.state === "stale");
-  const hasCatalogSignals = availableCatalogUpdates.length > 0 || staleCatalogSnapshots.length > 0;
+  const reportedUpdateSignals = installed.filter((item) => item.update_signal);
+  const hasUpdateSignals =
+    availableCatalogUpdates.length > 0 || staleCatalogSnapshots.length > 0 || reportedUpdateSignals.length > 0;
   const activeTab = readTabFromPath(location.pathname);
   const installedErrorMessage = installedError ? formatActionError(installedError) : null;
   const visibleInstalledError = installedErrorMessage === dismissedInstalledError ? null : installedErrorMessage;
@@ -427,6 +431,16 @@ export function AppsPage() {
     }
   };
 
+  const handleClearUpdateSignal = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      await clearUpdateSignalMutation.mutateAsync(app.app_id);
+      setMessage(`${pickAppDisplayName(app)} update signal was cleared.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const handleSetSelection = async () => {
     if (!effectiveSelectedAppId || !selectedEntitlementId) {
       return;
@@ -503,22 +517,25 @@ export function AppsPage() {
         </div>
       </header>
 
-      {hasCatalogSignals && (
+      {hasUpdateSignals && (
         <Card className="rounded-hc-md border-hc-primary/25 bg-hc-primary/5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-semibold">Catalog update attention</div>
+                <div className="text-sm font-semibold">Application update attention</div>
+                {reportedUpdateSignals.length > 0 && (
+                  <Badge tone="warn">{reportedUpdateSignals.length} app signal reported</Badge>
+                )}
                 {availableCatalogUpdates.length > 0 && (
-                  <Badge tone="warn">{availableCatalogUpdates.length} update available</Badge>
+                  <Badge tone="warn">{availableCatalogUpdates.length} catalog update available</Badge>
                 )}
                 {staleCatalogSnapshots.length > 0 && (
                   <Badge tone="neutral">{staleCatalogSnapshots.length} catalog snapshot stale</Badge>
                 )}
               </div>
               <div className="mt-2 max-w-3xl text-sm text-hc-muted">
-                Installed apps are compared with matching catalog entries. Review available updates before refreshing artifacts;
-                refresh stale catalog entries when the running installation is newer than the local catalog snapshot.
+                Installed apps can report update signals, and Core compares them with matching catalog entries. Review
+                signals before refreshing artifacts; clear signals that are informational or already handled.
               </div>
             </div>
             <Button variant="outlined" onClick={() => navigate("/core/apps/installed")}>
@@ -650,13 +667,19 @@ export function AppsPage() {
               navigate("/core/apps/licensing");
             }}
             onCheckUpdate={handleCheckUpdate}
+            onClearUpdateSignal={handleClearUpdateSignal}
             onRefreshCatalog={handleRefreshCatalogFromInstalled}
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => {
               setUninstallConfirmChecked(false);
               setUninstallState({ status: "confirm", app });
             }}
-            isMutating={checkUpdateMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending}
+            isMutating={
+              checkUpdateMutation.isPending ||
+              clearUpdateSignalMutation.isPending ||
+              refreshArtifactMutation.isPending ||
+              refreshCatalogFromInstalled.isPending
+            }
           />
         </Card>
       )}
@@ -971,6 +994,7 @@ function InstalledTable({
   isLoading,
   onLicense,
   onCheckUpdate,
+  onClearUpdateSignal,
   onRefreshCatalog,
   onRefreshArtifact,
   onUninstall,
@@ -981,6 +1005,7 @@ function InstalledTable({
   isLoading: boolean;
   onLicense: (appId: string) => void;
   onCheckUpdate: (app: InstalledApp) => Promise<void>;
+  onClearUpdateSignal: (app: InstalledApp) => Promise<void>;
   onRefreshCatalog: (app: InstalledApp) => Promise<void>;
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
@@ -1013,6 +1038,19 @@ function InstalledTable({
                 <div className="font-medium">{pickAppDisplayName(app)}</div>
                 <div className="mt-1 text-xs text-hc-muted">{app.app_id}</div>
                 {app.app_version && <div className="mt-1 text-xs text-hc-muted">installed {app.app_version}</div>}
+                {app.update_signal && (
+                  <div className="mt-3 max-w-md rounded-hc-md border border-hc-warning/25 bg-hc-warning/10 px-3 py-2 text-xs">
+                    <div className="font-semibold text-hc-warning">
+                      Update signal from {app.update_signal.source}
+                      {app.update_signal.app_version ? ` (${app.update_signal.app_version})` : ""}
+                    </div>
+                    <div className="mt-1 text-hc-muted">reported {formatDate(app.update_signal.reported_at)}</div>
+                    {app.update_signal.note && <div className="mt-1 text-hc-muted">{app.update_signal.note}</div>}
+                    {app.update_signal.manifest_hash && (
+                      <div className="mt-1 break-all text-hc-muted">manifest {app.update_signal.manifest_hash}</div>
+                    )}
+                  </div>
+                )}
               </td>
               <td className="px-5 py-4">
                 <Badge tone={status.tone}>{status.label}</Badge>
@@ -1053,6 +1091,11 @@ function InstalledTable({
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>
                     Check update
                   </Button>
+                  {app.update_signal && (
+                    <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>
+                      Clear signal
+                    </Button>
+                  )}
                   <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>
                     Refresh catalog
                   </Button>

@@ -25,6 +25,15 @@ export type InstalledApp = {
     source_type: "manual" | "feed";
     trust_status: "dev" | "manual" | "unverified" | "verified" | "official" | "rejected";
   } | null;
+  update_signal: {
+    source: "app" | "feed" | "manual";
+    app_version: string | null;
+    manifest_hash: string | null;
+    manifest_url: string | null;
+    note: string | null;
+    reported_at: string;
+    update_available: boolean | null;
+  } | null;
   resolved_entitlement:
     | {
         entitlement_id: string;
@@ -182,5 +191,19 @@ export function useCheckInstalledAppUpdateMutation() {
           body: JSON.stringify({}),
         },
       ),
+  });
+}
+
+export function useClearInstalledAppUpdateSignalMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<void>(`/apps/installed/${encodeURIComponent(appId)}/update-signal`, {
+        method: "DELETE",
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
+    },
   });
 }
