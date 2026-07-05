@@ -213,6 +213,9 @@ export function AppsPage() {
   const licensedCatalogCount = catalog.filter((item) => item.license_required).length;
   const installableCount = catalog.filter((item) => !item.installed).length;
   const publishedCount = catalog.filter((item) => item.published).length;
+  const availableCatalogUpdates = installed.filter((item) => item.catalog_update?.state === "available");
+  const staleCatalogSnapshots = installed.filter((item) => item.catalog_update?.state === "stale");
+  const hasCatalogSignals = availableCatalogUpdates.length > 0 || staleCatalogSnapshots.length > 0;
   const activeTab = readTabFromPath(location.pathname);
   const installedErrorMessage = installedError ? formatActionError(installedError) : null;
   const visibleInstalledError = installedErrorMessage === dismissedInstalledError ? null : installedErrorMessage;
@@ -499,6 +502,31 @@ export function AppsPage() {
           <Metric label="Published" value={publishedCount} />
         </div>
       </header>
+
+      {hasCatalogSignals && (
+        <Card className="rounded-hc-md border-hc-primary/25 bg-hc-primary/5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold">Catalog update attention</div>
+                {availableCatalogUpdates.length > 0 && (
+                  <Badge tone="warn">{availableCatalogUpdates.length} update available</Badge>
+                )}
+                {staleCatalogSnapshots.length > 0 && (
+                  <Badge tone="neutral">{staleCatalogSnapshots.length} catalog snapshot stale</Badge>
+                )}
+              </div>
+              <div className="mt-2 max-w-3xl text-sm text-hc-muted">
+                Installed apps are compared with matching catalog entries. Review available updates before refreshing artifacts;
+                refresh stale catalog entries when the running installation is newer than the local catalog snapshot.
+              </div>
+            </div>
+            <Button variant="outlined" onClick={() => navigate("/core/apps/installed")}>
+              Review installed apps
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-hc-outline">
         {([
