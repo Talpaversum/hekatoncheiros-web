@@ -969,10 +969,28 @@ function InstalledTable({
               <td className="px-5 py-4">
                 <div className="font-medium">{pickAppDisplayName(app)}</div>
                 <div className="mt-1 text-xs text-hc-muted">{app.app_id}</div>
+                {app.app_version && <div className="mt-1 text-xs text-hc-muted">installed {app.app_version}</div>}
               </td>
               <td className="px-5 py-4">
                 <Badge tone={status.tone}>{status.label}</Badge>
                 {status.detail && <div className="mt-2 max-w-md text-xs text-hc-muted">{status.detail}</div>}
+                {app.catalog_update && (
+                  <div className="mt-3 max-w-md">
+                    {app.catalog_update.state === "available" && (
+                      <Badge tone="warn">Catalog update available ({app.catalog_update.app_version})</Badge>
+                    )}
+                    {app.catalog_update.state === "same" && <Badge tone="good">Catalog up to date</Badge>}
+                    {app.catalog_update.state === "stale" && (
+                      <Badge tone="neutral">Catalog snapshot older than install</Badge>
+                    )}
+                    {app.catalog_update.state === "baseline_missing" && (
+                      <Badge tone="neutral">Catalog baseline missing</Badge>
+                    )}
+                    <div className="mt-2 text-xs text-hc-muted">
+                      {app.catalog_update.source_type} / {app.catalog_update.trust_status}, fetched {formatDate(app.catalog_update.fetched_at)}
+                    </div>
+                  </div>
+                )}
               </td>
               <td className="px-5 py-4 text-sm">
                 {app.resolved_entitlement ? (

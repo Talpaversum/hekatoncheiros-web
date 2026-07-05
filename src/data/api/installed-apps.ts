@@ -16,6 +16,15 @@ export type InstalledApp = {
   required_privileges: string[];
   nav_entries?: Array<{ label: string; path: string; required_privileges?: string[] }>;
   enabled?: boolean;
+  catalog_update: {
+    state: "available" | "same" | "stale" | "baseline_missing";
+    update_available: boolean | null;
+    app_version: string;
+    manifest_hash: string;
+    fetched_at: string;
+    source_type: "manual" | "feed";
+    trust_status: "dev" | "manual" | "unverified" | "verified" | "official" | "rejected";
+  } | null;
   resolved_entitlement:
     | {
         entitlement_id: string;
