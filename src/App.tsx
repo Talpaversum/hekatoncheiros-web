@@ -23,7 +23,7 @@ export default function App() {
         <Route path="help/:categorySlug" element={<HelpPage />} />
         <Route path="account/*" element={<AccountPage />} />
         <Route path="apps/*" element={<AppsPage />} />
-        <Route path="licensing" element={<LicensingPage />} />
+        <Route path="licensing/*" element={<LicensingPage />} />
         <Route
           path="platform/*"
           element={

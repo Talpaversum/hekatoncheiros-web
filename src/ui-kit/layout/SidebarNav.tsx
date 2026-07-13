@@ -46,8 +46,9 @@ const sidebarConfig = [
     prefix: "/core/licensing",
     title: "Licensing",
     items: [
-      { to: "/core/licensing", label: "App inventory" },
-      { to: "/core/licensing", label: "Aktivace" },
+      { to: "/core/licensing", label: "License inventory" },
+      { to: "/core/licensing/import", label: "Offline import" },
+      { to: "/core/licensing/activation", label: "OAuth activation" },
     ],
   },
   {
@@ -91,17 +92,18 @@ export function SidebarNav({ children }: SidebarNavProps) {
 
   return (
     <>
-      <aside className="w-64 bg-hc-rail px-5 py-6 shadow-hc-card">
+      <aside className="w-full shrink-0 border-b border-hc-outline bg-hc-rail px-4 py-3 md:w-60 md:border-b-0 md:border-r md:py-5">
         <div className="text-xs uppercase text-hc-muted">{current.title}</div>
-        <nav className="mt-4 flex flex-col gap-2">
+        <nav className="mt-2 flex gap-1 overflow-x-auto md:mt-3 md:flex-col">
           {current.items.map((item) => (
             <NavLink
               key={`${item.to}-${item.label}`}
               to={item.to}
+              end={!item.to.includes("#")}
               className={({ isActive }) =>
-                `rounded-hc-sm px-3 py-2 text-sm transition ${
+                `whitespace-nowrap rounded-hc-sm px-3 py-1.5 text-sm transition ${
                   isActive
-                    ? "bg-hc-surface text-hc-text shadow-hc-card"
+                    ? "bg-hc-surface text-hc-text"
                     : "text-hc-muted hover:bg-hc-surface-variant hover:text-hc-text"
                 }`
               }
@@ -111,7 +113,7 @@ export function SidebarNav({ children }: SidebarNavProps) {
           ))}
         </nav>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-5 lg:p-6">{children}</main>
     </>
   );
 }

@@ -7,7 +7,7 @@ type CardProps = HTMLAttributes<HTMLDivElement>;
 export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
-      className={cn("rounded-hc-lg bg-hc-surface p-5 shadow-hc-card", className)}
+      className={cn("rounded-hc-md border border-hc-outline bg-hc-surface p-4", className)}
       {...props}
     >
       {children}

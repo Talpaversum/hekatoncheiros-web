@@ -42,11 +42,14 @@ import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Dialog } from "../../ui-kit/components/Dialog";
 import { Input } from "../../ui-kit/components/Input";
+import { Field, MetricStrip, PageHeader, SectionHeader } from "../../ui-kit/components/Page";
 import { Select } from "../../ui-kit/components/Select";
 import { Table } from "../../ui-kit/components/Table";
+import { TabBar } from "../../ui-kit/components/TabBar";
+import { Textarea } from "../../ui-kit/components/Textarea";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
-type Tab = "catalog" | "installed" | "licensing";
+type Tab = "catalog" | "feeds" | "installed" | "licensing";
 
 type UninstallState =
   | { status: "idle" }
@@ -154,13 +157,28 @@ function buildCatalogDeploymentPlan(entry: AppCatalogEntry, mode: InstallCatalog
 }
 
 function readTabFromPath(pathname: string): Tab {
-  if (pathname.endsWith("/installed")) {
+  if (pathname.startsWith("/core/apps/feeds")) {
+    return "feeds";
+  }
+  if (pathname.startsWith("/core/apps/installed")) {
     return "installed";
   }
   if (pathname.endsWith("/licensing")) {
     return "licensing";
   }
   return "catalog";
+}
+
+function readCatalogDetailId(pathname: string) {
+  const marker = "/core/apps/catalog/";
+  if (!pathname.startsWith(marker)) return null;
+  return decodeURIComponent(pathname.slice(marker.length).split("/")[0] ?? "") || null;
+}
+
+function readInstalledDetailId(pathname: string) {
+  const marker = "/core/apps/installed/";
+  if (!pathname.startsWith(marker)) return null;
+  return decodeURIComponent(pathname.slice(marker.length).split("/")[0] ?? "") || null;
 }
 
 function formatActionError(error: unknown) {
@@ -211,6 +229,8 @@ export function AppsPage() {
   const [appTokenDialog, setAppTokenDialog] = useState<AppTokenDialogState>({ status: "idle" });
   const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [installedSearch, setInstalledSearch] = useState("");
 
   const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
   const catalogSources = useMemo(() => catalogSourcesData?.items ?? [], [catalogSourcesData?.items]);
@@ -229,6 +249,20 @@ export function AppsPage() {
   const hasUpdateSignals =
     availableCatalogUpdates.length > 0 || staleCatalogSnapshots.length > 0 || reportedUpdateSignals.length > 0;
   const activeTab = readTabFromPath(location.pathname);
+  const catalogDetailId = readCatalogDetailId(location.pathname);
+  const installedDetailId = readInstalledDetailId(location.pathname);
+  const catalogDetail = catalog.find((entry) => entry.app_id === catalogDetailId) ?? null;
+  const installedDetail = installed.find((app) => app.app_id === installedDetailId) ?? null;
+  const filteredCatalog = useMemo(() => {
+    const query = catalogSearch.trim().toLowerCase();
+    if (!query) return catalog;
+    return catalog.filter((entry) => [entry.app_id, entry.app_name, entry.summary ?? "", entry.namespace ?? ""].some((value) => value.toLowerCase().includes(query)));
+  }, [catalog, catalogSearch]);
+  const filteredInstalled = useMemo(() => {
+    const query = installedSearch.trim().toLowerCase();
+    if (!query) return installed;
+    return installed.filter((app) => [app.app_id, pickAppDisplayName(app), app.slug].some((value) => value.toLowerCase().includes(query)));
+  }, [installed, installedSearch]);
   const installedErrorMessage = installedError ? formatActionError(installedError) : null;
   const visibleInstalledError = installedErrorMessage === dismissedInstalledError ? null : installedErrorMessage;
   const toastMessage = actionError ?? message ?? visibleInstalledError;
@@ -510,7 +544,7 @@ export function AppsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <ToastNotice
         message={toastMessage}
         tone={toastTone}
@@ -523,18 +557,16 @@ export function AppsPage() {
         }}
       />
 
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">Admin</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-normal">Applications</h1>
-          <p className="mt-1 text-sm text-hc-muted">Catalog discovery, instance installation, and tenant license activation.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-right">
-          <Metric label="Catalog" value={catalog.length} />
-          <Metric label="Installable" value={installableCount} />
-          <Metric label="Published" value={publishedCount} />
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Admin"
+        title="Applications"
+        description="Catalog discovery, instance installation, and tenant license activation."
+        actions={<MetricStrip items={[
+          { label: "Catalog", value: catalog.length },
+          { label: "Installable", value: installableCount },
+          { label: "Published", value: publishedCount },
+        ]} />}
+      />
 
       {hasUpdateSignals && (
         <Card className="rounded-hc-md border-hc-primary/25 bg-hc-primary/5">
@@ -564,59 +596,62 @@ export function AppsPage() {
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-2 border-b border-hc-outline">
-        {([
-          ["catalog", "Catalog"],
-          ["installed", "Installed"],
-          ["licensing", "Licensing"],
-        ] as Array<[Tab, string]>).map(([tab, label]) => (
-          <button
-            key={tab}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-              activeTab === tab
-                ? "border-hc-primary text-hc-text"
-                : "border-transparent text-hc-muted hover:text-hc-text"
-            }`}
-            onClick={() => navigate(tab === "catalog" ? "/core/apps" : `/core/apps/${tab}`)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        active={activeTab}
+        items={[
+          { id: "catalog", label: "Catalog", count: catalog.length },
+          { id: "feeds", label: "Feed sources", count: catalogSources.length },
+          { id: "installed", label: "Installed", count: installed.length },
+          { id: "licensing", label: "Licensing" },
+        ]}
+        onChange={(tab) => navigate(tab === "catalog" ? "/core/apps" : `/core/apps/${tab}`)}
+      />
+
+      {activeTab === "feeds" && (
+        <CatalogSourcesPanel
+          sources={catalogSources}
+          isLoading={catalogSourcesLoading}
+          form={sourceForm}
+          setForm={setSourceForm}
+          onCreate={handleCreateCatalogSource}
+          onSync={handleSyncCatalogSource}
+          onSetEnabled={handleSetCatalogSourceEnabled}
+          isMutating={createCatalogSource.isPending || syncCatalogSource.isPending || setCatalogSourceEnabled.isPending}
+        />
+      )}
 
       {activeTab === "catalog" && (
-        <div className="space-y-5">
-          <CatalogSourcesPanel
-            sources={catalogSources}
-            isLoading={catalogSourcesLoading}
-            form={sourceForm}
-            setForm={setSourceForm}
-            onCreate={handleCreateCatalogSource}
-            onSync={handleSyncCatalogSource}
-            onSetEnabled={handleSetCatalogSourceEnabled}
-            isMutating={createCatalogSource.isPending || syncCatalogSource.isPending || setCatalogSourceEnabled.isPending}
-          />
-
-          <Card className="rounded-hc-md">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-72 flex-1">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Manifest base URL</label>
+        catalogDetailId ? (
+          catalogDetail ? <CatalogAppDetail
+            entry={catalogDetail}
+            installed={installedByAppId.get(catalogDetail.app_id)}
+            onBack={() => navigate("/core/apps")}
+            onInstall={openInstallDialog}
+            onLicense={(appId) => { setSelectedAppId(appId); navigate("/core/apps/licensing"); }}
+            onActivateLicense={handleActivateLicense}
+            onDelete={handleDeleteCatalogEntry}
+            onSetPublication={handleSetCatalogEntryPublication}
+            isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending || setCatalogEntryPublication.isPending || startLicenseOAuth.isPending}
+          /> : <Card><div className="text-sm text-hc-muted">Application not found.</div></Card>
+        ) : <div className="space-y-4">
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title="Add application" description="Fetch an application manifest directly into the local catalog." />
+            <div className="flex flex-wrap items-end gap-3 border-t border-hc-outline p-4">
+              <Field label="Manifest base URL" className="min-w-72 flex-1">
                 <Input
                   placeholder="https://apps.example.com/inventory"
                   value={catalogForm.base_url}
                   onChange={(event) => setCatalogForm((prev) => ({ ...prev, base_url: event.target.value }))}
                 />
-              </div>
-              <div className="min-w-64 flex-1">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Summary</label>
+              </Field>
+              <Field label="Summary" className="min-w-64 flex-1">
                 <Input
                   placeholder="Short operator-facing note"
                   value={catalogForm.summary}
                   onChange={(event) => setCatalogForm((prev) => ({ ...prev, summary: event.target.value }))}
                 />
-              </div>
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Trust</label>
+              </Field>
+              <Field label="Trust">
                 <Select
                   value={catalogForm.trust_status}
                   onChange={(event) =>
@@ -627,7 +662,7 @@ export function AppsPage() {
                   <option value="dev">dev</option>
                   <option value="unverified">unverified</option>
                 </Select>
-              </div>
+              </Field>
               <Button
                 onClick={() => void handleCreateCatalogEntry()}
                 disabled={!catalogForm.base_url.trim() || createCatalogEntry.isPending}
@@ -638,38 +673,42 @@ export function AppsPage() {
           </Card>
 
           <Card id="catalog" className="rounded-hc-md p-0">
-            <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hc-outline px-4 py-3">
               <div>
                 <div className="text-sm font-semibold">Available applications</div>
                 <div className="mt-1 text-xs text-hc-muted">{licensedCatalogCount} require a tenant license.</div>
               </div>
               <Badge>{catalogLoading ? "Loading" : `${catalog.length} entries`}</Badge>
             </div>
+            <div className="border-b border-hc-outline p-3"><Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Search catalog" /></div>
             <CatalogTable
-              entries={catalog}
+              entries={filteredCatalog}
               installedByAppId={installedByAppId}
               isLoading={catalogLoading}
               onInstall={openInstallDialog}
-              onLicense={(appId) => {
-                setSelectedAppId(appId);
-                navigate("/core/apps/licensing");
-              }}
-              onActivateLicense={handleActivateLicense}
-              onDelete={handleDeleteCatalogEntry}
-              onSetPublication={handleSetCatalogEntryPublication}
-              isMutating={
-                installCatalogEntry.isPending ||
-                deleteCatalogEntry.isPending ||
-                setCatalogEntryPublication.isPending ||
-                startLicenseOAuth.isPending
-              }
+              onOpen={(entry) => navigate(`/core/apps/catalog/${encodeURIComponent(entry.app_id)}`)}
+              isMutating={installCatalogEntry.isPending}
             />
           </Card>
         </div>
       )}
 
       {activeTab === "installed" && (
-        <Card id="installed" className="rounded-hc-md p-0">
+        installedDetailId ? (
+          installedDetail ? <InstalledAppDetail
+            app={installedDetail}
+            registrySlugs={registrySlugs}
+            onBack={() => navigate("/core/apps/installed")}
+            onLicense={(appId) => { setSelectedAppId(appId); navigate("/core/apps/licensing"); }}
+            onCheckUpdate={handleCheckUpdate}
+            onClearUpdateSignal={handleClearUpdateSignal}
+            onIssueAppToken={handleIssueAppToken}
+            onRefreshCatalog={handleRefreshCatalogFromInstalled}
+            onRefreshArtifact={handleRefreshArtifact}
+            onUninstall={(app) => { setUninstallConfirmChecked(false); setUninstallState({ status: "confirm", app }); }}
+            isMutating={checkUpdateMutation.isPending || clearUpdateSignalMutation.isPending || issueAppTokenMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending}
+          /> : <Card><div className="text-sm text-hc-muted">Installed application not found.</div></Card>
+        ) : <Card id="installed" className="rounded-hc-md p-0">
           <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
             <div>
               <div className="text-sm font-semibold">Installed applications</div>
@@ -677,30 +716,16 @@ export function AppsPage() {
             </div>
             <Badge>{installedLoading ? "Loading" : `${installed.length} installed`}</Badge>
           </div>
+          <div className="border-b border-hc-outline p-3"><Input value={installedSearch} onChange={(event) => setInstalledSearch(event.target.value)} placeholder="Search installed applications" /></div>
           <InstalledTable
-            apps={installed}
+            apps={filteredInstalled}
             registrySlugs={registrySlugs}
             isLoading={installedLoading}
             onLicense={(appId) => {
               setSelectedAppId(appId);
               navigate("/core/apps/licensing");
             }}
-            onCheckUpdate={handleCheckUpdate}
-            onClearUpdateSignal={handleClearUpdateSignal}
-            onIssueAppToken={handleIssueAppToken}
-            onRefreshCatalog={handleRefreshCatalogFromInstalled}
-            onRefreshArtifact={handleRefreshArtifact}
-            onUninstall={(app) => {
-              setUninstallConfirmChecked(false);
-              setUninstallState({ status: "confirm", app });
-            }}
-            isMutating={
-              checkUpdateMutation.isPending ||
-              clearUpdateSignalMutation.isPending ||
-              issueAppTokenMutation.isPending ||
-              refreshArtifactMutation.isPending ||
-              refreshCatalogFromInstalled.isPending
-            }
+            onOpen={(app) => navigate(`/core/apps/installed/${encodeURIComponent(app.app_id)}`)}
           />
         </Card>
       )}
@@ -710,8 +735,7 @@ export function AppsPage() {
           <div className="grid gap-5 lg:grid-cols-[minmax(260px,360px)_1fr]">
             <section>
               <div className="text-sm font-semibold">Tenant license selection</div>
-              <div className="mt-3">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Application</label>
+              <Field label="Application" className="mt-3">
                 <Select
                   value={effectiveSelectedAppId ?? ""}
                   onChange={(event) => {
@@ -726,9 +750,8 @@ export function AppsPage() {
                     </option>
                   ))}
                 </Select>
-              </div>
-              <div className="mt-3">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Stored license</label>
+              </Field>
+              <Field label="Stored license" className="mt-3">
                 <Select
                   value={selectedEntitlementId}
                   onChange={(event) => setSelectedEntitlementId(event.target.value)}
@@ -741,7 +764,7 @@ export function AppsPage() {
                     </option>
                   ))}
                 </Select>
-              </div>
+              </Field>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => void handleSetSelection()} disabled={!selectedEntitlementId || setSelectionMutation.isPending}>
                   Set selection
@@ -754,8 +777,8 @@ export function AppsPage() {
 
             <section>
               <div className="text-sm font-semibold">Offline import</div>
-              <textarea
-                className="mt-3 min-h-40 w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 text-sm text-hc-text placeholder:text-hc-muted focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/20"
+              <Textarea
+                className="mt-3 min-h-40"
                 value={offlineToken}
                 onChange={(event) => setOfflineToken(event.target.value)}
                 placeholder="Paste license bundle or token"
@@ -787,15 +810,6 @@ export function AppsPage() {
         state={appTokenDialog}
         onClose={() => setAppTokenDialog({ status: "idle" })}
       />
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="min-w-24 rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2">
-      <div className="text-lg font-semibold leading-none">{value}</div>
-      <div className="mt-1 text-xs text-hc-muted">{label}</div>
     </div>
   );
 }
@@ -893,10 +907,10 @@ function CatalogSourcesPanel({
   );
 }
 
-function CatalogTable({
-  entries,
-  installedByAppId,
-  isLoading,
+function CatalogAppDetail({
+  entry,
+  installed,
+  onBack,
   onInstall,
   onLicense,
   onActivateLicense,
@@ -904,14 +918,71 @@ function CatalogTable({
   onSetPublication,
   isMutating,
 }: {
-  entries: AppCatalogEntry[];
-  installedByAppId: Map<string, InstalledApp>;
-  isLoading: boolean;
+  entry: AppCatalogEntry;
+  installed?: InstalledApp;
+  onBack: () => void;
   onInstall: (entry: AppCatalogEntry) => void;
   onLicense: (appId: string) => void;
   onActivateLicense: (entry: AppCatalogEntry) => Promise<void>;
   onDelete: (entry: AppCatalogEntry) => Promise<void>;
   onSetPublication: (entry: AppCatalogEntry, published: boolean) => Promise<void>;
+  isMutating: boolean;
+}) {
+  const runtimeStatus = getCatalogRuntimeStatus(entry);
+  const needsLicenseAction = Boolean(installed) && entry.license_state.required && !entry.license_state.selected_active_license;
+  const canPublish = Boolean(installed?.enabled !== false && installed);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <SectionHeader
+        title={entry.app_name}
+        description={entry.app_id}
+        meta={<Button size="sm" variant="outlined" onClick={onBack}>Back to catalog</Button>}
+      />
+      <div className="flex flex-wrap gap-1.5 border-t border-hc-outline px-4 py-3">
+        <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>{entry.trust_status}</Badge>
+        <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
+        {entry.license_required ? <Badge tone="warn">license required</Badge> : <Badge tone="good">free</Badge>}
+        {entry.published ? <Badge tone="good">published to feed</Badge> : <Badge>{entry.publish_status}</Badge>}
+      </div>
+      <dl className="grid border-t border-hc-outline md:grid-cols-2">
+        <DetailCell label="Source" value={`${entry.source_type} · ${entry.namespace ?? "no namespace"}`} />
+        <DetailCell label="Runtime" value={runtimeStatus.detail ?? runtimeStatus.label} />
+        <DetailCell label="Summary" value={entry.summary ?? "No summary"} />
+        <DetailCell label="License issuer" value={entry.license_issuer_url ?? "Not configured"} />
+      </dl>
+      <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
+        {!installed && <Button variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>Install application</Button>}
+        {installed && needsLicenseAction && <Button variant="tonal" disabled={isMutating} onClick={() => entry.license_issuer_url ? void onActivateLicense(entry) : onLicense(entry.app_id)}>{entry.license_issuer_url ? "Activate license" : "Open licensing"}</Button>}
+        <Button variant={entry.published ? "tonal" : "outlined"} disabled={isMutating || (!entry.published && !canPublish)} onClick={() => void onSetPublication(entry, !entry.published)}>{entry.published ? "Unpublish" : "Publish"}</Button>
+        <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry).then(onBack)}>Remove from catalog</Button>
+      </div>
+    </Card>
+  );
+}
+
+function DetailCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-hc-outline px-4 py-3 last:border-b-0 md:odd:border-r">
+      <dt className="text-xs font-medium text-hc-muted">{label}</dt>
+      <dd className="mt-1 text-sm">{value}</dd>
+    </div>
+  );
+}
+
+function CatalogTable({
+  entries,
+  installedByAppId,
+  isLoading,
+  onInstall,
+  onOpen,
+  isMutating,
+}: {
+  entries: AppCatalogEntry[];
+  installedByAppId: Map<string, InstalledApp>;
+  isLoading: boolean;
+  onInstall: (entry: AppCatalogEntry) => void;
+  onOpen: (entry: AppCatalogEntry) => void;
   isMutating: boolean;
 }) {
   if (isLoading) {
@@ -923,7 +994,7 @@ function CatalogTable({
   }
 
   return (
-    <Table className="rounded-none shadow-none">
+    <Table className="rounded-none border-0 shadow-none">
       <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
         <tr>
           <th className="px-5 py-3 font-semibold">Application</th>
@@ -937,72 +1008,31 @@ function CatalogTable({
         {entries.map((entry) => {
           const installed = installedByAppId.get(entry.app_id);
           const runtimeStatus = getCatalogRuntimeStatus(entry);
-          const needsLicenseAction =
-            Boolean(entry.installed) && entry.license_state.required && !entry.license_state.selected_active_license;
-          const canPublish = Boolean(installed?.enabled !== false && installed);
           return (
-            <tr key={entry.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
-              <td className="px-5 py-4">
+            <tr key={entry.app_id}>
+              <td>
                 <div className="font-medium">{entry.app_name}</div>
-                <div className="mt-1 text-xs text-hc-muted">{entry.app_id}</div>
-                {entry.summary && <div className="mt-2 max-w-xl text-xs text-hc-muted">{entry.summary}</div>}
+                <div className="truncate text-xs text-hc-muted" title={entry.app_id}>{entry.app_id}</div>
               </td>
-              <td className="px-5 py-4 text-sm">
-                <div>{entry.source_type}</div>
-                <div className="mt-1 text-xs text-hc-muted">{entry.namespace ?? "no namespace"}</div>
+              <td className="text-sm">
+                <span>{entry.source_type}</span><span className="ml-2 text-xs text-hc-muted">{entry.namespace ?? "no namespace"}</span>
               </td>
-              <td className="px-5 py-4">
+              <td>
                 {entry.license_required ? <Badge tone="warn">required</Badge> : <Badge tone="good">free</Badge>}
               </td>
-              <td className="px-5 py-4">
-                <div className="flex flex-col gap-2">
+              <td>
+                <div className="flex flex-wrap gap-1.5" title={runtimeStatus.detail ?? undefined}>
                   <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>
                     {entry.trust_status}
                   </Badge>
-                  <div>
-                    <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
-                    {runtimeStatus.detail && <div className="mt-1 max-w-48 text-xs text-hc-muted">{runtimeStatus.detail}</div>}
-                  </div>
+                  <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
                   {entry.published ? <Badge tone="good">feed</Badge> : <Badge>{entry.publish_status}</Badge>}
                 </div>
               </td>
-              <td className="px-5 py-4">
-                <div className="flex flex-wrap gap-2">
-                  {installed ? (
-                    needsLicenseAction ? (
-                      <Button
-                        variant="tonal"
-                        disabled={isMutating}
-                        onClick={() => {
-                          if (entry.license_issuer_url) {
-                            void onActivateLicense(entry);
-                            return;
-                          }
-                          onLicense(entry.app_id);
-                        }}
-                      >
-                        {entry.license_issuer_url ? "Activate" : "Licensing"}
-                      </Button>
-                    ) : (
-                      <Button variant="outlined" disabled>
-                        Installed
-                      </Button>
-                    )
-                  ) : (
-                    <Button variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>
-                      Install...
-                    </Button>
-                  )}
-                  <Button
-                    variant={entry.published ? "tonal" : "outlined"}
-                    disabled={isMutating || (!entry.published && !canPublish)}
-                    onClick={() => void onSetPublication(entry, !entry.published)}
-                  >
-                    {entry.published ? "Unpublish" : "Publish"}
-                  </Button>
-                  <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry)}>
-                    Remove
-                  </Button>
+              <td>
+                <div className="flex justify-end gap-1.5">
+                  {!installed && <Button size="sm" variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>Install</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => onOpen(entry)}>Open</Button>
                 </div>
               </td>
             </tr>
@@ -1013,10 +1043,10 @@ function CatalogTable({
   );
 }
 
-function InstalledTable({
-  apps,
+function InstalledAppDetail({
+  app,
   registrySlugs,
-  isLoading,
+  onBack,
   onLicense,
   onCheckUpdate,
   onClearUpdateSignal,
@@ -1026,9 +1056,9 @@ function InstalledTable({
   onUninstall,
   isMutating,
 }: {
-  apps: InstalledApp[];
+  app: InstalledApp;
   registrySlugs: Set<string>;
-  isLoading: boolean;
+  onBack: () => void;
   onLicense: (appId: string) => void;
   onCheckUpdate: (app: InstalledApp) => Promise<void>;
   onClearUpdateSignal: (app: InstalledApp) => Promise<void>;
@@ -1037,6 +1067,53 @@ function InstalledTable({
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
   isMutating: boolean;
+}) {
+  const status = getInstalledStatus(app, registrySlugs);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <SectionHeader title={pickAppDisplayName(app)} description={app.app_id} meta={<Button size="sm" variant="outlined" onClick={onBack}>Back to installed apps</Button>} />
+      <div className="flex flex-wrap gap-1.5 border-t border-hc-outline px-4 py-3">
+        <Badge tone={status.tone}>{status.label}</Badge>
+        {app.app_version && <Badge>{app.app_version}</Badge>}
+        {app.update_signal && <Badge tone="warn">update signal</Badge>}
+        {app.catalog_update?.state === "available" && <Badge tone="warn">catalog update available</Badge>}
+      </div>
+      <dl className="grid border-t border-hc-outline md:grid-cols-2">
+        <DetailCell label="Runtime" value={status.detail ?? status.label} />
+        <DetailCell label="Entitlement" value={app.resolved_entitlement ? `${app.resolved_entitlement.tier}, valid to ${formatDate(app.resolved_entitlement.valid_to)}` : "No active entitlement"} />
+        <DetailCell label="UI URL" value={app.ui_url} />
+        <DetailCell label="Catalog state" value={app.catalog_update ? `${app.catalog_update.state} · ${app.catalog_update.source_type} / ${app.catalog_update.trust_status}` : "Not checked"} />
+      </dl>
+      {app.update_signal && <div className="border-t border-hc-warning/30 bg-hc-warning/10 px-4 py-3 text-sm">
+        <div className="font-semibold text-hc-warning">Update reported by {app.update_signal.source}</div>
+        <div className="mt-1 text-xs text-hc-muted">{app.update_signal.note ?? "No note"} · {formatDate(app.update_signal.reported_at)}</div>
+      </div>}
+      <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
+        <Button variant="tonal" onClick={() => onLicense(app.app_id)}>Licensing</Button>
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>Check update</Button>
+        {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>Clear signal</Button>}
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>Issue token</Button>
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>Refresh catalog</Button>
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>Refresh artifact</Button>
+        <Button variant="ghost" onClick={() => onUninstall(app)}>Uninstall</Button>
+      </div>
+    </Card>
+  );
+}
+
+function InstalledTable({
+  apps,
+  registrySlugs,
+  isLoading,
+  onLicense,
+  onOpen,
+}: {
+  apps: InstalledApp[];
+  registrySlugs: Set<string>;
+  isLoading: boolean;
+  onLicense: (appId: string) => void;
+  onOpen: (app: InstalledApp) => void;
 }) {
   if (isLoading) {
     return <div className="px-5 py-6 text-sm text-hc-muted">Loading installed apps...</div>;
@@ -1047,12 +1124,13 @@ function InstalledTable({
   }
 
   return (
-    <Table className="rounded-none shadow-none">
+    <Table className="rounded-none border-0 shadow-none">
       <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
         <tr>
           <th className="px-5 py-3 font-semibold">Application</th>
           <th className="px-5 py-3 font-semibold">Runtime</th>
           <th className="px-5 py-3 font-semibold">Entitlement</th>
+          <th className="px-5 py-3 font-semibold">Updates</th>
           <th className="px-5 py-3 font-semibold">Actions</th>
         </tr>
       </thead>
@@ -1060,81 +1138,33 @@ function InstalledTable({
         {apps.map((app) => {
           const status = getInstalledStatus(app, registrySlugs);
           return (
-            <tr key={app.app_id} className="border-b border-hc-outline/70 align-top last:border-b-0">
-              <td className="px-5 py-4">
+            <tr key={app.app_id}>
+              <td>
                 <div className="font-medium">{pickAppDisplayName(app)}</div>
-                <div className="mt-1 text-xs text-hc-muted">{app.app_id}</div>
-                {app.app_version && <div className="mt-1 text-xs text-hc-muted">installed {app.app_version}</div>}
-                {app.update_signal && (
-                  <div className="mt-3 max-w-md rounded-hc-md border border-hc-warning/25 bg-hc-warning/10 px-3 py-2 text-xs">
-                    <div className="font-semibold text-hc-warning">
-                      Update signal from {app.update_signal.source}
-                      {app.update_signal.app_version ? ` (${app.update_signal.app_version})` : ""}
-                    </div>
-                    <div className="mt-1 text-hc-muted">reported {formatDate(app.update_signal.reported_at)}</div>
-                    {app.update_signal.note && <div className="mt-1 text-hc-muted">{app.update_signal.note}</div>}
-                    {app.update_signal.manifest_hash && (
-                      <div className="mt-1 break-all text-hc-muted">manifest {app.update_signal.manifest_hash}</div>
-                    )}
-                  </div>
-                )}
+                <div className="truncate text-xs text-hc-muted" title={app.app_id}>{app.app_id}{app.app_version ? ` · ${app.app_version}` : ""}</div>
               </td>
-              <td className="px-5 py-4">
+              <td title={status.detail ?? undefined}>
                 <Badge tone={status.tone}>{status.label}</Badge>
-                {status.detail && <div className="mt-2 max-w-md text-xs text-hc-muted">{status.detail}</div>}
-                {app.catalog_update && (
-                  <div className="mt-3 max-w-md">
-                    {app.catalog_update.state === "available" && (
-                      <Badge tone="warn">Catalog update available ({app.catalog_update.app_version})</Badge>
-                    )}
-                    {app.catalog_update.state === "same" && <Badge tone="good">Catalog up to date</Badge>}
-                    {app.catalog_update.state === "stale" && (
-                      <Badge tone="neutral">Catalog snapshot older than install</Badge>
-                    )}
-                    {app.catalog_update.state === "baseline_missing" && (
-                      <Badge tone="neutral">Catalog baseline missing</Badge>
-                    )}
-                    <div className="mt-2 text-xs text-hc-muted">
-                      {app.catalog_update.source_type} / {app.catalog_update.trust_status}, fetched {formatDate(app.catalog_update.fetched_at)}
-                    </div>
-                  </div>
-                )}
               </td>
-              <td className="px-5 py-4 text-sm">
+              <td className="text-sm">
                 {app.resolved_entitlement ? (
-                  <div>
-                    <div>{app.resolved_entitlement.tier}</div>
-                    <div className="mt-1 text-xs text-hc-muted">valid to {formatDate(app.resolved_entitlement.valid_to)}</div>
-                  </div>
+                  <span>{app.resolved_entitlement.tier} <span className="text-xs text-hc-muted">to {formatDate(app.resolved_entitlement.valid_to)}</span></span>
                 ) : (
                   <span className="text-hc-muted">none selected</span>
                 )}
               </td>
-              <td className="px-5 py-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="tonal" onClick={() => onLicense(app.app_id)}>
-                    Licensing
-                  </Button>
-                  <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>
-                    Check update
-                  </Button>
-                  {app.update_signal && (
-                    <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>
-                      Clear signal
-                    </Button>
-                  )}
-                  <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>
-                    Issue token
-                  </Button>
-                  <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>
-                    Refresh catalog
-                  </Button>
-                  <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>
-                    Refresh artifact
-                  </Button>
-                  <Button variant="outlined" onClick={() => onUninstall(app)}>
-                    Uninstall
-                  </Button>
+              <td>
+                <div className="flex flex-wrap gap-1.5">
+                  {app.update_signal && <Badge tone="warn">signal</Badge>}
+                  {app.catalog_update?.state === "available" && <Badge tone="warn">available</Badge>}
+                  {app.catalog_update?.state === "same" && <Badge tone="good">current</Badge>}
+                  {!app.update_signal && !app.catalog_update && <span className="text-xs text-hc-muted">not checked</span>}
+                </div>
+              </td>
+              <td>
+                <div className="flex justify-end gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => onLicense(app.app_id)}>Licensing</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onOpen(app)}>Open</Button>
                 </div>
               </td>
             </tr>
@@ -1169,9 +1199,9 @@ function AppTokenDialog({
             Short-lived app token for Core app-auth endpoints. Expires {formatDate(state.token.expires_at)}.
           </div>
         </div>
-        <textarea
+        <Textarea
           readOnly
-          className="min-h-36 w-full rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 font-mono text-xs text-hc-text focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/20"
+          className="min-h-36 font-mono text-xs"
           value={state.token.access_token}
         />
         <div className="flex justify-end gap-2">
@@ -1314,7 +1344,10 @@ function UninstallDialog({
               checked={confirmChecked}
               onChange={(event) => setConfirmChecked(event.target.checked)}
             />
-            <span>Remove this app from the runtime installation registry.</span>
+            <span>
+              Remove this app from Core. Core-managed containers will also be removed; external runtimes are not
+              affected.
+            </span>
           </label>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>

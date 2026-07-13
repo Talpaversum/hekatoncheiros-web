@@ -8,6 +8,8 @@ import { clearTokens } from "../../data/auth/storage";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { Field, MetricStrip, PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
+import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
 function formatPrivilege(value: string) {
   return value.replaceAll(".", " / ");
@@ -71,64 +73,45 @@ export function AccountPage() {
   };
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">Account</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-normal">{isSecurity ? "Security" : "User profile"}</h1>
-          <p className="mt-1 text-sm text-hc-muted">Current session, identity fields, and password controls.</p>
-        </div>
-        <Button variant="outlined" onClick={handleLogout}>
-          Sign out
-        </Button>
-      </header>
+    <div className="space-y-4">
+      <PageHeader
+        eyebrow="Account"
+        title={isSecurity ? "Security" : "User profile"}
+        description="Current session, identity fields, and password controls."
+        actions={<Button variant="outlined" onClick={handleLogout}>Sign out</Button>}
+      />
 
-      {message && <div className="rounded-hc-md border border-hc-success/25 bg-hc-success/10 px-4 py-3 text-sm text-hc-success">{message}</div>}
-      {error && <div className="rounded-hc-md border border-hc-danger/30 bg-hc-danger/10 px-4 py-3 text-sm text-hc-danger">{error}</div>}
+      <ToastNotice message={error ?? message} tone={error ? "danger" : "success"} onDismiss={resetNotices} />
 
       {!isSecurity && (
         <>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="rounded-hc-md">
-              <div className="text-sm font-semibold">Actor</div>
-              <div className="mt-3 text-2xl font-semibold">{account?.id ?? "Loading..."}</div>
-              <div className="mt-2 text-xs text-hc-muted">Status: {account?.status ?? "-"}</div>
-            </Card>
-            <Card className="rounded-hc-md">
-              <div className="text-sm font-semibold">Tenant</div>
-              <div className="mt-3 text-2xl font-semibold">{context?.tenant.name ?? context?.tenant.id ?? "-"}</div>
-              <div className="mt-2 text-xs text-hc-muted">Mode: {context?.tenant.mode ?? "-"}</div>
-            </Card>
-            <Card className="rounded-hc-md">
-              <div className="text-sm font-semibold">Delegation</div>
-              <div className="mt-3 text-2xl font-semibold">{context?.actor.impersonating ? "Active" : "Off"}</div>
-              <div className="mt-2 text-xs text-hc-muted">Effective user: {context?.actor.effective_user_id ?? "-"}</div>
-            </Card>
-          </div>
+          <MetricStrip items={[
+            { label: "Account", value: account?.status ?? "-", tone: account?.status === "active" ? "success" : "neutral" },
+            { label: "Tenant mode", value: context?.tenant.mode ?? "-" },
+            { label: "Privileges", value: privileges.length },
+            { label: "Delegation", value: context?.actor.impersonating ? "On" : "Off", tone: context?.actor.impersonating ? "warning" : "neutral" },
+          ]} />
 
-          <Card className="rounded-hc-md">
-            <div className="text-sm font-semibold">Profile fields</div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Display name</label>
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title="Profile fields" description={`${account?.id ?? "Loading..."} · ${context?.tenant.name ?? context?.tenant.id ?? "No tenant"}`} meta={<StatusBadge>{account?.status ?? "-"}</StatusBadge>} />
+            <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
+              <Field label="Display name">
                 <Input value={effectiveDisplayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Jane Admin" />
-              </div>
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Email</label>
+              </Field>
+              <Field label="Email">
                 <Input value={effectiveEmail} onChange={(event) => setEmail(event.target.value)} placeholder="admin@example.com" />
-              </div>
+              </Field>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="flex justify-end border-t border-hc-outline px-4 py-3">
               <Button onClick={() => void handleSaveProfile()} disabled={!effectiveEmail.trim() || updateAccount.isPending}>
                 Save profile
               </Button>
             </div>
           </Card>
 
-          <Card className="rounded-hc-md">
-            <div className="text-sm font-semibold">Privileges</div>
-            <div className="mt-1 text-xs text-hc-muted">{privileges.length} privilege entries in this session.</div>
-            <div className="mt-4 flex flex-wrap gap-2">
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title="Privileges" description="Effective privilege entries in this session." meta={<StatusBadge>{privileges.length} assigned</StatusBadge>} />
+            <div className="flex flex-wrap gap-1.5 border-t border-hc-outline p-3">
               {privileges.map((privilege) => (
                 <span key={privilege} className="rounded-hc-sm border border-hc-outline bg-hc-surface-variant px-2 py-1 text-xs">
                   {formatPrivilege(privilege)}
@@ -140,19 +123,17 @@ export function AccountPage() {
       )}
 
       {isSecurity && (
-        <Card className="rounded-hc-md">
-          <div className="text-sm font-semibold">Change password</div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">Current password</label>
+        <Card className="overflow-hidden p-0">
+          <SectionHeader title="Change password" description="Use at least eight characters for the new password." />
+          <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
+            <Field label="Current password">
               <Input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-hc-muted">New password</label>
+            </Field>
+            <Field label="New password">
               <Input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-            </div>
+            </Field>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="flex justify-end border-t border-hc-outline px-4 py-3">
             <Button
               onClick={() => void handleChangePassword()}
               disabled={currentPassword.length === 0 || newPassword.length < 8 || changePassword.isPending}

@@ -41,7 +41,7 @@ export function Menu({ open, onClose, className, children }: MenuProps) {
     <div
       ref={ref}
       className={cn(
-        "absolute right-0 top-full mt-2 w-56 rounded-hc-lg bg-hc-surface px-2 py-2 shadow-hc-elevation",
+        "absolute right-0 top-full mt-2 w-56 rounded-hc-md border border-hc-outline bg-hc-surface p-1.5 shadow-hc-elevation",
         className,
       )}
     >

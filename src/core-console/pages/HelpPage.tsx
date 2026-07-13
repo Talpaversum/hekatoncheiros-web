@@ -5,6 +5,7 @@ import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { useContextQuery } from "../../data/api/context";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { PageHeader } from "../../ui-kit/components/Page";
 import {
   findCategoryBySlug,
   getHelpCategoryPath,
@@ -72,26 +73,20 @@ export function HelpPage() {
   }, [helpGuides]);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-hc-muted">Help</div>
-          <div className="mt-1 text-2xl font-semibold">{selectedCategory ?? "Postupy a návody"}</div>
-          <div className="mt-1 max-w-3xl text-sm text-hc-muted">
-            {selectedCategory
-              ? "Sekce nápovědy vybraná z hlavního menu."
-              : "Návody jsou psané podle cíle, kterého chceš dosáhnout. Aplikace sem mohou přidat vlastní postupy z manifestu."}
-          </div>
-        </div>
-        <div className="w-full lg:w-80">
+    <div className="space-y-4">
+      <PageHeader
+        eyebrow="Help"
+        title={selectedCategory ?? "Postupy a návody"}
+        description={selectedCategory ? "Sekce nápovědy vybraná z hlavního menu." : "Návody jsou uspořádané podle cíle; aplikace mohou přidat vlastní postupy z manifestu."}
+        actions={<div className="w-full sm:w-80">
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Hledat postup" />
-        </div>
-      </div>
+        </div>}
+      />
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 border-b border-hc-outline pb-3">
         <Link
           to="/core/help"
-          className={`rounded-hc-sm border px-3 py-2 text-sm transition ${
+          className={`rounded-hc-sm border px-3 py-1.5 text-sm transition ${
             !categorySlug
               ? "border-hc-primary bg-hc-primary text-hc-on-primary"
               : "border-hc-outline text-hc-text hover:bg-hc-surface-variant"
@@ -103,7 +98,7 @@ export function HelpPage() {
           <Link
             key={category}
             to={getHelpCategoryPath(category)}
-            className={`rounded-hc-sm border px-3 py-2 text-sm transition ${
+            className={`rounded-hc-sm border px-3 py-1.5 text-sm transition ${
               selectedCategory === category
                 ? "border-hc-primary bg-hc-primary text-hc-on-primary"
                 : "border-hc-outline text-hc-text hover:bg-hc-surface-variant"
@@ -123,14 +118,14 @@ export function HelpPage() {
         </Card>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {Object.entries(groupedGuides).map(([category, items]) => (
           <section key={category}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">{category}</div>
               <div className="text-xs text-hc-muted">{items.length} postupů</div>
             </div>
-            <div className="overflow-hidden rounded-hc-lg border border-hc-outline bg-hc-surface shadow-hc-card">
+            <div className="overflow-hidden rounded-hc-md border border-hc-outline bg-hc-surface">
               {items.map((item) => (
                 <GuideDisclosure
                   key={`${item.source}-${item.path}-${item.title}`}

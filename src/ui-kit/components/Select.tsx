@@ -11,7 +11,7 @@ export function Select({ hasError, className, children, ...props }: SelectProps)
     <div className="relative w-full">
       <select
         className={cn(
-          "w-full appearance-none rounded-hc-md border border-hc-outline bg-hc-surface px-3 py-2 pr-9 text-sm text-hc-text shadow-sm",
+          "h-9 w-full appearance-none rounded-hc-md border border-hc-outline bg-hc-surface px-3 pr-9 text-sm text-hc-text",
           "focus:border-hc-primary focus:outline-none focus:ring-2 focus:ring-hc-primary/30",
           "disabled:cursor-not-allowed disabled:opacity-60",
           "[&>option]:bg-hc-surface [&>option]:text-hc-text",

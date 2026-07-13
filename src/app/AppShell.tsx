@@ -22,7 +22,7 @@ export function AppShell() {
         privileges={privileges}
         tenantMode={data?.tenant?.mode}
       />
-      <div className="flex min-h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col md:flex-row">
         <SidebarNav privileges={privileges}>
           {data?.actor?.impersonating && (
             <div className="mb-4 rounded-hc-sm border border-hc-danger bg-hc-danger/10 px-4 py-2 text-xs text-hc-danger">

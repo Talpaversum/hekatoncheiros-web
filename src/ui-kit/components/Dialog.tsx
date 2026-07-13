@@ -44,7 +44,7 @@ export function Dialog({ open, title, disableClose = false, onClose, children }:
         role="dialog"
         aria-modal="true"
         aria-label={title ?? "Dialog"}
-        className="w-full max-w-xl rounded-hc-md border border-hc-outline bg-hc-surface p-5 shadow-2xl"
+        className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-hc-md border border-hc-outline bg-hc-surface p-4 shadow-2xl"
         onClick={handlePanelClick}
       >
         {children}

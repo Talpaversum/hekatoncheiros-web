@@ -67,12 +67,11 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   }, [appGroups, privileges]);
 
   return (
-    <header className="sticky top-0 z-40 bg-hc-topbar shadow-hc-topbar">
-      <div className="absolute inset-0 bg-gradient-to-b from-hc-topbar-glow via-transparent to-hc-topbar-depth opacity-70" />
-      <div className="flex h-16 items-center justify-between px-6">
-        <div className="relative flex items-center gap-6">
-          <div className="text-lg font-semibold">Hekatoncheiros</div>
-          <nav className="flex items-center gap-3 text-sm">
+    <header className="sticky top-0 z-40 border-b border-hc-outline bg-hc-topbar">
+      <div className="flex h-14 items-center justify-between gap-3 px-4 lg:px-5">
+        <div className="flex min-w-0 items-center gap-3 lg:gap-5">
+          <div className="hidden text-base font-semibold lg:block">Hekatoncheiros</div>
+          <nav className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm">
             <NavLink
               to="/core/dashboard"
               className={({ isActive }) =>
@@ -174,7 +173,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
           </nav>
         </div>
 
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex shrink-0 items-center gap-2">
           <div className="relative">
             <IconButton aria-label="Settings" onClick={() => setSettingsOpen((prev) => !prev)}>
               ⚙

@@ -14,13 +14,15 @@ const variantClasses: Record<Variant, string> = {
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
+  size?: "sm" | "md";
 };
 
-export function Button({ variant = "filled", className, ...props }: ButtonProps) {
+export function Button({ variant = "filled", size = "md", className, ...props }: ButtonProps) {
   return (
     <button
       className={cn(
-        "rounded-hc-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-hc-primary/40 disabled:opacity-50",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-hc-md text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-hc-primary/40 disabled:cursor-not-allowed disabled:opacity-50",
+        size === "sm" ? "min-h-8 px-2.5 py-1 text-xs" : "min-h-9 px-3 py-1.5",
         variantClasses[variant],
         className,
       )}

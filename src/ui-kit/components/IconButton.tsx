@@ -16,7 +16,7 @@ export function IconButton({ variant = "ghost", className, ...props }: IconButto
   return (
     <button
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-hc-primary/40",
+        "inline-flex h-9 w-9 items-center justify-center rounded-hc-md transition focus:outline-none focus:ring-2 focus:ring-hc-primary/40",
         variantClasses[variant],
         className,
       )}
