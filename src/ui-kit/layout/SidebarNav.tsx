@@ -2,7 +2,6 @@ import type { PropsWithChildren } from "react";
 
 import { NavLink, useLocation } from "react-router-dom";
 
-import { hasPrivilege } from "../../access/privileges";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 
 type SidebarNavProps = PropsWithChildren<{
@@ -74,28 +73,21 @@ const sidebarConfig = [
       { to: "/core/tenant/audit", label: "Audit context" },
     ],
   },
-  {
-    prefix: "/admin",
-    title: "Admin",
-    items: [{ to: "/admin/apps", label: "Apps" }],
-  },
 ];
 
-export function SidebarNav({ children, privileges }: SidebarNavProps) {
-  const canManageApps = hasPrivilege(privileges ?? [], "platform.apps.manage");
+export function SidebarNav({ children }: SidebarNavProps) {
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
   const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
   const appEntry = appRegistry?.items.find((item) => item.slug === slug);
-  const filteredConfig = sidebarConfig.filter((section) => section.prefix !== "/admin" || canManageApps);
-  const fallbackSection = filteredConfig[0] ?? sidebarConfig[0];
+  const fallbackSection = sidebarConfig[0];
 
   const current = appEntry
     ? {
         title: appEntry.app_id,
         items: appEntry.nav_entries.map((entry) => ({ to: entry.path, label: entry.label })),
       }
-    : filteredConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? fallbackSection;
+    : sidebarConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? fallbackSection;
 
   return (
     <>

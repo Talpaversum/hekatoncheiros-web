@@ -41,9 +41,6 @@ export default function App() {
           }
         />
       </Route>
-      <Route path="/admin" element={<AppShell />}>
-        <Route path="apps" element={<AppsPage />} />
-      </Route>
       <Route path="/app/:slug/*" element={<AppShell />}>
         <Route index element={<AppRuntimePage />} />
         <Route path="*" element={<AppRuntimePage />} />

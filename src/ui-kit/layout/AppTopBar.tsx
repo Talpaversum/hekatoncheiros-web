@@ -96,7 +96,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               </button>
               <Menu open={appsOpen} onClose={() => setAppsOpen(false)} className="w-80">
                 <NavLink
-                  to="/admin/apps"
+                  to="/core/apps"
                   onClick={() => setAppsOpen(false)}
                   className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
                 >

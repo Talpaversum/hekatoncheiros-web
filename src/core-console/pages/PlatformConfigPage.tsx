@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   usePlatformInstanceSettingsQuery,
@@ -43,9 +43,19 @@ function StatusBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
+type IdentityTab = "users" | "tenants" | "roles";
+
+function readIdentityTabFromPath(pathname: string): IdentityTab {
+  if (pathname.endsWith("/tenants")) return "tenants";
+  if (pathname.endsWith("/roles")) return "roles";
+  return "users";
+}
+
 export function PlatformConfigPage() {
   const location = useLocation();
-  const section = location.pathname.split("/").pop() ?? "";
+  const navigate = useNavigate();
+  const section = location.pathname.split("/")[3] ?? "";
+  const activeIdentityTab = readIdentityTabFromPath(location.pathname);
   const { data, isLoading } = useTrustedOriginsQuery(true);
   const { data: platformInstance } = usePlatformInstanceSettingsQuery(true);
   const { data: identityUsersData } = useIdentityUsersQuery(section === "identity" || section === "platform" || section === "");
@@ -401,7 +411,29 @@ export function PlatformConfigPage() {
         </Card>}
 
         {section === "identity" && <div className="grid gap-4">
-          <Card className="rounded-hc-md">
+          <div className="flex flex-wrap gap-2 border-b border-hc-outline">
+            {([
+              ["users", "Users"],
+              ["tenants", "Tenants"],
+              ["roles", "Roles"],
+            ] as Array<[IdentityTab, string]>).map(([tab, label]) => (
+              <button
+                key={tab}
+                className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+                  activeIdentityTab === tab
+                    ? "border-hc-primary text-hc-text"
+                    : "border-transparent text-hc-muted hover:text-hc-text"
+                }`}
+                onClick={() =>
+                  navigate(tab === "users" ? "/core/platform/identity" : `/core/platform/identity/${tab}`)
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {activeIdentityTab === "users" && <Card className="rounded-hc-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Users</div>
@@ -431,9 +463,9 @@ export function PlatformConfigPage() {
                 />
               ))}
             </div>
-          </Card>
+          </Card>}
 
-          <Card className="rounded-hc-md">
+          {activeIdentityTab === "tenants" && <Card className="rounded-hc-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Tenants</div>
@@ -454,9 +486,9 @@ export function PlatformConfigPage() {
                 <IdentityTenantRow key={tenant.id} tenant={tenant} onSave={(payload) => updateTenant.mutateAsync(payload)} busy={updateTenant.isPending} />
               ))}
             </div>
-          </Card>
+          </Card>}
 
-          <Card className="rounded-hc-md">
+          {activeIdentityTab === "roles" && <Card className="rounded-hc-md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">RBAC grants</div>
@@ -495,7 +527,7 @@ export function PlatformConfigPage() {
                 ))}
               </div>
             )}
-          </Card>
+          </Card>}
         </div>}
 
         {section === "automation" && <Card className="rounded-hc-md">
