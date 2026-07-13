@@ -71,11 +71,11 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
       <div className="flex h-14 items-center justify-between gap-3 px-4 lg:px-5">
         <div className="flex min-w-0 items-center gap-3 lg:gap-5">
           <div className="hidden text-base font-semibold lg:block">Hekatoncheiros</div>
-          <nav className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm">
+          <nav className="flex min-w-0 items-center gap-1 overflow-visible text-sm">
             <NavLink
               to="/core/dashboard"
               className={({ isActive }) =>
-                `rounded-hc-sm px-3 py-2 transition ${
+                `hidden rounded-hc-sm px-3 py-2 transition sm:block ${
                   isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted hover:text-hc-text"
                 }`
               }
@@ -93,7 +93,11 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               >
                 Apps ▾
               </button>
-              <Menu open={appsOpen} onClose={() => setAppsOpen(false)} className="w-80">
+              <Menu
+                open={appsOpen}
+                onClose={() => setAppsOpen(false)}
+                className="left-0 right-auto w-80 max-w-[calc(100vw-2rem)]"
+              >
                 <NavLink
                   to="/core/apps"
                   onClick={() => setAppsOpen(false)}
@@ -147,7 +151,11 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               >
                 Help ▾
               </button>
-              <Menu open={helpOpen} onClose={() => setHelpOpen(false)} className="w-72">
+              <Menu
+                open={helpOpen}
+                onClose={() => setHelpOpen(false)}
+                className="!-right-16 w-72 max-w-[calc(100vw-2rem)] sm:!right-0"
+              >
                 <NavLink
                   to="/core/help"
                   onClick={() => setHelpOpen(false)}
