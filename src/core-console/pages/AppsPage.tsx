@@ -538,7 +538,7 @@ export function AppsPage() {
     return (
       <Card>
         <div className="text-lg font-semibold">Apps</div>
-        <div className="mt-2 text-sm text-hc-muted">Nemáš oprávnění pro správu aplikací.</div>
+        <div className="mt-2 text-sm text-hc-muted">You do not have permission to manage applications.</div>
       </Card>
     );
   }

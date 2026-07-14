@@ -22,7 +22,7 @@ export function LoginPage() {
       await login(email, password);
       navigate("/core/dashboard");
     } catch {
-      setError("Neplatné přihlašovací údaje.");
+      setError("Invalid credentials.");
     } finally {
       setLoading(false);
     }
@@ -31,18 +31,18 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-hc-bg px-4">
       <Card className="w-full max-w-sm border border-hc-outline shadow-none">
-        <h1 className="text-xl font-semibold">Přihlášení do Core</h1>
-        <p className="mt-1 text-sm text-hc-muted">Použij admin@example.com / admin</p>
+        <h1 className="text-xl font-semibold">Sign in to Core</h1>
+        <p className="mt-1 text-sm text-hc-muted">Use admin@example.com / admin</p>
         <form className="mt-5 flex flex-col gap-3" onSubmit={handleSubmit}>
           <Field label="Email">
             <Input value={email} onChange={(event) => setEmail(event.target.value)} />
           </Field>
-          <Field label="Heslo">
+          <Field label="Password">
             <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </Field>
           {error && <div className="text-sm text-hc-danger">{error}</div>}
           <Button type="submit" disabled={loading}>
-            {loading ? "Přihlašuji…" : "Přihlásit"}
+            {loading ? "Signing in..." : "Sign in"}
           </Button>
         </form>
       </Card>

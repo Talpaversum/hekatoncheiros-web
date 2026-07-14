@@ -41,11 +41,11 @@ export function HelpPage() {
           title: entry.title,
           summary: entry.summary,
           outcome: entry.outcome,
-          category: entry.category ?? "Aplikace",
+          category: entry.category ?? "Applications",
           steps: entry.steps,
           path: entry.path,
           source: app.app_name ?? app.app_id,
-          actionLabel: "Přejít k akci",
+          actionLabel: "Open action",
         })),
       ) ?? [];
 
@@ -76,10 +76,10 @@ export function HelpPage() {
     <div className="space-y-4">
       <PageHeader
         eyebrow="Help"
-        title={selectedCategory ?? "Postupy a návody"}
-        description={selectedCategory ? "Sekce nápovědy vybraná z hlavního menu." : "Návody jsou uspořádané podle cíle; aplikace mohou přidat vlastní postupy z manifestu."}
+        title={selectedCategory ?? "Procedures and guides"}
+        description={selectedCategory ? "Help section selected from the main menu." : "Guides are organized by goal; applications can contribute procedures through their manifests."}
         actions={<div className="w-full sm:w-80">
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Hledat postup" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search guides" />
         </div>}
       />
 
@@ -92,7 +92,7 @@ export function HelpPage() {
               : "border-hc-outline text-hc-text hover:bg-hc-surface-variant"
           }`}
         >
-          Vše
+          All
         </Link>
         {categories.map((category) => (
           <Link
@@ -109,12 +109,12 @@ export function HelpPage() {
         ))}
       </div>
 
-      {isLoading && <div className="text-sm text-hc-muted">Načítám aplikační návody…</div>}
+      {isLoading && <div className="text-sm text-hc-muted">Loading application guides...</div>}
 
       {categorySlug && !selectedCategory && !isLoading && (
         <Card>
-          <div className="text-sm font-semibold">Sekce nenalezena</div>
-          <div className="mt-1 text-sm text-hc-muted">Vyber jinou sekci z hlavního Help menu.</div>
+          <div className="text-sm font-semibold">Section not found</div>
+          <div className="mt-1 text-sm text-hc-muted">Select another section from the main Help menu.</div>
         </Card>
       )}
 
@@ -123,7 +123,7 @@ export function HelpPage() {
           <section key={category}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">{category}</div>
-              <div className="text-xs text-hc-muted">{items.length} postupů</div>
+              <div className="text-xs text-hc-muted">{items.length} guides</div>
             </div>
             <div className="overflow-hidden rounded-hc-md border border-hc-outline bg-hc-surface">
               {items.map((item) => (
@@ -144,8 +144,8 @@ export function HelpPage() {
 
       {!isLoading && helpGuides.length === 0 && (
         <Card>
-          <div className="text-sm font-semibold">Nic nenalezeno</div>
-          <div className="mt-1 text-sm text-hc-muted">Zkus upravit hledaný výraz nebo kategorii.</div>
+          <div className="text-sm font-semibold">No results found</div>
+          <div className="mt-1 text-sm text-hc-muted">Try changing the search term or category.</div>
         </Card>
       )}
     </div>
@@ -201,13 +201,13 @@ function GuideDisclosure({
             </div>
 
             <aside className="rounded-hc-md border border-hc-outline bg-hc-surface p-4">
-              <div className="text-xs uppercase tracking-wide text-hc-muted">Výsledek</div>
-              <div className="mt-2 text-sm text-hc-text">{guide.outcome ?? "Postup dokončí požadovanou akci."}</div>
+              <div className="text-xs uppercase tracking-wide text-hc-muted">Outcome</div>
+              <div className="mt-2 text-sm text-hc-text">{guide.outcome ?? "The guide completes the requested action."}</div>
               <Link
                 to={guide.path}
                 className="mt-4 inline-flex rounded-hc-sm border border-hc-outline px-3 py-2 text-sm font-medium text-hc-text transition hover:bg-hc-surface-variant"
               >
-                {guide.actionLabel ?? "Přejít k akci"}
+                {guide.actionLabel ?? "Open action"}
               </Link>
             </aside>
           </div>

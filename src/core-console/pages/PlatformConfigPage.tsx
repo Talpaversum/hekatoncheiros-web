@@ -143,18 +143,18 @@ export function PlatformConfigPage() {
 
     const normalized = origin.trim();
     if (!normalized) {
-      setError("Origin je povinný.");
+      setError("Origin is required.");
       return;
     }
 
     if (httpOriginDetected && !allowHttp) {
-      setError("Pro http:// origin musíš explicitně potvrdit Allow HTTP.");
+      setError("You must explicitly enable Allow HTTP for an http:// origin.");
       return;
     }
 
     try {
       await createMutation.mutateAsync({ origin: normalized, note: note.trim() || null });
-      setMessage("Trusted origin byl přidán.");
+      setMessage("Trusted origin added.");
       setOrigin("");
       setNote("");
       setAllowHttp(false);

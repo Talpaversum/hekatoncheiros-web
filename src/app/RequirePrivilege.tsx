@@ -14,7 +14,7 @@ export function RequirePrivilege({ required, children }: RequirePrivilegeProps) 
   if (isLoading) {
     return (
       <Card>
-        <div className="text-lg font-semibold">Načítám oprávnění…</div>
+        <div className="text-lg font-semibold">Loading privileges...</div>
       </Card>
     );
   }
@@ -24,7 +24,7 @@ export function RequirePrivilege({ required, children }: RequirePrivilegeProps) 
     return (
       <Card>
         <div className="text-lg font-semibold">403 Forbidden</div>
-        <div className="mt-2 text-sm text-hc-muted">Nemáš oprávnění pro zobrazení této stránky.</div>
+        <div className="mt-2 text-sm text-hc-muted">You do not have permission to view this page.</div>
       </Card>
     );
   }

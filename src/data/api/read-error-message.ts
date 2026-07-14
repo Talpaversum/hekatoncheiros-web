@@ -14,5 +14,5 @@ export function readErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Neočekávaná chyba.";
+  return "Unexpected error.";
 }

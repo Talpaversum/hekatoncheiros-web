@@ -156,11 +156,11 @@ export function AppRuntimePage() {
   }
 
   if (isRegistryLoading || isContextLoading || isPluginLoading) {
-    return <div className="text-sm text-hc-muted">Načítám app runtime…</div>;
+    return <div className="text-sm text-hc-muted">Loading app runtime...</div>;
   }
 
   if (!appEntry) {
-    return <div className="text-sm text-hc-danger">App pro slug "{slug}" není v registry.</div>;
+    return <div className="text-sm text-hc-danger">No registry entry exists for app slug "{slug}".</div>;
   }
 
   if (pluginError) {
@@ -168,7 +168,7 @@ export function AppRuntimePage() {
   }
 
   if (!plugin || plugin.routes.length === 0) {
-    return <div className="text-sm text-hc-muted">Plugin nedefinuje žádné routy.</div>;
+    return <div className="text-sm text-hc-muted">The plugin does not define any routes.</div>;
   }
 
   const basePath = `/app/${slug}`;

@@ -62,7 +62,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const appGroups = useMemo(() => registry?.items ?? [], [registry?.items]);
   const helpCategories = useMemo(() => {
     const platformCategories = getVisiblePlatformHelpGuides(privileges).map((guide) => guide.category);
-    const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? "Aplikace"));
+    const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? "Applications"));
     return Array.from(new Set([...platformCategories, ...appCategories])).sort((a, b) => a.localeCompare(b));
   }, [appGroups, privileges]);
 
@@ -108,9 +108,9 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 {appGroups.length > 0 && <div className="my-2 border-t border-hc-outline" />}
 
                 <div className="max-h-[24rem] overflow-auto pr-1">
-                  {registryLoading && <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Načítám aplikace…</div>}
+                  {registryLoading && <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Loading applications...</div>}
                   {!registryLoading && appGroups.length === 0 && (
-                    <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Žádné aplikace nejsou dostupné.</div>
+                    <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">No applications are available.</div>
                   )}
 
                   {appGroups.map((app) => (
@@ -161,7 +161,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   onClick={() => setHelpOpen(false)}
                   className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
                 >
-                  Všechny návody
+                  All guides
                 </NavLink>
                 {helpCategories.length > 0 && <div className="my-2 border-t border-hc-outline" />}
                 <div className="max-h-[24rem] overflow-auto pr-1">
@@ -205,8 +205,8 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               )}
               <div className="flex items-center justify-between rounded-hc-sm px-3 py-2">
                 <div>
-                  <div className="text-sm font-medium">Tmavý režim</div>
-                  <div className="text-xs text-hc-muted">Přepnout vzhled</div>
+                  <div className="text-sm font-medium">Dark mode</div>
+                  <div className="text-xs text-hc-muted">Switch appearance</div>
                 </div>
                 <Switch checked={isDark} onClick={toggle} />
               </div>
@@ -225,7 +225,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
             </button>
             <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
               <div className="px-3 py-2">
-                <div className="text-sm font-medium">{displayName ?? userId ?? "Uživatel"}</div>
+                <div className="text-sm font-medium">{displayName ?? userId ?? "User"}</div>
                 <div className="text-xs text-hc-muted">Session account</div>
               </div>
               <button
@@ -238,7 +238,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 onClick={handleLogout}
                 className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
               >
-                Odhlásit
+                Sign out
               </button>
             </Menu>
           </div>
