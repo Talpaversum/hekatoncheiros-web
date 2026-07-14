@@ -15,6 +15,7 @@ import {
   useSyncCatalogSourceMutation,
   type AppCatalogEntry,
   type AppCatalogSource,
+  type AppRuntimeStartApproval,
   type CatalogDeploymentPlan,
   type InstallCatalogEntryMode,
 } from "../../data/api/app-catalog";
@@ -142,17 +143,30 @@ function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleString();
 }
 
+function normalizePlanUrl(value: string, originOnly = false) {
+  try {
+    const parsed = new URL(value);
+    parsed.hash = "";
+    return originOnly ? parsed.origin : parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
 function buildCatalogDeploymentPlan(entry: AppCatalogEntry, mode: InstallCatalogEntryMode = "external"): CatalogDeploymentPlan {
+  const internalBaseUrl = entry.deployment.internal_base_url ?? entry.deployment.base_url ?? entry.base_url;
   return {
     app_id: entry.app_id,
     mode,
     service_name: entry.deployment.service_name ?? entry.slug,
-    internal_base_url: entry.deployment.internal_base_url ?? entry.deployment.base_url ?? entry.base_url,
+    internal_base_url: normalizePlanUrl(internalBaseUrl, true),
     compose_project: entry.deployment.compose_project ?? "hekatoncheiros-core",
     compose_file: entry.deployment.compose_file ?? null,
+    package_url: entry.deployment.package_url ? normalizePlanUrl(entry.deployment.package_url) : null,
+    package_sha256: entry.deployment.package_sha256 ?? null,
     published_ports_allowed: false,
     host_mounts_allowed: false,
-    requires_approval: true,
+    requires_approval: mode === "compose",
   };
 }
 
@@ -226,6 +240,7 @@ export function AppsPage() {
   const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
   const [offlineToken, setOfflineToken] = useState("");
   const [installDialog, setInstallDialog] = useState<InstallDialogState>({ status: "idle" });
+  const [runtimeApprovalConfirmed, setRuntimeApprovalConfirmed] = useState(false);
   const [appTokenDialog, setAppTokenDialog] = useState<AppTokenDialogState>({ status: "idle" });
   const [uninstallState, setUninstallState] = useState<UninstallState>({ status: "idle" });
   const [uninstallConfirmChecked, setUninstallConfirmChecked] = useState(false);
@@ -327,11 +342,13 @@ export function AppsPage() {
 
   const openInstallDialog = (entry: AppCatalogEntry) => {
     resetNotices();
+    setRuntimeApprovalConfirmed(false);
     const mode = "external";
     setInstallDialog({ status: "confirm", entry, mode, plan: buildCatalogDeploymentPlan(entry, mode) });
   };
 
   const setInstallMode = (mode: InstallCatalogEntryMode) => {
+    setRuntimeApprovalConfirmed(false);
     setInstallDialog((prev) => {
       if (prev.status !== "confirm") {
         return prev;
@@ -344,6 +361,7 @@ export function AppsPage() {
     if (installDialog.status === "running") {
       return;
     }
+    setRuntimeApprovalConfirmed(false);
     setInstallDialog({ status: "idle" });
   };
 
@@ -353,11 +371,29 @@ export function AppsPage() {
     }
 
     const { entry, mode, plan } = installDialog;
+    let approval: AppRuntimeStartApproval | undefined;
+    if (mode === "compose") {
+      if (!runtimeApprovalConfirmed || !plan.package_sha256 || !plan.package_url || !plan.compose_file) {
+        return;
+      }
+      approval = {
+        confirmed: true,
+        expected_manifest_sha256: entry.manifest_hash,
+        expected_package_sha256: plan.package_sha256,
+        expected_deployment: {
+          service_name: plan.service_name,
+          internal_base_url: plan.internal_base_url,
+          package_url: plan.package_url,
+          compose_project: plan.compose_project,
+          compose_file: plan.compose_file,
+        },
+      };
+    }
     resetNotices();
     setInstallDialog({ status: "running", entry, mode, plan });
 
     try {
-      const result = await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode });
+      const result = await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode, approval });
       const message =
         result.status === "staged"
           ? `${entry.app_name} was staged for installation.`
@@ -802,6 +838,8 @@ export function AppsPage() {
       />
       <CatalogInstallDialog
         state={installDialog}
+        runtimeApprovalConfirmed={runtimeApprovalConfirmed}
+        onRuntimeApprovalChange={setRuntimeApprovalConfirmed}
         onModeChange={setInstallMode}
         onClose={closeInstallDialog}
         onConfirm={executeCatalogInstall}
@@ -1217,11 +1255,15 @@ function AppTokenDialog({
 
 function CatalogInstallDialog({
   state,
+  runtimeApprovalConfirmed,
+  onRuntimeApprovalChange,
   onModeChange,
   onClose,
   onConfirm,
 }: {
   state: InstallDialogState;
+  runtimeApprovalConfirmed: boolean;
+  onRuntimeApprovalChange: (confirmed: boolean) => void;
   onModeChange: (mode: InstallCatalogEntryMode) => void;
   onClose: () => void;
   onConfirm: () => Promise<void>;
@@ -1234,6 +1276,9 @@ function CatalogInstallDialog({
   const plan = state.plan;
   const mode = state.status === "result" ? undefined : state.mode;
   const isRunning = state.status === "running";
+  const composeApprovalBlocked =
+    mode === "compose" &&
+    (!runtimeApprovalConfirmed || !plan.package_sha256 || !plan.package_url || !plan.compose_file);
 
   return (
     <Dialog open title="Install app" disableClose={isRunning} onClose={onClose}>
@@ -1285,9 +1330,34 @@ function CatalogInstallDialog({
             <PlanItem label="Internal URL" value={plan.internal_base_url} />
             <PlanItem label="Compose project" value={plan.compose_project} />
             <PlanItem label="Compose file" value={plan.compose_file ?? "not declared"} />
+            <PlanItem label="Manifest SHA-256" value={entry.manifest_hash} />
+            <PlanItem label="Package SHA-256" value={plan.package_sha256 ?? "not declared"} />
             <PlanItem label="Host access" value={plan.host_mounts_allowed ? "allowed" : "blocked"} />
           </dl>
         </div>
+
+        {mode === "compose" && state.status !== "result" && (
+          <label className="mt-4 flex items-start gap-3 rounded-hc-md border border-hc-warning/40 bg-hc-warning/5 p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={runtimeApprovalConfirmed}
+              onChange={(event) => onRuntimeApprovalChange(event.target.checked)}
+              disabled={isRunning || !plan.package_sha256 || !plan.package_url || !plan.compose_file}
+            />
+            <span>
+              <span className="block font-medium text-hc-text">Approve Core-managed runtime start</span>
+              <span className="mt-1 block text-xs text-hc-muted">
+                I reviewed the manifest and package hashes and authorize Core to build and start this Compose service.
+              </span>
+              {(!plan.package_sha256 || !plan.package_url || !plan.compose_file) && (
+                <span className="mt-2 block text-xs text-hc-danger">
+                  The catalog entry must declare package URL, package SHA-256, and Compose file before this runtime can be approved.
+                </span>
+              )}
+            </span>
+          </label>
+        )}
 
         {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">Installation is running...</div>}
 
@@ -1296,7 +1366,7 @@ function CatalogInstallDialog({
             {state.status === "result" ? "Close" : "Cancel"}
           </Button>
           {state.status !== "result" && (
-            <Button onClick={() => void onConfirm()} disabled={isRunning}>
+            <Button onClick={() => void onConfirm()} disabled={isRunning || composeApprovalBlocked}>
               {isRunning ? "Running..." : "Approve"}
             </Button>
           )}

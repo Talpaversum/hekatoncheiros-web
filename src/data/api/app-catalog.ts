@@ -26,6 +26,8 @@ export type AppCatalogEntry = {
     internal_base_url?: string;
     compose_project?: string;
     compose_file?: string;
+    package_url?: string;
+    package_sha256?: string;
     base_url?: string;
   } & Record<string, unknown>;
   published: boolean;
@@ -106,9 +108,24 @@ export type CatalogDeploymentPlan = {
   internal_base_url: string;
   compose_project: string;
   compose_file: string | null;
+  package_url: string | null;
+  package_sha256: string | null;
   published_ports_allowed: boolean;
   host_mounts_allowed: boolean;
   requires_approval: boolean;
+};
+
+export type AppRuntimeStartApproval = {
+  confirmed: true;
+  expected_manifest_sha256: string;
+  expected_package_sha256: string;
+  expected_deployment: {
+    service_name: string;
+    internal_base_url: string;
+    package_url: string;
+    compose_project: string;
+    compose_file: string;
+  };
 };
 
 export type InstallCatalogEntryResponse = {
@@ -218,10 +235,18 @@ export function useInstallCatalogEntryMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ appId, mode }: { appId: string; mode: InstallCatalogEntryMode }) =>
+    mutationFn: ({
+      appId,
+      mode,
+      approval,
+    }: {
+      appId: string;
+      mode: InstallCatalogEntryMode;
+      approval?: AppRuntimeStartApproval;
+    }) =>
       authFetch<InstallCatalogEntryResponse>(`/apps/catalog/entries/${encodeURIComponent(appId)}/install`, {
         method: "POST",
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode, approval }),
       }),
     onSuccess: async () => {
       await Promise.all([
