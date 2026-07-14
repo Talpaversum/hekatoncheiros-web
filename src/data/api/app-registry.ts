@@ -7,6 +7,12 @@ export type AppRegistryEntry = {
   app_name?: string;
   slug: string;
   ui_url: string;
+  localization: {
+    contract_version: number;
+    default_locale: string;
+    supported_locales: string[];
+    resources: Array<{ locale: string; path: string; format: string }>;
+  };
   nav_entries: Array<{
     label: string;
     path: string;

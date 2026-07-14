@@ -4,6 +4,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { useContextQuery } from "../data/api/context";
 import { useAppRegistryQuery } from "../data/api/app-registry";
 import { authFetch } from "../data/auth/auth-fetch";
+import { useLocalization } from "../localization/LocalizationProvider";
 
 function rewritePluginImports(params: {
   source: string;
@@ -37,6 +38,12 @@ type AppContext = {
     source: string;
     entitlement_id: string;
   } | null;
+  localization: {
+    locale: string;
+    requested_locale: string;
+    fallback_locale: "en";
+    resources: Array<{ locale: string; path: string; format: string }>;
+  };
 };
 
 function matchesRoutePath(routePath: string, subPath: string) {
@@ -59,6 +66,7 @@ function matchesRoutePath(routePath: string, subPath: string) {
 export function AppRuntimePage() {
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
+  const { locale, t } = useLocalization();
 
   const { data: registry, isLoading: isRegistryLoading } = useAppRegistryQuery(Boolean(slug));
   const { data: context, isLoading: isContextLoading } = useContextQuery(Boolean(slug));
@@ -88,6 +96,12 @@ export function AppRuntimePage() {
       },
       privileges: context?.privileges ?? [],
       entitlement: null,
+      localization: {
+        requested_locale: locale,
+        locale: appEntry.localization.supported_locales.includes(locale) ? locale : "en",
+        fallback_locale: "en",
+        resources: appEntry.localization.resources,
+      },
     };
 
     const loadPlugin = async () => {
@@ -149,18 +163,18 @@ export function AppRuntimePage() {
     return () => {
       cancelled = true;
     };
-  }, [appEntry, context?.privileges]);
+  }, [appEntry, context?.privileges, locale]);
 
   if (!slug) {
-    return <div className="text-sm text-hc-danger">Missing app slug in route.</div>;
+    return <div className="text-sm text-hc-danger">{t("runtime.missingSlug")}</div>;
   }
 
   if (isRegistryLoading || isContextLoading || isPluginLoading) {
-    return <div className="text-sm text-hc-muted">Loading app runtime...</div>;
+    return <div className="text-sm text-hc-muted">{t("runtime.loading")}</div>;
   }
 
   if (!appEntry) {
-    return <div className="text-sm text-hc-danger">No registry entry exists for app slug "{slug}".</div>;
+    return <div className="text-sm text-hc-danger">{t("runtime.notFound", { slug })}</div>;
   }
 
   if (pluginError) {
@@ -168,7 +182,7 @@ export function AppRuntimePage() {
   }
 
   if (!plugin || plugin.routes.length === 0) {
-    return <div className="text-sm text-hc-muted">The plugin does not define any routes.</div>;
+    return <div className="text-sm text-hc-muted">{t("runtime.noRoutes")}</div>;
   }
 
   const basePath = `/app/${slug}`;

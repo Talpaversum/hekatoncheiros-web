@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAppRegistryQuery } from "../../data/api/app-registry";
+import { useLocalization } from "../../localization/LocalizationProvider";
 
 type SidebarNavProps = PropsWithChildren<{
   privileges?: string[];
@@ -11,25 +12,25 @@ type SidebarNavProps = PropsWithChildren<{
 const sidebarConfig = [
   {
     prefix: "/core/dashboard",
-    title: "Dashboard",
+    titleKey: "nav.dashboard",
     items: [
-      { to: "/core/dashboard", label: "Overview" },
+      { to: "/core/dashboard", labelKey: "nav.overview" },
       { to: "/core/dashboard#context", label: "Context snapshot" },
     ],
   },
   {
     prefix: "/core/help",
-    title: "Help",
+    titleKey: "nav.help",
     items: [
-      { to: "/core/help", label: "Help center" },
+      { to: "/core/help", labelKey: "nav.help" },
     ],
   },
   {
     prefix: "/core/account",
-    title: "Account",
+    titleKey: "nav.account",
     items: [
-      { to: "/core/account", label: "Session" },
-      { to: "/core/account/security", label: "Security" },
+      { to: "/core/account", labelKey: "nav.session" },
+      { to: "/core/account/security", labelKey: "nav.security" },
     ],
   },
   {
@@ -77,6 +78,7 @@ const sidebarConfig = [
 ];
 
 export function SidebarNav({ children }: SidebarNavProps) {
+  const { t } = useLocalization();
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
   const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
@@ -88,7 +90,16 @@ export function SidebarNav({ children }: SidebarNavProps) {
         title: appEntry.app_id,
         items: appEntry.nav_entries.map((entry) => ({ to: entry.path, label: entry.label })),
       }
-    : sidebarConfig.find((section) => location.pathname.startsWith(section.prefix)) ?? fallbackSection;
+    : (() => {
+        const section = sidebarConfig.find((item) => location.pathname.startsWith(item.prefix)) ?? fallbackSection;
+        return {
+          title: "titleKey" in section && typeof section.titleKey === "string" ? t(section.titleKey) : section.title,
+          items: section.items.map((item) => ({
+            to: item.to,
+            label: "labelKey" in item && typeof item.labelKey === "string" ? t(item.labelKey) : item.label,
+          })),
+        };
+      })();
 
   return (
     <>

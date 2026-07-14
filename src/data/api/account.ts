@@ -7,6 +7,7 @@ export type AccountProfile = {
   email: string;
   display_name: string | null;
   status: string;
+  preferred_locale: "en" | "cs" | "sk" | "de" | "fr" | "es";
   created_at: string;
   updated_at: string;
 };
@@ -23,7 +24,7 @@ export function useUpdateAccountMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { email?: string; display_name?: string | null }) =>
+    mutationFn: (payload: { email?: string; display_name?: string | null; preferred_locale?: AccountProfile["preferred_locale"] }) =>
       authFetch<AccountProfile>("/account", {
         method: "PATCH",
         body: JSON.stringify(payload),

@@ -15,6 +15,7 @@ export type ContextResponse = {
     email?: string | null;
     display_name?: string | null;
     status?: string | null;
+    preferred_locale?: string;
     effective_user_id: string;
     impersonating: boolean;
     delegation: unknown;

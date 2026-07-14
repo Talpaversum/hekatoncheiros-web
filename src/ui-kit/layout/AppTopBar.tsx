@@ -5,6 +5,7 @@ import { hasPrivilege } from "../../access/privileges";
 import { getHelpCategoryPath, getVisiblePlatformHelpGuides } from "../../core-console/pages/help-guides";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { clearTokens } from "../../data/auth/storage";
+import { useLocalization } from "../../localization/LocalizationProvider";
 import { Avatar } from "../components/Avatar";
 import { IconButton } from "../components/IconButton";
 import { Menu } from "../components/Menu";
@@ -22,6 +23,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggle } = useTheme();
+  const { t } = useLocalization();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
   const [appsOpen, setAppsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -80,7 +82,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 }`
               }
             >
-              Dashboard
+              {t("nav.dashboard")}
             </NavLink>
             <div className="relative">
               <button
@@ -91,7 +93,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 className="rounded-hc-sm px-3 py-2 text-hc-muted transition hover:text-hc-text"
                 aria-expanded={appsOpen}
               >
-                Apps ▾
+                {t("nav.apps")} ▾
               </button>
               <Menu
                 open={appsOpen}
@@ -103,14 +105,14 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   onClick={() => setAppsOpen(false)}
                   className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
                 >
-                  Manage apps
+                  {t("nav.manageApps")}
                 </NavLink>
                 {appGroups.length > 0 && <div className="my-2 border-t border-hc-outline" />}
 
                 <div className="max-h-[24rem] overflow-auto pr-1">
-                  {registryLoading && <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">Loading applications...</div>}
+                  {registryLoading && <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">{t("common.loadingApps")}</div>}
                   {!registryLoading && appGroups.length === 0 && (
-                    <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">No applications are available.</div>
+                    <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">{t("common.noApps")}</div>
                   )}
 
                   {appGroups.map((app) => (
@@ -134,7 +136,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 }`
               }
             >
-              Licensing
+              {t("nav.licensing")}
             </NavLink>
             <div className="relative">
               <button
@@ -149,7 +151,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 }`}
                 aria-expanded={helpOpen}
               >
-                Help ▾
+                {t("nav.help")} ▾
               </button>
               <Menu
                 open={helpOpen}
@@ -161,7 +163,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   onClick={() => setHelpOpen(false)}
                   className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
                 >
-                  All guides
+                  {t("nav.allGuides")}
                 </NavLink>
                 {helpCategories.length > 0 && <div className="my-2 border-t border-hc-outline" />}
                 <div className="max-h-[24rem] overflow-auto pr-1">
@@ -183,7 +185,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
 
         <div className="relative flex shrink-0 items-center gap-2">
           <div className="relative">
-            <IconButton aria-label="Settings" onClick={() => setSettingsOpen((prev) => !prev)}>
+            <IconButton aria-label={t("common.settings")} onClick={() => setSettingsOpen((prev) => !prev)}>
               ⚙
             </IconButton>
             <Menu open={settingsOpen} onClose={() => setSettingsOpen(false)} className="w-64">
@@ -192,7 +194,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   onClick={openPlatformConfig}
                   className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
                 >
-                  Platform configuration
+                  {t("settings.platform")}
                 </button>
               )}
               {hasPrivilege(privileges, "tenant.config.manage") && (
@@ -200,18 +202,18 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   onClick={openTenantConfig}
                   className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
                 >
-                  Tenant configuration
+                  {t("settings.tenant")}
                 </button>
               )}
               <div className="flex items-center justify-between rounded-hc-sm px-3 py-2">
                 <div>
-                  <div className="text-sm font-medium">Dark mode</div>
-                  <div className="text-xs text-hc-muted">Switch appearance</div>
+                  <div className="text-sm font-medium">{t("settings.darkMode")}</div>
+                  <div className="text-xs text-hc-muted">{t("settings.switchAppearance")}</div>
                 </div>
                 <Switch checked={isDark} onClick={toggle} />
               </div>
               <div className="mt-2 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
-                Tenant mode: {tenantMode ?? "unknown"}
+                {t("settings.tenantMode", { mode: tenantMode ?? "unknown" })}
               </div>
             </Menu>
           </div>
@@ -225,7 +227,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
             </button>
             <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
               <div className="px-3 py-2">
-                <div className="text-sm font-medium">{displayName ?? userId ?? "User"}</div>
+                <div className="text-sm font-medium">{displayName ?? userId ?? t("common.user")}</div>
                 <div className="text-xs text-hc-muted">Session account</div>
               </div>
               <button
@@ -238,7 +240,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 onClick={handleLogout}
                 className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
               >
-                Sign out
+                {t("common.signOut")}
               </button>
             </Menu>
           </div>

@@ -1,14 +1,23 @@
+import { useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { AppTopBar } from "../ui-kit/layout/AppTopBar";
 import { SidebarNav } from "../ui-kit/layout/SidebarNav";
 import { useContextQuery } from "../data/api/context";
 import { getAccessToken } from "../data/auth/storage";
+import { useLocalization } from "../localization/LocalizationProvider";
+import { locales, type Locale } from "../localization/resources";
 
 export function AppShell() {
   const token = getAccessToken();
   const { data } = useContextQuery(!!token);
   const privileges = data?.privileges ?? [];
+  const { locale, setLocale, t } = useLocalization();
+
+  useEffect(() => {
+    const preferred = data?.actor?.preferred_locale;
+    if (locales.includes(preferred as Locale) && preferred !== locale) setLocale(preferred as Locale);
+  }, [data?.actor?.preferred_locale, locale, setLocale]);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -26,7 +35,7 @@ export function AppShell() {
         <SidebarNav privileges={privileges}>
           {data?.actor?.impersonating && (
             <div className="mb-4 rounded-hc-sm border border-hc-danger bg-hc-danger/10 px-4 py-2 text-xs text-hc-danger">
-              Impersonation active
+              {t("shell.impersonation")}
             </div>
           )}
           <Outlet />

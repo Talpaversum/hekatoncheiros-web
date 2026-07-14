@@ -5,9 +5,12 @@ import { useAccountQuery, useChangePasswordMutation, useUpdateAccountMutation } 
 import { useContextQuery } from "../../data/api/context";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { clearTokens } from "../../data/auth/storage";
+import { useLocalization } from "../../localization/LocalizationProvider";
+import { locales, type Locale } from "../../localization/resources";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
+import { Select } from "../../ui-kit/components/Select";
 import { Field, MetricStrip, PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
@@ -22,9 +25,11 @@ export function AccountPage() {
   const { data: account } = useAccountQuery(true);
   const updateAccount = useUpdateAccountMutation();
   const changePassword = useChangePasswordMutation();
+  const { setLocale, t } = useLocalization();
 
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [preferredLocale, setPreferredLocale] = useState<Locale | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -34,6 +39,7 @@ export function AccountPage() {
   const privileges = context?.privileges ?? [];
   const effectiveDisplayName = displayName ?? account?.display_name ?? "";
   const effectiveEmail = email ?? account?.email ?? "";
+  const effectiveLocale = preferredLocale ?? account?.preferred_locale ?? "en";
 
   const resetNotices = () => {
     setMessage(null);
@@ -51,10 +57,13 @@ export function AccountPage() {
       await updateAccount.mutateAsync({
         display_name: effectiveDisplayName.trim() || null,
         email: effectiveEmail.trim(),
+        preferred_locale: effectiveLocale,
       });
       setDisplayName(null);
       setEmail(null);
-      setMessage("Account profile was updated.");
+      setPreferredLocale(null);
+      setLocale(effectiveLocale);
+      setMessage(t("account.updated"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -66,7 +75,7 @@ export function AccountPage() {
       await changePassword.mutateAsync({ current_password: currentPassword, new_password: newPassword });
       setCurrentPassword("");
       setNewPassword("");
-      setMessage("Password was changed.");
+      setMessage(t("account.passwordChanged"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -76,9 +85,9 @@ export function AccountPage() {
     <div className="space-y-4">
       <PageHeader
         eyebrow="Account"
-        title={isSecurity ? "Security" : "User profile"}
-        description="Current session, identity fields, and password controls."
-        actions={<Button variant="outlined" onClick={handleLogout}>Sign out</Button>}
+        title={isSecurity ? t("nav.security") : t("account.profile")}
+        description={t("account.description")}
+        actions={<Button variant="outlined" onClick={handleLogout}>{t("common.signOut")}</Button>}
       />
 
       <ToastNotice message={error ?? message} tone={error ? "danger" : "success"} onDismiss={resetNotices} />
@@ -94,17 +103,22 @@ export function AccountPage() {
 
           <Card className="overflow-hidden p-0">
             <SectionHeader title="Profile fields" description={`${account?.id ?? "Loading..."} · ${context?.tenant.name ?? context?.tenant.id ?? "No tenant"}`} meta={<StatusBadge>{account?.status ?? "-"}</StatusBadge>} />
-            <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
-              <Field label="Display name">
+            <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
+              <Field label={t("account.displayName")}>
                 <Input value={effectiveDisplayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Jane Admin" />
               </Field>
-              <Field label="Email">
+              <Field label={t("account.email")}>
                 <Input value={effectiveEmail} onChange={(event) => setEmail(event.target.value)} placeholder="admin@example.com" />
+              </Field>
+              <Field label={t("account.language")}>
+                <Select value={effectiveLocale} onChange={(event) => setPreferredLocale(event.target.value as Locale)}>
+                  {locales.map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
+                </Select>
               </Field>
             </div>
             <div className="flex justify-end border-t border-hc-outline px-4 py-3">
               <Button onClick={() => void handleSaveProfile()} disabled={!effectiveEmail.trim() || updateAccount.isPending}>
-                Save profile
+                {t("account.save")}
               </Button>
             </div>
           </Card>
@@ -124,12 +138,12 @@ export function AccountPage() {
 
       {isSecurity && (
         <Card className="overflow-hidden p-0">
-          <SectionHeader title="Change password" description="Use at least eight characters for the new password." />
+          <SectionHeader title={t("account.password")} description="Use at least eight characters for the new password." />
           <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
-            <Field label="Current password">
+            <Field label={t("account.currentPassword")}>
               <Input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
             </Field>
-            <Field label="New password">
+            <Field label={t("account.newPassword")}>
               <Input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
             </Field>
           </div>
@@ -138,7 +152,7 @@ export function AccountPage() {
               onClick={() => void handleChangePassword()}
               disabled={currentPassword.length === 0 || newPassword.length < 8 || changePassword.isPending}
             >
-              Change password
+              {t("account.password")}
             </Button>
           </div>
         </Card>
