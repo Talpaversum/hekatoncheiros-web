@@ -22,6 +22,18 @@ const en = {
   "audit.event.app.runtime.stopped": "Application runtime stopped", "audit.event.inventory.item.created": "Inventory item created",
   "audit.event.inventory.item.updated": "Inventory item updated", "audit.event.inventory.item.deleted": "Inventory item deleted",
   "audit.event.inventory.operation.denied": "Inventory operation denied",
+  "audit.timeRange": "Time range", "audit.range.15m": "Last 15 min", "audit.range.1h": "Last 1 hour",
+  "audit.range.6h": "Last 6 hours", "audit.range.24h": "Last 24 hours", "audit.range.7d": "Last 7 days",
+  "audit.range.30d": "Last 30 days", "audit.range.custom": "Custom", "audit.timeInvalid": "Enter a relative expression such as now-1h or an absolute date and time.",
+  "audit.timeOrderInvalid": "The start of the range must be before its end.", "audit.addFilter": "Add filter",
+  "audit.chooseValues": "Choose values", "audit.searchValues": "Search values", "audit.noValues": "No matching values.",
+  "audit.removeFilter": "Remove {{filter}} filter", "audit.allFiltersAdded": "All available filters are active.",
+  "audit.clearAll": "Clear all", "audit.clearFilters": "Clear filters", "audit.events": "events",
+  "audit.refresh": "Refresh", "audit.refreshing": "Refreshing...", "audit.loadError": "Audit events could not be loaded.",
+  "audit.retry": "Retry", "audit.emptySelected": "No audit events match the selected time range and filters.",
+  "audit.eventScope": "Event scope", "audit.visibility": "Visibility", "audit.showRaw": "Show raw event",
+  "audit.hideRaw": "Hide raw event", "audit.section.summary": "Summary", "audit.section.actor": "Actor",
+  "audit.section.target": "Target", "audit.section.request": "Request",
 } as const;
 
 const cs: Record<keyof typeof en, string> = {
@@ -49,6 +61,18 @@ const cs: Record<keyof typeof en, string> = {
   "audit.event.app.runtime.stopped": "Běh aplikace zastaven", "audit.event.inventory.item.created": "Položka inventáře vytvořena",
   "audit.event.inventory.item.updated": "Položka inventáře změněna", "audit.event.inventory.item.deleted": "Položka inventáře odstraněna",
   "audit.event.inventory.operation.denied": "Operace inventáře zamítnuta",
+  "audit.timeRange": "Časový rozsah", "audit.range.15m": "Posledních 15 min", "audit.range.1h": "Poslední hodina",
+  "audit.range.6h": "Posledních 6 hodin", "audit.range.24h": "Posledních 24 hodin", "audit.range.7d": "Posledních 7 dní",
+  "audit.range.30d": "Posledních 30 dní", "audit.range.custom": "Vlastní", "audit.timeInvalid": "Zadejte relativní výraz jako now-1h nebo absolutní datum a čas.",
+  "audit.timeOrderInvalid": "Začátek rozsahu musí být před jeho koncem.", "audit.addFilter": "Přidat filtr",
+  "audit.chooseValues": "Vyberte hodnoty", "audit.searchValues": "Hledat hodnoty", "audit.noValues": "Žádné odpovídající hodnoty.",
+  "audit.removeFilter": "Odebrat filtr {{filter}}", "audit.allFiltersAdded": "Všechny dostupné filtry jsou aktivní.",
+  "audit.clearAll": "Vymazat vše", "audit.clearFilters": "Vymazat filtry", "audit.events": "událostí",
+  "audit.refresh": "Obnovit", "audit.refreshing": "Obnovování...", "audit.loadError": "Auditní události se nepodařilo načíst.",
+  "audit.retry": "Zkusit znovu", "audit.emptySelected": "Vybranému času a filtrům neodpovídají žádné auditní události.",
+  "audit.eventScope": "Rozsah události", "audit.visibility": "Viditelnost", "audit.showRaw": "Zobrazit nezpracovanou událost",
+  "audit.hideRaw": "Skrýt nezpracovanou událost", "audit.section.summary": "Souhrn", "audit.section.actor": "Aktér",
+  "audit.section.target": "Cíl", "audit.section.request": "Požadavek",
 };
 
 export const auditResources = { en, cs };
