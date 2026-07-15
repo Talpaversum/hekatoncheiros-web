@@ -13,6 +13,7 @@ import {
   type TenantLicenseItem,
 } from "../../data/api/licensing";
 import { readErrorMessage } from "../../data/api/read-error-message";
+import { useLocalization } from "../../localization/LocalizationProvider";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
@@ -34,6 +35,7 @@ export function LicensingPage() {
   const section = readSection(location.pathname);
   const { data: context } = useContextQuery(true);
   const tenantId = context?.tenant.id ?? null;
+  const { t } = useLocalization();
 
   const [appId, setAppId] = useState("talpaversum/inventory");
   const [licenseJws, setLicenseJws] = useState("");
@@ -72,7 +74,7 @@ export function LicensingPage() {
         license_jws: licenseJws,
         author_cert_jws: authorCertJws || undefined,
       });
-      setMessage(`Validation: ${result.status}${result.errors.length ? ` (${result.errors.join("; ")})` : ""}`);
+      setMessage(t("licensing.validationResult", { status: result.status, errors: result.errors.length ? ` (${result.errors.join("; ")})` : "" }));
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -85,7 +87,7 @@ export function LicensingPage() {
         license_jws: licenseJws,
         author_cert_jws: authorCertJws || undefined,
       });
-      setMessage(`Imported ${result.item.jti} (${result.item.status}).`);
+      setMessage(t("licensing.imported", { id: result.item.jti, status: result.item.status }));
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -95,7 +97,7 @@ export function LicensingPage() {
     clearNotice();
     try {
       await selectMutation.mutateAsync({ app_id: appId, entitlement_id: entitlementId });
-      setMessage("Entitlement selected.");
+      setMessage(t("licensing.selected"));
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -112,7 +114,7 @@ export function LicensingPage() {
       });
       setOauthState(result.state);
       setOauthRedirectUrl(result.redirect_url);
-      setMessage("Authorization request created.");
+      setMessage(t("licensing.authorizationCreated"));
     } catch (e) {
       setError(readErrorMessage(e));
     }
@@ -122,49 +124,49 @@ export function LicensingPage() {
     clearNotice();
     try {
       const result = await callbackMutation.mutateAsync({ code: oauthCode, state: oauthState });
-      setMessage(`Imported ${result.item.jti} from the vendor.`);
+      setMessage(t("licensing.vendorImported", { id: result.item.jti }));
     } catch (e) {
       setError(readErrorMessage(e));
     }
   };
 
   const sectionMeta = {
-    inventory: ["License inventory", "Review entitlements and choose the active license for an app."],
-    import: ["Offline import", "Validate or import a signed license bundle."],
-    activation: ["OAuth activation", "Request a license from a vendor and complete its callback."],
+    inventory: [t("nav.licenseInventory"), t("licensing.inventoryDescription")],
+    import: [t("nav.offlineImport"), t("licensing.importDescription")],
+    activation: [t("nav.oauthActivation"), t("licensing.activationDescription")],
   }[section];
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader eyebrow="Licensing" title={sectionMeta[0]} description={sectionMeta[1]} />
+      <PageHeader eyebrow={t("nav.licensing")} title={sectionMeta[0]} description={sectionMeta[1]} />
 
       <Card className="my-4 grid gap-3 border border-hc-outline p-3 shadow-none md:grid-cols-[minmax(16rem,1fr)_minmax(18rem,1.4fr)] md:items-end">
-        <Field label="Application">
+        <Field label={t("licensing.application")}>
           <Input value={appId} onChange={(event) => setAppId(event.target.value)} placeholder="author_id/slug" />
         </Field>
         <div className="min-w-0">
-          <div className="text-xs font-medium text-hc-muted">Platform instance ID</div>
+          <div className="text-xs font-medium text-hc-muted">{t("licensing.platformInstanceId")}</div>
           <div className="mt-1 truncate rounded-hc-sm bg-hc-surface-variant px-3 py-2 font-mono text-xs" title={instanceData?.platform_instance_id}>
-            {instanceData?.platform_instance_id ?? "Loading..."}
+            {instanceData?.platform_instance_id ?? t("common.loading")}
           </div>
         </div>
       </Card>
 
       {section === "inventory" && (
         <Card className="overflow-hidden p-0">
-          <SectionHeader title="Entitlements" description={selectedLicense ? `Active: ${selectedLicense.jti}` : "No active entitlement"} meta={<StatusBadge>{licensesData?.items.length ?? 0} total</StatusBadge>} />
+          <SectionHeader title={t("licensing.entitlements")} description={selectedLicense ? t("licensing.activeEntitlement", { id: selectedLicense.jti }) : t("licensing.noActiveEntitlement")} meta={<StatusBadge>{t("common.total", { count: licensesData?.items.length ?? 0 })}</StatusBadge>} />
           <div className="overflow-x-auto border-t border-hc-outline">
             <div className="min-w-[680px]">
               <div className="grid grid-cols-[minmax(16rem,1.5fr)_8rem_9rem_10rem_5rem] gap-3 bg-hc-surface-variant/40 px-4 py-2 text-xs font-semibold uppercase text-hc-muted">
-                <div>Entitlement</div>
-                <div>Status</div>
-                <div>Mode</div>
-                <div>Valid until</div>
-                <div className="text-right">Action</div>
+                <div>{t("licensing.entitlement")}</div>
+                <div>{t("common.status")}</div>
+                <div>{t("licensing.mode")}</div>
+                <div>{t("licensing.validUntil")}</div>
+                <div className="text-right">{t("common.actions")}</div>
               </div>
-              {isLoading && <div className="px-4 py-6 text-center text-sm text-hc-muted">Loading licenses...</div>}
+              {isLoading && <div className="px-4 py-6 text-center text-sm text-hc-muted">{t("licensing.loading")}</div>}
               {!isLoading && (licensesData?.items.length ?? 0) === 0 && (
-                <div className="px-4 py-8 text-center text-sm text-hc-muted">No licenses found for this application.</div>
+                <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("licensing.noneFound")}</div>
               )}
               {(licensesData?.items ?? []).map((item) => (
                 <LicenseRow
@@ -182,27 +184,27 @@ export function LicensingPage() {
 
       {section === "import" && (
         <Card className="p-0">
-          <SectionHeader title="Signed bundle" description="The author certificate is optional when its key is already trusted." />
+          <SectionHeader title={t("licensing.signedBundle")} description={t("licensing.signedBundleDescription")} />
           <div className="grid gap-4 border-t border-hc-outline p-4">
-            <Field label="License JWS">
+            <Field label={t("licensing.licenseJws")}>
               <Textarea
                 className="min-h-36 font-mono text-xs"
                 value={licenseJws}
                 onChange={(event) => setLicenseJws(event.target.value)}
-                placeholder="Paste license_jws"
+                placeholder={t("licensing.pasteLicenseJws")}
               />
             </Field>
-            <Field label="Author certificate JWS (optional)">
+            <Field label={t("licensing.authorCertificateOptional")}>
               <Textarea
                 className="min-h-24 font-mono text-xs"
                 value={authorCertJws}
                 onChange={(event) => setAuthorCertJws(event.target.value)}
-                placeholder="Paste author_cert_jws"
+                placeholder={t("licensing.pasteAuthorCertificate")}
               />
             </Field>
             <div className="flex justify-end gap-2">
-              <Button variant="outlined" onClick={() => void handleValidate()} disabled={!licenseJws || validateMutation.isPending}>Validate</Button>
-              <Button onClick={() => void handleImport()} disabled={!licenseJws || importMutation.isPending}>Import</Button>
+              <Button variant="outlined" onClick={() => void handleValidate()} disabled={!licenseJws || validateMutation.isPending}>{t("licensing.validate")}</Button>
+              <Button onClick={() => void handleImport()} disabled={!licenseJws || importMutation.isPending}>{t("licensing.import")}</Button>
             </div>
           </div>
         </Card>
@@ -210,42 +212,42 @@ export function LicensingPage() {
 
       {section === "activation" && (
         <Card className="p-0">
-          <SectionHeader title="Vendor authorization" description="The vendor issues a portable or instance-bound entitlement." />
+          <SectionHeader title={t("licensing.vendorAuthorization")} description={t("licensing.vendorAuthorizationDescription")} />
           <div className="grid gap-4 border-t border-hc-outline p-4">
             <div className="grid gap-3 md:grid-cols-[1fr_14rem_auto] md:items-end">
-              <Field label="Issuer URL">
+              <Field label={t("licensing.issuerUrl")}>
                 <Input value={issuerUrl} onChange={(event) => setIssuerUrl(event.target.value)} placeholder="https://issuer.example" />
               </Field>
-              <Field label="License mode">
+              <Field label={t("licensing.licenseMode")}>
                 <Select value={licenseMode} onChange={(event) => setLicenseMode(event.target.value as "portable" | "instance_bound")}>
-                  <option value="portable">Portable</option>
-                  <option value="instance_bound">Instance-bound</option>
+                  <option value="portable">{t("licensing.portable")}</option>
+                  <option value="instance_bound">{t("licensing.instanceBound")}</option>
                 </Select>
               </Field>
-              <Button onClick={() => void handleOauthStart()} disabled={startOauthMutation.isPending || !issuerUrl}>Start activation</Button>
+              <Button onClick={() => void handleOauthStart()} disabled={startOauthMutation.isPending || !issuerUrl}>{t("licensing.startActivation")}</Button>
             </div>
 
             {oauthRedirectUrl && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-y border-hc-outline bg-hc-surface-variant/40 px-3 py-2">
                 <div className="min-w-0">
-                  <div className="text-xs font-medium">Authorization is ready</div>
-                  <div className="mt-0.5 truncate text-xs text-hc-muted">Continue at the vendor, then enter the returned code below.</div>
+                  <div className="text-xs font-medium">{t("licensing.authorizationReady")}</div>
+                  <div className="mt-0.5 truncate text-xs text-hc-muted">{t("licensing.authorizationReadyDescription")}</div>
                 </div>
                 <a className="rounded-hc-md bg-hc-primary px-3 py-2 text-sm font-semibold text-hc-on-primary" href={oauthRedirectUrl} target="_blank" rel="noreferrer">
-                  Open vendor
+                  {t("licensing.openVendor")}
                 </a>
               </div>
             )}
 
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-              <Field label="Callback code">
-                <Input value={oauthCode} onChange={(event) => setOauthCode(event.target.value)} placeholder="Authorization code" />
+              <Field label={t("licensing.callbackCode")}>
+                <Input value={oauthCode} onChange={(event) => setOauthCode(event.target.value)} placeholder={t("licensing.authorizationCode")} />
               </Field>
-              <Field label="OAuth state">
-                <Input value={oauthState} onChange={(event) => setOauthState(event.target.value)} placeholder="State" />
+              <Field label={t("licensing.oauthState")}>
+                <Input value={oauthState} onChange={(event) => setOauthState(event.target.value)} placeholder={t("licensing.state")} />
               </Field>
               <Button variant="outlined" onClick={() => void handleOauthCallback()} disabled={callbackMutation.isPending || !oauthCode || !oauthState}>
-                Complete callback
+                {t("licensing.completeCallback")}
               </Button>
             </div>
           </div>
@@ -258,6 +260,7 @@ export function LicensingPage() {
 }
 
 function LicenseRow({ item, selected, busy, onSelect }: { item: TenantLicenseItem; selected: boolean; busy: boolean; onSelect: () => void }) {
+  const { t } = useLocalization();
   return (
     <div className="grid grid-cols-[minmax(16rem,1.5fr)_8rem_9rem_10rem_5rem] items-center gap-3 border-t border-hc-outline px-4 py-2.5 text-sm">
       <div className="min-w-0">
@@ -265,16 +268,19 @@ function LicenseRow({ item, selected, busy, onSelect }: { item: TenantLicenseIte
         <div className="mt-0.5 text-xs text-hc-muted">{new Date(item.created_at).toLocaleDateString()}</div>
       </div>
       <div><LicenseStatusBadge status={item.status} /></div>
-      <div className="text-xs">{item.license_mode === "instance_bound" ? "Instance-bound" : "Portable"}</div>
-      <div className="text-xs">{item.valid_to ? new Date(item.valid_to).toLocaleDateString() : "No expiration"}</div>
+      <div className="text-xs">{item.license_mode === "instance_bound" ? t("licensing.instanceBound") : t("licensing.portable")}</div>
+      <div className="text-xs">{item.valid_to ? new Date(item.valid_to).toLocaleDateString() : t("licensing.noExpiration")}</div>
       <Button className="px-2 py-1 text-xs" variant={selected ? "tonal" : "ghost"} onClick={onSelect} disabled={selected || busy}>
-        {selected ? "Active" : "Select"}
+        {selected ? t("common.active") : t("licensing.select")}
       </Button>
     </div>
   );
 }
 
 function LicenseStatusBadge({ status }: { status: string }) {
+  const { t } = useLocalization();
   const tone = status === "active" || status === "valid" ? "bg-hc-success/10 text-hc-success" : "bg-hc-surface-variant text-hc-muted";
-  return <span className={`rounded-hc-sm px-2 py-1 text-xs ${tone}`}>{status}</span>;
+  const key = `licensing.status.${status}`;
+  const translated = t(key);
+  return <span className={`rounded-hc-sm px-2 py-1 text-xs ${tone}`}>{translated === key ? status : translated}</span>;
 }

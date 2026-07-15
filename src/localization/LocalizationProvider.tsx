@@ -8,6 +8,8 @@ type LocalizationContextValue = {
   t(key: string, values?: Record<string, string | number>): string;
 };
 
+export type Translate = LocalizationContextValue["t"];
+
 const LocalizationContext = createContext<LocalizationContextValue | null>(null);
 
 function initialLocale(): Locale {

@@ -1,4 +1,5 @@
 import { useEffect, type MouseEvent, type ReactNode } from "react";
+import { useLocalization } from "../../localization/LocalizationProvider";
 
 type DialogProps = {
   open: boolean;
@@ -9,6 +10,7 @@ type DialogProps = {
 };
 
 export function Dialog({ open, title, disableClose = false, onClose, children }: DialogProps) {
+  const { t } = useLocalization();
   useEffect(() => {
     if (!open || disableClose) {
       return;
@@ -43,7 +45,7 @@ export function Dialog({ open, title, disableClose = false, onClose, children }:
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={title ?? "Dialog"}
+        aria-label={title ?? t("common.dialog")}
         className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-hc-md border border-hc-outline bg-hc-surface p-4 shadow-2xl"
         onClick={handlePanelClick}
       >

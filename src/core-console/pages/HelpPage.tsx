@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { useContextQuery } from "../../data/api/context";
+import { useLocalization } from "../../localization/LocalizationProvider";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
 import { PageHeader } from "../../ui-kit/components/Page";
@@ -32,25 +33,26 @@ export function HelpPage() {
   const { data: context } = useContextQuery();
   const { data: registry, isLoading } = useAppRegistryQuery(true);
   const privileges = useMemo(() => context?.privileges ?? [], [context?.privileges]);
+  const { t } = useLocalization();
 
   const allGuides = useMemo(() => {
-    const visiblePlatformGuides = getVisiblePlatformHelpGuides(privileges);
+    const visiblePlatformGuides = getVisiblePlatformHelpGuides(privileges, t);
     const appGuides =
       registry?.items.flatMap((app) =>
         (app.help_entries ?? []).map((entry) => ({
           title: entry.title,
           summary: entry.summary,
           outcome: entry.outcome,
-          category: entry.category ?? "Applications",
+          category: entry.category ?? t("help.categoryApplications"),
           steps: entry.steps,
           path: entry.path,
           source: app.app_name ?? app.app_id,
-          actionLabel: "Open action",
+          actionLabel: t("help.openAction"),
         })),
       ) ?? [];
 
     return [...visiblePlatformGuides, ...appGuides];
-  }, [privileges, registry?.items]);
+  }, [privileges, registry?.items, t]);
 
   const categories = useMemo(() => {
     return Array.from(new Set(allGuides.map((item) => item.category))).sort((a, b) => a.localeCompare(b));
@@ -75,11 +77,11 @@ export function HelpPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Help"
-        title={selectedCategory ?? "Procedures and guides"}
-        description={selectedCategory ? "Help section selected from the main menu." : "Guides are organized by goal; applications can contribute procedures through their manifests."}
+        eyebrow={t("nav.help")}
+        title={selectedCategory ?? t("help.title")}
+        description={selectedCategory ? t("help.selectedDescription") : t("help.description")}
         actions={<div className="w-full sm:w-80">
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search guides" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("help.search")} />
         </div>}
       />
 
@@ -92,7 +94,7 @@ export function HelpPage() {
               : "border-hc-outline text-hc-text hover:bg-hc-surface-variant"
           }`}
         >
-          All
+          {t("help.all")}
         </Link>
         {categories.map((category) => (
           <Link
@@ -109,12 +111,12 @@ export function HelpPage() {
         ))}
       </div>
 
-      {isLoading && <div className="text-sm text-hc-muted">Loading application guides...</div>}
+      {isLoading && <div className="text-sm text-hc-muted">{t("help.loadingApps")}</div>}
 
       {categorySlug && !selectedCategory && !isLoading && (
         <Card>
-          <div className="text-sm font-semibold">Section not found</div>
-          <div className="mt-1 text-sm text-hc-muted">Select another section from the main Help menu.</div>
+          <div className="text-sm font-semibold">{t("help.sectionNotFound")}</div>
+          <div className="mt-1 text-sm text-hc-muted">{t("help.sectionNotFoundDescription")}</div>
         </Card>
       )}
 
@@ -123,7 +125,7 @@ export function HelpPage() {
           <section key={category}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-hc-muted">{category}</div>
-              <div className="text-xs text-hc-muted">{items.length} guides</div>
+              <div className="text-xs text-hc-muted">{t("common.guidesCount", { count: items.length })}</div>
             </div>
             <div className="overflow-hidden rounded-hc-md border border-hc-outline bg-hc-surface">
               {items.map((item) => (
@@ -144,8 +146,8 @@ export function HelpPage() {
 
       {!isLoading && helpGuides.length === 0 && (
         <Card>
-          <div className="text-sm font-semibold">No results found</div>
-          <div className="mt-1 text-sm text-hc-muted">Try changing the search term or category.</div>
+          <div className="text-sm font-semibold">{t("help.noResults")}</div>
+          <div className="mt-1 text-sm text-hc-muted">{t("help.noResultsDescription")}</div>
         </Card>
       )}
     </div>
@@ -161,6 +163,7 @@ function GuideDisclosure({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useLocalization();
   const panelId = `help-guide-${guide.source}-${guide.path}-${guide.title}`.replace(/[^a-zA-Z0-9_-]+/g, "-");
 
   return (
@@ -201,13 +204,13 @@ function GuideDisclosure({
             </div>
 
             <aside className="rounded-hc-md border border-hc-outline bg-hc-surface p-4">
-              <div className="text-xs uppercase tracking-wide text-hc-muted">Outcome</div>
-              <div className="mt-2 text-sm text-hc-text">{guide.outcome ?? "The guide completes the requested action."}</div>
+              <div className="text-xs uppercase tracking-wide text-hc-muted">{t("help.outcome")}</div>
+              <div className="mt-2 text-sm text-hc-text">{guide.outcome ?? t("help.defaultOutcome")}</div>
               <Link
                 to={guide.path}
                 className="mt-4 inline-flex rounded-hc-sm border border-hc-outline px-3 py-2 text-sm font-medium text-hc-text transition hover:bg-hc-surface-variant"
               >
-                {guide.actionLabel ?? "Open action"}
+                {guide.actionLabel ?? t("help.openAction")}
               </Link>
             </aside>
           </div>

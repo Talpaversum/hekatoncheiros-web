@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "react";
 
 import { hasPrivilege } from "../access/privileges";
 import { useContextQuery } from "../data/api/context";
+import { useLocalization } from "../localization/LocalizationProvider";
 import { Card } from "../ui-kit/components/Card";
 
 type RequirePrivilegeProps = PropsWithChildren<{
@@ -10,11 +11,12 @@ type RequirePrivilegeProps = PropsWithChildren<{
 
 export function RequirePrivilege({ required, children }: RequirePrivilegeProps) {
   const { data, isLoading } = useContextQuery(true);
+  const { t } = useLocalization();
 
   if (isLoading) {
     return (
       <Card>
-        <div className="text-lg font-semibold">Loading privileges...</div>
+        <div className="text-lg font-semibold">{t("access.loading")}</div>
       </Card>
     );
   }
@@ -23,8 +25,8 @@ export function RequirePrivilege({ required, children }: RequirePrivilegeProps) 
   if (!hasPrivilege(privileges, required)) {
     return (
       <Card>
-        <div className="text-lg font-semibold">403 Forbidden</div>
-        <div className="mt-2 text-sm text-hc-muted">You do not have permission to view this page.</div>
+        <div className="text-lg font-semibold">{t("access.forbidden")}</div>
+        <div className="mt-2 text-sm text-hc-muted">{t("access.denied")}</div>
       </Card>
     );
   }

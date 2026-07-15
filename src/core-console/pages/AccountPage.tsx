@@ -84,7 +84,7 @@ export function AccountPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Account"
+        eyebrow={t("account.eyebrow")}
         title={isSecurity ? t("nav.security") : t("account.profile")}
         description={t("account.description")}
         actions={<Button variant="outlined" onClick={handleLogout}>{t("common.signOut")}</Button>}
@@ -95,14 +95,14 @@ export function AccountPage() {
       {!isSecurity && (
         <>
           <MetricStrip items={[
-            { label: "Account", value: account?.status ?? "-", tone: account?.status === "active" ? "success" : "neutral" },
-            { label: "Tenant mode", value: context?.tenant.mode ?? "-" },
-            { label: "Privileges", value: privileges.length },
-            { label: "Delegation", value: context?.actor.impersonating ? "On" : "Off", tone: context?.actor.impersonating ? "warning" : "neutral" },
+            { label: t("account.metricAccount"), value: account?.status ?? "-", tone: account?.status === "active" ? "success" : "neutral" },
+            { label: t("account.metricTenantMode"), value: context?.tenant.mode ?? "-" },
+            { label: t("account.metricPrivileges"), value: privileges.length },
+            { label: t("account.metricDelegation"), value: context?.actor.impersonating ? t("common.on") : t("common.off"), tone: context?.actor.impersonating ? "warning" : "neutral" },
           ]} />
 
           <Card className="overflow-hidden p-0">
-            <SectionHeader title="Profile fields" description={`${account?.id ?? "Loading..."} · ${context?.tenant.name ?? context?.tenant.id ?? "No tenant"}`} meta={<StatusBadge>{account?.status ?? "-"}</StatusBadge>} />
+            <SectionHeader title={t("account.profileFields")} description={`${account?.id ?? t("common.loading")} · ${context?.tenant.name ?? context?.tenant.id ?? t("common.noTenant")}`} meta={<StatusBadge>{account?.status ?? "-"}</StatusBadge>} />
             <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
               <Field label={t("account.displayName")}>
                 <Input value={effectiveDisplayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Jane Admin" />
@@ -124,7 +124,7 @@ export function AccountPage() {
           </Card>
 
           <Card className="overflow-hidden p-0">
-            <SectionHeader title="Privileges" description="Effective privilege entries in this session." meta={<StatusBadge>{privileges.length} assigned</StatusBadge>} />
+            <SectionHeader title={t("account.privilegesTitle")} description={t("account.privilegesDescription")} meta={<StatusBadge>{t("common.assigned", { count: privileges.length })}</StatusBadge>} />
             <div className="flex flex-wrap gap-1.5 border-t border-hc-outline p-3">
               {privileges.map((privilege) => (
                 <span key={privilege} className="rounded-hc-sm border border-hc-outline bg-hc-surface-variant px-2 py-1 text-xs">
@@ -138,7 +138,7 @@ export function AccountPage() {
 
       {isSecurity && (
         <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("account.password")} description="Use at least eight characters for the new password." />
+          <SectionHeader title={t("account.password")} description={t("account.passwordHint")} />
           <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
             <Field label={t("account.currentPassword")}>
               <Input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />

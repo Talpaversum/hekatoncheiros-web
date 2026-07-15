@@ -15,7 +15,7 @@ const sidebarConfig = [
     titleKey: "nav.dashboard",
     items: [
       { to: "/core/dashboard", labelKey: "nav.overview" },
-      { to: "/core/dashboard#context", label: "Context snapshot" },
+      { to: "/core/dashboard#context", labelKey: "nav.contextSnapshot" },
     ],
   },
   {
@@ -35,45 +35,45 @@ const sidebarConfig = [
   },
   {
     prefix: "/core/apps",
-    title: "Apps",
+    titleKey: "nav.apps",
     items: [
-      { to: "/core/apps", label: "Catalog" },
-      { to: "/core/apps/feeds", label: "Feed sources" },
-      { to: "/core/apps/installed", label: "Installed apps" },
-      { to: "/core/apps/licensing", label: "Tenant licensing" },
+      { to: "/core/apps", labelKey: "nav.catalog" },
+      { to: "/core/apps/feeds", labelKey: "nav.feedSources" },
+      { to: "/core/apps/installed", labelKey: "nav.installedApps" },
+      { to: "/core/apps/licensing", labelKey: "nav.tenantLicensing" },
     ],
   },
   {
     prefix: "/core/licensing",
-    title: "Licensing",
+    titleKey: "nav.licensing",
     items: [
-      { to: "/core/licensing", label: "License inventory" },
-      { to: "/core/licensing/import", label: "Offline import" },
-      { to: "/core/licensing/activation", label: "OAuth activation" },
+      { to: "/core/licensing", labelKey: "nav.licenseInventory" },
+      { to: "/core/licensing/import", labelKey: "nav.offlineImport" },
+      { to: "/core/licensing/activation", labelKey: "nav.oauthActivation" },
     ],
   },
   {
     prefix: "/core/platform",
-    title: "Platform configuration",
+    titleKey: "settings.platform",
     items: [
-      { to: "/core/platform", label: "Dashboard" },
-      { to: "/core/platform/instance", label: "Instance" },
-      { to: "/core/platform/trusted-origins", label: "Trusted origins" },
-      { to: "/core/platform/app-distribution", label: "App distribution" },
-      { to: "/core/platform/authors", label: "Application authors" },
-      { to: "/core/platform/identity", label: "Identity & tenancy" },
-      { to: "/core/platform/automation", label: "Automation" },
+      { to: "/core/platform", labelKey: "nav.platformDashboard" },
+      { to: "/core/platform/instance", labelKey: "nav.instance" },
+      { to: "/core/platform/trusted-origins", labelKey: "nav.trustedOrigins" },
+      { to: "/core/platform/app-distribution", labelKey: "nav.appDistribution" },
+      { to: "/core/platform/authors", labelKey: "nav.applicationAuthors" },
+      { to: "/core/platform/identity", labelKey: "nav.identityTenancy" },
+      { to: "/core/platform/automation", labelKey: "nav.automation" },
     ],
   },
   {
     prefix: "/core/tenant",
-    title: "Tenant configuration",
+    titleKey: "nav.tenantConfiguration",
     items: [
-      { to: "/core/tenant", label: "Dashboard" },
-      { to: "/core/tenant/details", label: "Tenant details" },
-      { to: "/core/tenant/users", label: "Users & roles" },
-      { to: "/core/tenant/apps", label: "Apps & licenses" },
-      { to: "/core/tenant/audit", label: "Audit context" },
+      { to: "/core/tenant", labelKey: "nav.platformDashboard" },
+      { to: "/core/tenant/details", labelKey: "nav.tenantDetails" },
+      { to: "/core/tenant/users", labelKey: "nav.usersRoles" },
+      { to: "/core/tenant/apps", labelKey: "nav.appsLicenses" },
+      { to: "/core/tenant/audit", labelKey: "nav.auditContext" },
     ],
   },
 ];
@@ -94,10 +94,10 @@ export function SidebarNav({ children }: SidebarNavProps) {
     : (() => {
         const section = sidebarConfig.find((item) => location.pathname.startsWith(item.prefix)) ?? fallbackSection;
         return {
-          title: "titleKey" in section && typeof section.titleKey === "string" ? t(section.titleKey) : section.title,
+          title: t(section.titleKey),
           items: section.items.map((item) => ({
             to: item.to,
-            label: "labelKey" in item && typeof item.labelKey === "string" ? t(item.labelKey) : item.label,
+            label: t(item.labelKey),
           })),
         };
       })();

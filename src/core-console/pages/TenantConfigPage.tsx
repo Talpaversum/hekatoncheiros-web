@@ -20,8 +20,10 @@ import { Input } from "../../ui-kit/components/Input";
 import { Field, MetricStrip, PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
 import { Select } from "../../ui-kit/components/Select";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
+import { useLocalization } from "../../localization/LocalizationProvider";
 
 export function TenantConfigPage() {
+  const { t } = useLocalization();
   const location = useLocation();
   const { data: context } = useContextQuery(true);
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
@@ -65,7 +67,7 @@ export function TenantConfigPage() {
       });
       setTenantName(null);
       setPrimaryDomain(null);
-      setMessage("Tenant details were updated.");
+      setMessage(t("tenant.detailsUpdated"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -77,7 +79,7 @@ export function TenantConfigPage() {
     }
     const exists = selectedTenantUser.privileges.some((item) => item.privilege === tenantGrantPrivilege);
     if (exists) {
-      setError("This user already has that tenant privilege.");
+      setError(t("tenant.privilegeExists"));
       return;
     }
     setMessage(null);
@@ -88,7 +90,7 @@ export function TenantConfigPage() {
         grants: [...selectedTenantUser.privileges, { privilege: tenantGrantPrivilege, tenant_id: tenantSettings?.id ?? context?.tenant.id ?? null }],
       });
       setTenantGrantPrivilege("");
-      setMessage("Tenant privilege was added.");
+      setMessage(t("tenant.privilegeAdded"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -102,7 +104,7 @@ export function TenantConfigPage() {
         id: user.id,
         grants: user.privileges.filter((item) => item.privilege !== grant.privilege),
       });
-      setMessage("Tenant privilege was removed.");
+      setMessage(t("tenant.privilegeRemoved"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -112,64 +114,64 @@ export function TenantConfigPage() {
     <div className="space-y-4">
       <ToastNotice message={toastMessage} tone={toastTone} onDismiss={dismissToast} />
 
-      <PageHeader eyebrow="Configuration" title="Tenant configuration" description="Tenant-local settings for identity, app access, and license selection." />
+      <PageHeader eyebrow={t("config.configuration")} title={t("tenant.title")} description={t("tenant.description")} />
 
       {(section === "tenant" || section === "") && <>
         <MetricStrip items={[
-          { label: "Installed apps", value: installed.length },
-          { label: "License required", value: licenseRequired, tone: licenseRequired > 0 ? "warning" : "neutral" },
-          { label: "Users", value: tenantUsers.length },
-          { label: "Tenant mode", value: context?.tenant.mode ?? "-" },
+          { label: t("tenant.installedApps"), value: installed.length },
+          { label: t("tenant.licenseRequired"), value: licenseRequired, tone: licenseRequired > 0 ? "warning" : "neutral" },
+          { label: t("tenant.users"), value: tenantUsers.length },
+          { label: t("tenant.mode"), value: context?.tenant.mode ?? "-" },
         ]} />
         <Card className="mt-4 overflow-hidden p-0">
-          <SectionHeader title={tenantSettings?.name ?? context?.tenant.name ?? context?.tenant.id ?? "Tenant"} description={tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? "No primary domain"} meta={<StatusBadge tone="success">{tenantSettings?.status ?? "active"}</StatusBadge>} />
+          <SectionHeader title={tenantSettings?.name ?? context?.tenant.name ?? context?.tenant.id ?? t("tenant.fallbackName")} description={tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? t("tenant.noPrimaryDomain")} meta={<StatusBadge tone="success">{tenantSettings?.status ?? t("config.active")}</StatusBadge>} />
         </Card>
       </>}
 
       <div className="grid gap-4">
         {section === "details" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Tenant details" description="Edit the tenant display name and primary domain used for tenant resolution." meta={<StatusBadge tone="success">{tenantSettings?.status ?? "active"}</StatusBadge>} />
+          <SectionHeader title={t("tenant.details")} description={t("tenant.detailsDescription")} meta={<StatusBadge tone="success">{tenantSettings?.status ?? t("config.active")}</StatusBadge>} />
           <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
-            <Field label="Tenant name">
+            <Field label={t("tenant.name")}>
               <Input value={effectiveTenantName} onChange={(event) => setTenantName(event.target.value)} />
             </Field>
-            <Field label="Primary domain">
+            <Field label={t("tenant.primaryDomain")}>
               <Input value={effectivePrimaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder="example.com" />
             </Field>
           </div>
           <div className="flex justify-end border-t border-hc-outline px-4 py-3">
             <Button onClick={() => void handleSaveTenant()} disabled={!effectiveTenantName.trim() || updateTenant.isPending}>
-              Save tenant
+              {t("tenant.save")}
             </Button>
           </div>
           <div className="grid border-t border-hc-outline md:grid-cols-2 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Data policy" status="planned" detail="Tenant-level retention and isolation policy summary." />
-            <ConfigTile title="Operational contacts" status="planned" detail="People and addresses responsible for tenant operations." />
+            <ConfigTile title={t("tenant.dataPolicy")} status={t("common.planned")} detail={t("tenant.dataPolicyDescription")} />
+            <ConfigTile title={t("tenant.operationalContacts")} status={t("common.planned")} detail={t("tenant.operationalContactsDescription")} />
           </div>
         </Card>}
 
         {section === "users" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Users and roles" description="Manage tenant-scoped privileges for users already known to the platform." meta={<StatusBadge>{tenantUsers.length} users</StatusBadge>} />
+          <SectionHeader title={t("tenant.usersRoles")} description={t("tenant.usersRolesDescription")} meta={<StatusBadge>{t("tenant.usersCount", { count: tenantUsers.length })}</StatusBadge>} />
 
           <div className="grid gap-3 border-y border-hc-outline bg-hc-surface-variant/40 px-4 py-3 md:grid-cols-[minmax(14rem,1fr)_minmax(14rem,1fr)_auto] md:items-end">
-            <Field label="User">
+            <Field label={t("tenant.user")}>
               <Select value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>
                 {tenantUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
               </Select>
             </Field>
-            <Field label="Tenant privilege">
+            <Field label={t("tenant.privilege")}>
               <Select value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}>
-                <option value="">Select tenant privilege</option>
+                <option value="">{t("tenant.selectPrivilege")}</option>
                 {tenantPrivilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
               </Select>
             </Field>
             <Button onClick={() => void handleAddTenantGrant()} disabled={!selectedTenantUser || !tenantGrantPrivilege || replaceTenantUserPrivileges.isPending}>
-              Add privilege
+              {t("tenant.addPrivilege")}
             </Button>
           </div>
 
           <div>
-            {tenantUsers.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">No tenant users yet. Platform admin can create users and grant the first tenant privilege from Platform configuration.</div>}
+            {tenantUsers.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("tenant.noUsers")}</div>}
             {tenantUsers.map((user) => (
               <TenantUserRow
                 key={user.id}
@@ -184,20 +186,20 @@ export function TenantConfigPage() {
         </Card>}
 
         {section === "apps" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Apps and licenses" description="App installation, catalog sync, feed publishing, and license selection are managed from Applications." meta={<StatusBadge tone="info">active elsewhere</StatusBadge>} />
+          <SectionHeader title={t("tenant.appsLicenses")} description={t("tenant.appsLicensesDescription")} meta={<StatusBadge tone="info">{t("tenant.activeElsewhere")}</StatusBadge>} />
           <div className="grid border-t border-hc-outline md:grid-cols-3 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Installed apps" status={`${installed.length}`} detail="Runtime apps known to this Core instance." />
-            <ConfigTile title="License-required apps" status={`${licenseRequired}`} detail="Catalog entries that need tenant license selection." />
-            <ConfigTile title="Feed publishing" status="admin gated" detail="Only installed apps can be published to this instance feed." />
+            <ConfigTile title={t("tenant.installedApps")} status={`${installed.length}`} detail={t("tenant.installedAppsDescription")} />
+            <ConfigTile title={t("tenant.licenseApps")} status={`${licenseRequired}`} detail={t("tenant.licenseAppsDescription")} />
+            <ConfigTile title={t("tenant.feedPublishing")} status={t("tenant.adminGated")} detail={t("tenant.feedPublishingDescription")} />
           </div>
         </Card>}
 
         {section === "audit" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Audit context" description="Tenant-scoped audit search and review will belong here once audit query APIs are available." meta={<StatusBadge>planned</StatusBadge>} />
+          <SectionHeader title={t("tenant.auditContext")} description={t("tenant.auditDescription")} meta={<StatusBadge>{t("common.planned")}</StatusBadge>} />
           <div className="grid border-t border-hc-outline md:grid-cols-3 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Recent admin actions" status="planned" detail="Configuration and app lifecycle events." />
-            <ConfigTile title="License events" status="planned" detail="License import, activation, and selection history." />
-            <ConfigTile title="Export" status="planned" detail="Tenant evidence bundle for audits and operations." />
+            <ConfigTile title={t("tenant.recentActions")} status={t("common.planned")} detail={t("tenant.recentActionsDescription")} />
+            <ConfigTile title={t("tenant.licenseEvents")} status={t("common.planned")} detail={t("tenant.licenseEventsDescription")} />
+            <ConfigTile title={t("tenant.export")} status={t("common.planned")} detail={t("tenant.exportDescription")} />
           </div>
         </Card>}
       </div>
@@ -230,6 +232,7 @@ function TenantUserRow({
   onRemove: (grant: PrivilegeGrant) => void;
   busy: boolean;
 }) {
+  const { t } = useLocalization();
   return (
     <div className={`grid gap-2 border-b border-hc-outline px-4 py-3 last:border-b-0 md:grid-cols-[minmax(14rem,0.8fr)_minmax(18rem,1.5fr)_auto] md:items-center ${selected ? "bg-hc-primary/5" : ""}`}>
       <button type="button" className="min-w-0 text-left" onClick={onSelect}>
@@ -240,12 +243,12 @@ function TenantUserRow({
         {user.privileges.map((grant) => (
           <span key={`${grant.privilege}:${grant.tenant_id ?? "tenant"}`} className="inline-flex items-center gap-1 rounded-hc-sm border border-hc-outline bg-hc-surface px-2 py-1 text-xs">
             {grant.privilege}
-            <button type="button" className="ml-1 text-hc-muted hover:text-hc-danger disabled:opacity-50" onClick={() => onRemove(grant)} disabled={busy} aria-label={`Remove ${grant.privilege}`}>×</button>
+            <button type="button" className="ml-1 text-hc-muted hover:text-hc-danger disabled:opacity-50" onClick={() => onRemove(grant)} disabled={busy} aria-label={`${t("tenant.remove")} ${grant.privilege}`}>×</button>
           </span>
         ))}
-        {user.privileges.length === 0 && <span className="text-xs text-hc-muted">No tenant privileges</span>}
+        {user.privileges.length === 0 && <span className="text-xs text-hc-muted">{t("tenant.noPrivileges")}</span>}
       </div>
-      <StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{user.status}</StatusBadge>
+      <StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{user.status === "active" ? t("config.active") : user.status === "disabled" ? t("config.disabled") : user.status}</StatusBadge>
     </div>
   );
 }

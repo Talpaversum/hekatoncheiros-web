@@ -36,7 +36,7 @@ import {
 } from "../../data/api/installed-apps";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { useContextQuery } from "../../data/api/context";
-import { useLocalization } from "../../localization/LocalizationProvider";
+import { useLocalization, type Translate } from "../../localization/LocalizationProvider";
 import { getLocaleLabel } from "../../localization/resources";
 import {
   useAppEntitlementsQuery,
@@ -108,50 +108,50 @@ function readAppLocalization(app: InstalledApp) {
   return { defaultLocale, supportedLocales: supportedLocales.length > 0 ? supportedLocales : [defaultLocale] };
 }
 
-function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>) {
+function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>, t: Translate) {
   const licensing = app.manifest?.["licensing"] as { required?: boolean } | undefined;
 
   if (app.ui_url.trim().length === 0) {
-    return { label: "Broken", tone: "danger" as const, detail: "Missing Core-hosted UI artifact." };
+    return { label: t("apps.status.broken"), tone: "danger" as const, detail: t("apps.status.missingArtifact") };
   }
 
   if (licensing?.required === true && !app.resolved_entitlement) {
     return {
-      label: app.has_any_entitlement ? "License inactive" : "License missing",
+      label: app.has_any_entitlement ? t("apps.status.licenseInactive") : t("apps.status.licenseMissing"),
       tone: "warn" as const,
       detail: app.has_any_entitlement
-        ? "Tenant has licenses, but none is selected and active."
-        : "Installed and staged, but runtime use is blocked.",
+        ? t("apps.status.tenantLicenseInactive")
+        : t("apps.status.runtimeBlocked"),
     };
   }
 
   if (!registrySlugs.has(app.slug)) {
-    return { label: "Hidden", tone: "neutral" as const, detail: "Current user cannot see it in runtime navigation." };
+    return { label: t("apps.status.hidden"), tone: "neutral" as const, detail: t("apps.status.hiddenDescription") };
   }
 
-  return { label: "Ready", tone: "good" as const, detail: null };
+  return { label: t("apps.status.ready"), tone: "good" as const, detail: null };
 }
 
-function getCatalogRuntimeStatus(entry: AppCatalogEntry) {
+function getCatalogRuntimeStatus(entry: AppCatalogEntry, t: Translate) {
   if (!entry.installed) {
-    return { label: "Available", tone: "neutral" as const, detail: null };
+    return { label: t("apps.status.available"), tone: "neutral" as const, detail: null };
   }
 
   if (!entry.installed.enabled) {
-    return { label: "Disabled", tone: "danger" as const, detail: "Installed, but disabled for runtime use." };
+    return { label: t("apps.status.disabled"), tone: "danger" as const, detail: t("apps.status.disabledDescription") };
   }
 
   if (entry.license_state.required && !entry.license_state.selected_active_license) {
     return {
-      label: entry.license_state.has_any_license ? "License inactive" : "License missing",
+      label: entry.license_state.has_any_license ? t("apps.status.licenseInactive") : t("apps.status.licenseMissing"),
       tone: "warn" as const,
       detail: entry.license_state.has_any_license
-        ? "A tenant license exists, but no active license is selected."
-        : "Installed, but runtime use is blocked until a tenant license is selected.",
+        ? t("apps.status.catalogLicenseInactive")
+        : t("apps.status.catalogRuntimeBlocked"),
     };
   }
 
-  return { label: "Ready", tone: "good" as const, detail: null };
+  return { label: t("apps.status.ready"), tone: "good" as const, detail: null };
 }
 
 function formatDate(value: string | null | undefined) {
@@ -213,18 +213,25 @@ function readInstalledDetailId(pathname: string) {
   return decodeURIComponent(pathname.slice(marker.length).split("/")[0] ?? "") || null;
 }
 
-function formatActionError(error: unknown) {
+function formatActionError(error: unknown, t: Translate) {
   const message = readErrorMessage(error);
   if (message.includes("base_url must use https")) {
-    return "HTTP manifest URL is allowed only for trusted origins. For local Inventory compose use http://inventory:4010 and add that origin in Platform configuration / Trusted origins.";
+    return t("apps.error.httpOrigin");
   }
   return message;
+}
+
+function translateAppValue(value: string, t: Translate) {
+  const key = `apps.value.${value}`;
+  const translated = t(key);
+  return translated === key ? value : translated;
 }
 
 export function AppsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: context } = useContextQuery(true);
+  const { t } = useLocalization();
   const tenantId = context?.tenant.id ?? null;
   const canManageApps = hasPrivilege(context?.privileges ?? [], "platform.apps.manage");
   const { data: catalogData, isLoading: catalogLoading } = useAppCatalogQuery(canManageApps);
@@ -300,7 +307,7 @@ export function AppsPage() {
     if (!query) return installed;
     return installed.filter((app) => [app.app_id, pickAppDisplayName(app), app.slug].some((value) => value.toLowerCase().includes(query)));
   }, [installed, installedSearch]);
-  const installedErrorMessage = installedError ? formatActionError(installedError) : null;
+  const installedErrorMessage = installedError ? formatActionError(installedError, t) : null;
   const visibleInstalledError = installedErrorMessage === dismissedInstalledError ? null : installedErrorMessage;
   const toastMessage = actionError ?? message ?? visibleInstalledError;
   const toastTone = actionError || visibleInstalledError ? "danger" : "success";
@@ -319,10 +326,10 @@ export function AppsPage() {
         summary: catalogForm.summary.trim() || null,
         trust_status: catalogForm.trust_status,
       });
-      setMessage(`Catalog entry ${entry.app_id} was refreshed.`);
+      setMessage(t("apps.message.catalogRefreshed", { id: entry.app_id }));
       setCatalogForm((prev) => ({ ...prev, base_url: "", summary: "" }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -334,10 +341,10 @@ export function AppsPage() {
         feed_url: sourceForm.feed_url.trim(),
         trust_mode: sourceForm.trust_mode,
       });
-      setMessage(`Catalog feed ${source.name} was saved.`);
+      setMessage(t("apps.message.feedSaved", { name: source.name }));
       setSourceForm((prev) => ({ ...prev, name: "", feed_url: "" }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -345,10 +352,10 @@ export function AppsPage() {
     resetNotices();
     try {
       const result = await syncCatalogSource.mutateAsync(source.id);
-      const suffix = result.skipped > 0 ? `, ${result.skipped} failed` : "";
-      setMessage(`Catalog feed ${source.name} synced: ${result.imported}/${result.total} imported${suffix}.`);
+      const suffix = result.skipped > 0 ? t("apps.message.failedSuffix", { count: result.skipped }) : "";
+      setMessage(t("apps.message.feedSynced", { name: source.name, imported: result.imported, total: result.total, suffix }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -356,9 +363,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await setCatalogSourceEnabled.mutateAsync({ id: source.id, isEnabled });
-      setMessage(`${source.name} was ${isEnabled ? "enabled" : "disabled"}.`);
+      setMessage(t("apps.message.sourceState", { name: source.name, state: t(isEnabled ? "common.enable" : "common.disable") }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -366,9 +373,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await setCatalogSourceAutoRefresh.mutateAsync({ id: source.id, autoRefreshEnabled });
-      setMessage(`${source.name} automatic refresh was ${autoRefreshEnabled ? "enabled" : "disabled"}.`);
+      setMessage(t("apps.message.autoRefreshState", { name: source.name, state: t(autoRefreshEnabled ? "common.enable" : "common.disable") }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -383,7 +390,7 @@ export function AppsPage() {
     resetNotices();
     const entry = catalog.find((item) => item.app_id === app.app_id);
     if (!entry) {
-      setActionError("A matching catalog entry is required before a managed runtime can be updated.");
+      setActionError(t("apps.message.runtimeCatalogRequired"));
       return;
     }
     setRuntimeApprovalConfirmed(false);
@@ -447,14 +454,14 @@ export function AppsPage() {
         : await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode, approval });
       const message =
         operation === "update"
-          ? `${entry.app_name} runtime was updated.`
+          ? t("apps.message.runtimeUpdated", { name: entry.app_name })
           : result.status === "staged"
-          ? `${entry.app_name} was staged for installation.`
-          : `${entry.app_name} was installed.`;
+          ? t("apps.message.staged", { name: entry.app_name })
+          : t("apps.message.installed", { name: entry.app_name });
       setInstallDialog({ status: "result", operation, entry, message, plan: result.deployment_plan });
       setMessage(message);
     } catch (error) {
-      const formatted = formatActionError(error);
+      const formatted = formatActionError(error, t);
       setActionError(formatted);
       setInstallDialog({ status: "error", operation, entry, mode, error: formatted, plan });
     }
@@ -464,9 +471,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await deleteCatalogEntry.mutateAsync(entry.app_id);
-      setMessage(`${entry.app_name} was removed from catalog.`);
+      setMessage(t("apps.message.removedCatalog", { name: entry.app_name }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -474,9 +481,9 @@ export function AppsPage() {
     resetNotices();
     try {
       const updated = await setCatalogEntryPublication.mutateAsync({ appId: entry.app_id, published });
-      setMessage(`${updated.app_name} was ${updated.published ? "published to" : "removed from"} this instance feed.`);
+      setMessage(t("apps.message.publication", { name: updated.app_name, state: t(updated.published ? "apps.message.publishedTo" : "apps.message.removedFrom") }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -497,7 +504,7 @@ export function AppsPage() {
       });
       window.location.assign(result.redirect_url);
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -508,9 +515,9 @@ export function AppsPage() {
     try {
       await uninstallMutation.mutateAsync(app.app_id);
       setUninstallState({ status: "success" });
-      setMessage(`${pickAppDisplayName(app)} was uninstalled.`);
+      setMessage(t("apps.message.uninstalled", { name: pickAppDisplayName(app) }));
     } catch (error) {
-      const formatted = formatActionError(error);
+      const formatted = formatActionError(error, t);
       setActionError(formatted);
       setUninstallState({ status: "error", app, error: formatted });
     }
@@ -528,9 +535,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await refreshArtifactMutation.mutateAsync(app.app_id);
-      setMessage(`${pickAppDisplayName(app)} artifact was refreshed.`);
+      setMessage(t("apps.message.artifactRefreshed", { name: pickAppDisplayName(app) }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -540,15 +547,15 @@ export function AppsPage() {
       const result = await checkUpdateMutation.mutateAsync(app.app_id);
       if (result.update_available === true) {
         setMessage(
-          `${pickAppDisplayName(app)} has an update available (${result.installed.app_version ?? "unknown"} -> ${result.fetched.app_version}).`,
+          t("apps.message.updateAvailable", { name: pickAppDisplayName(app), from: result.installed.app_version ?? t("common.unknown"), to: result.fetched.app_version }),
         );
       } else if (result.update_available === false) {
-        setMessage(`${pickAppDisplayName(app)} is up to date (${result.fetched.app_version}).`);
+        setMessage(t("apps.message.upToDate", { name: pickAppDisplayName(app), version: result.fetched.app_version }));
       } else {
-        setMessage(`${pickAppDisplayName(app)} update state is unknown. Refresh artifact once to store a baseline manifest hash.`);
+        setMessage(t("apps.message.updateUnknown", { name: pickAppDisplayName(app) }));
       }
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -556,9 +563,9 @@ export function AppsPage() {
     resetNotices();
     try {
       const entry = await refreshCatalogFromInstalled.mutateAsync(app.app_id);
-      setMessage(`${entry.app_name} catalog entry was refreshed from installed app.`);
+      setMessage(t("apps.message.catalogFromInstalled", { name: entry.app_name }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -566,9 +573,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await clearUpdateSignalMutation.mutateAsync(app.app_id);
-      setMessage(`${pickAppDisplayName(app)} update signal was cleared.`);
+      setMessage(t("apps.message.signalCleared", { name: pickAppDisplayName(app) }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -577,9 +584,9 @@ export function AppsPage() {
     try {
       const token = await issueAppTokenMutation.mutateAsync(app.app_id);
       setAppTokenDialog({ status: "issued", app, token });
-      setMessage(`${pickAppDisplayName(app)} app token was issued.`);
+      setMessage(t("apps.message.tokenIssued", { name: pickAppDisplayName(app) }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -587,9 +594,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await stopManagedRuntime.mutateAsync(app.app_id);
-      setMessage(`${pickAppDisplayName(app)} runtime was stopped.`);
+      setMessage(t("apps.message.runtimeStopped", { name: pickAppDisplayName(app) }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -597,9 +604,9 @@ export function AppsPage() {
     resetNotices();
     try {
       const result = await rotateManagedRuntimeToken.mutateAsync(app.app_id);
-      setMessage(`${pickAppDisplayName(app)} runtime token was rotated; valid until ${formatDate(result.expires_at)}.`);
+      setMessage(t("apps.message.tokenRotated", { name: pickAppDisplayName(app), date: formatDate(result.expires_at) }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -610,9 +617,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await setSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId, entitlement_id: selectedEntitlementId });
-      setMessage("License selection was updated.");
+      setMessage(t("apps.message.selectionUpdated"));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -623,9 +630,9 @@ export function AppsPage() {
     resetNotices();
     try {
       await clearSelectionMutation.mutateAsync({ app_id: effectiveSelectedAppId });
-      setMessage("License selection was cleared.");
+      setMessage(t("apps.message.selectionCleared"));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
@@ -637,17 +644,17 @@ export function AppsPage() {
     try {
       const result = await offlineIngestMutation.mutateAsync({ token: offlineToken.trim() });
       setOfflineToken("");
-      setMessage(`Offline token ingest OK (${result.verification_result}).`);
+      setMessage(t("apps.message.offlineImported", { result: result.verification_result }));
     } catch (error) {
-      setActionError(formatActionError(error));
+      setActionError(formatActionError(error, t));
     }
   };
 
   if (!canManageApps) {
     return (
       <Card>
-        <div className="text-lg font-semibold">Apps</div>
-        <div className="mt-2 text-sm text-hc-muted">You do not have permission to manage applications.</div>
+        <div className="text-lg font-semibold">{t("apps.title")}</div>
+        <div className="mt-2 text-sm text-hc-muted">{t("apps.permissionDenied")}</div>
       </Card>
     );
   }
@@ -667,13 +674,13 @@ export function AppsPage() {
       />
 
       <PageHeader
-        eyebrow="Admin"
-        title="Applications"
-        description="Catalog discovery, instance installation, and tenant license activation."
+        eyebrow={t("apps.admin")}
+        title={t("apps.title")}
+        description={t("apps.description")}
         actions={<MetricStrip items={[
-          { label: "Catalog", value: catalog.length },
-          { label: "Installable", value: installableCount },
-          { label: "Published", value: publishedCount },
+          { label: t("nav.catalog"), value: catalog.length },
+          { label: t("apps.installable"), value: installableCount },
+          { label: t("apps.published"), value: publishedCount },
         ]} />}
       />
 
@@ -682,24 +689,23 @@ export function AppsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-semibold">Application update attention</div>
+                <div className="text-sm font-semibold">{t("apps.updateAttention")}</div>
                 {reportedUpdateSignals.length > 0 && (
-                  <Badge tone="warn">{reportedUpdateSignals.length} app signal reported</Badge>
+                  <Badge tone="warn">{t("apps.appSignals", { count: reportedUpdateSignals.length })}</Badge>
                 )}
                 {availableCatalogUpdates.length > 0 && (
-                  <Badge tone="warn">{availableCatalogUpdates.length} catalog update available</Badge>
+                  <Badge tone="warn">{t("apps.catalogUpdates", { count: availableCatalogUpdates.length })}</Badge>
                 )}
                 {staleCatalogSnapshots.length > 0 && (
-                  <Badge tone="neutral">{staleCatalogSnapshots.length} catalog snapshot stale</Badge>
+                  <Badge tone="neutral">{t("apps.staleSnapshots", { count: staleCatalogSnapshots.length })}</Badge>
                 )}
               </div>
               <div className="mt-2 max-w-3xl text-sm text-hc-muted">
-                Installed apps can report update signals, and Core compares them with matching catalog entries. Review
-                signals before refreshing artifacts; clear signals that are informational or already handled.
+                {t("apps.updateAttentionDescription")}
               </div>
             </div>
             <Button variant="outlined" onClick={() => navigate("/core/apps/installed")}>
-              Review installed apps
+              {t("apps.reviewInstalled")}
             </Button>
           </div>
         </Card>
@@ -708,10 +714,10 @@ export function AppsPage() {
       <TabBar
         active={activeTab}
         items={[
-          { id: "catalog", label: "Catalog", count: catalog.length },
-          { id: "feeds", label: "Feed sources", count: catalogSources.length },
-          { id: "installed", label: "Installed", count: installed.length },
-          { id: "licensing", label: "Licensing" },
+          { id: "catalog", label: t("nav.catalog"), count: catalog.length },
+          { id: "feeds", label: t("nav.feedSources"), count: catalogSources.length },
+          { id: "installed", label: t("apps.installed"), count: installed.length },
+          { id: "licensing", label: t("nav.licensing") },
         ]}
         onChange={(tab) => navigate(tab === "catalog" ? "/core/apps" : `/core/apps/${tab}`)}
       />
@@ -742,42 +748,42 @@ export function AppsPage() {
             onDelete={handleDeleteCatalogEntry}
             onSetPublication={handleSetCatalogEntryPublication}
             isMutating={installCatalogEntry.isPending || deleteCatalogEntry.isPending || setCatalogEntryPublication.isPending || startLicenseOAuth.isPending}
-          /> : <Card><div className="text-sm text-hc-muted">Application not found.</div></Card>
+          /> : <Card><div className="text-sm text-hc-muted">{t("apps.notFound")}</div></Card>
         ) : <div className="space-y-4">
           <Card className="overflow-hidden p-0">
-            <SectionHeader title="Add application" description="Fetch an application manifest directly into the local catalog." />
+            <SectionHeader title={t("apps.addApplication")} description={t("apps.addApplicationDescription")} />
             <div className="flex flex-wrap items-end gap-3 border-t border-hc-outline p-4">
-              <Field label="Manifest base URL" className="min-w-72 flex-1">
+              <Field label={t("apps.manifestBaseUrl")} className="min-w-72 flex-1">
                 <Input
                   placeholder="https://apps.example.com/inventory"
                   value={catalogForm.base_url}
                   onChange={(event) => setCatalogForm((prev) => ({ ...prev, base_url: event.target.value }))}
                 />
               </Field>
-              <Field label="Summary" className="min-w-64 flex-1">
+              <Field label={t("apps.summary")} className="min-w-64 flex-1">
                 <Input
-                  placeholder="Short operator-facing note"
+                  placeholder={t("apps.summaryPlaceholder")}
                   value={catalogForm.summary}
                   onChange={(event) => setCatalogForm((prev) => ({ ...prev, summary: event.target.value }))}
                 />
               </Field>
-              <Field label="Trust">
+              <Field label={t("apps.trust")}>
                 <Select
                   value={catalogForm.trust_status}
                   onChange={(event) =>
                     setCatalogForm((prev) => ({ ...prev, trust_status: event.target.value as "dev" | "manual" | "unverified" }))
                   }
                 >
-                  <option value="manual">manual</option>
-                  <option value="dev">dev</option>
-                  <option value="unverified">unverified</option>
+                  <option value="manual">{translateAppValue("manual", t)}</option>
+                  <option value="dev">{translateAppValue("dev", t)}</option>
+                  <option value="unverified">{translateAppValue("unverified", t)}</option>
                 </Select>
               </Field>
               <Button
                 onClick={() => void handleCreateCatalogEntry()}
                 disabled={!catalogForm.base_url.trim() || createCatalogEntry.isPending}
               >
-                {createCatalogEntry.isPending ? "Fetching..." : "Add to catalog"}
+                {createCatalogEntry.isPending ? t("apps.fetching") : t("apps.addToCatalog")}
               </Button>
             </div>
           </Card>
@@ -785,12 +791,12 @@ export function AppsPage() {
           <Card id="catalog" className="rounded-hc-md p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hc-outline px-4 py-3">
               <div>
-                <div className="text-sm font-semibold">Available applications</div>
-                <div className="mt-1 text-xs text-hc-muted">{licensedCatalogCount} require a tenant license.</div>
+                <div className="text-sm font-semibold">{t("apps.availableApplications")}</div>
+                <div className="mt-1 text-xs text-hc-muted">{t("apps.requireLicenseCount", { count: licensedCatalogCount })}</div>
               </div>
-              <Badge>{catalogLoading ? "Loading" : `${catalog.length} entries`}</Badge>
+              <Badge>{catalogLoading ? t("common.loading") : t("apps.entriesCount", { count: catalog.length })}</Badge>
             </div>
-            <div className="border-b border-hc-outline p-3"><Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Search catalog" /></div>
+            <div className="border-b border-hc-outline p-3"><Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={t("apps.searchCatalog")} /></div>
             <CatalogTable
               entries={filteredCatalog}
               installedByAppId={installedByAppId}
@@ -820,16 +826,16 @@ export function AppsPage() {
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => { setUninstallConfirmChecked(false); setUninstallState({ status: "confirm", app }); }}
             isMutating={checkUpdateMutation.isPending || clearUpdateSignalMutation.isPending || issueAppTokenMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending || stopManagedRuntime.isPending || rotateManagedRuntimeToken.isPending || updateManagedRuntime.isPending}
-          /> : <Card><div className="text-sm text-hc-muted">Installed application not found.</div></Card>
+          /> : <Card><div className="text-sm text-hc-muted">{t("apps.installedNotFound")}</div></Card>
         ) : <Card id="installed" className="rounded-hc-md p-0">
           <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
             <div>
-              <div className="text-sm font-semibold">Installed applications</div>
-              <div className="mt-1 text-xs text-hc-muted">Runtime state for this Core instance.</div>
+              <div className="text-sm font-semibold">{t("apps.installedApplications")}</div>
+              <div className="mt-1 text-xs text-hc-muted">{t("apps.installedDescription")}</div>
             </div>
-            <Badge>{installedLoading ? "Loading" : `${installed.length} installed`}</Badge>
+            <Badge>{installedLoading ? t("common.loading") : t("apps.installedCount", { count: installed.length })}</Badge>
           </div>
-          <div className="border-b border-hc-outline p-3"><Input value={installedSearch} onChange={(event) => setInstalledSearch(event.target.value)} placeholder="Search installed applications" /></div>
+          <div className="border-b border-hc-outline p-3"><Input value={installedSearch} onChange={(event) => setInstalledSearch(event.target.value)} placeholder={t("apps.searchInstalled")} /></div>
           <InstalledTable
             apps={filteredInstalled}
             registrySlugs={registrySlugs}
@@ -847,8 +853,8 @@ export function AppsPage() {
         <Card id="licensing" className="rounded-hc-md">
           <div className="grid gap-5 lg:grid-cols-[minmax(260px,360px)_1fr]">
             <section>
-              <div className="text-sm font-semibold">Tenant license selection</div>
-              <Field label="Application" className="mt-3">
+              <div className="text-sm font-semibold">{t("apps.tenantLicenseSelection")}</div>
+              <Field label={t("licensing.application")} className="mt-3">
                 <Select
                   value={effectiveSelectedAppId ?? ""}
                   onChange={(event) => {
@@ -856,7 +862,7 @@ export function AppsPage() {
                     setSelectedEntitlementId("");
                   }}
                 >
-                  <option value="">Select app</option>
+                  <option value="">{t("apps.selectApp")}</option>
                   {installed.map((app) => (
                     <option key={app.app_id} value={app.app_id}>
                       {pickAppDisplayName(app)}
@@ -864,41 +870,41 @@ export function AppsPage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Stored license" className="mt-3">
+              <Field label={t("apps.storedLicense")} className="mt-3">
                 <Select
                   value={selectedEntitlementId}
                   onChange={(event) => setSelectedEntitlementId(event.target.value)}
                 >
-                  <option value="">Fallback selection</option>
+                  <option value="">{t("apps.fallbackSelection")}</option>
                   {(entitlementsData?.items ?? []).map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.source} / {item.tier} / {formatDate(item.valid_to)}
-                      {entitlementsData?.selected_entitlement_id === item.id ? " [selected]" : ""}
+                      {entitlementsData?.selected_entitlement_id === item.id ? ` [${t("apps.selectedSuffix")}]` : ""}
                     </option>
                   ))}
                 </Select>
               </Field>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => void handleSetSelection()} disabled={!selectedEntitlementId || setSelectionMutation.isPending}>
-                  Set selection
+                  {t("apps.setSelection")}
                 </Button>
                 <Button variant="outlined" onClick={() => void handleClearSelection()} disabled={!effectiveSelectedAppId || clearSelectionMutation.isPending}>
-                  Clear
+                  {t("apps.clear")}
                 </Button>
               </div>
             </section>
 
             <section>
-              <div className="text-sm font-semibold">Offline import</div>
+              <div className="text-sm font-semibold">{t("apps.offlineImport")}</div>
               <Textarea
                 className="mt-3 min-h-40"
                 value={offlineToken}
                 onChange={(event) => setOfflineToken(event.target.value)}
-                placeholder="Paste license bundle or token"
+                placeholder={t("apps.pasteLicense")}
               />
               <div className="mt-3 flex justify-end">
                 <Button onClick={() => void handleIngestOffline()} disabled={!offlineToken.trim() || offlineIngestMutation.isPending}>
-                  {offlineIngestMutation.isPending ? "Importing..." : "Import license"}
+                  {offlineIngestMutation.isPending ? t("apps.importing") : t("apps.importLicense")}
                 </Button>
               </div>
             </section>
@@ -950,19 +956,20 @@ function CatalogSourcesPanel({
   onSetAutoRefresh: (source: AppCatalogSource, autoRefreshEnabled: boolean) => Promise<void>;
   isMutating: boolean;
 }) {
+  const { t } = useLocalization();
   return (
     <Card id="catalog-feeds" className="rounded-hc-md p-0">
       <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
         <div>
-          <div className="text-sm font-semibold">Catalog feeds</div>
-          <div className="mt-1 text-xs text-hc-muted">Remote feeds that can populate the local catalog.</div>
+          <div className="text-sm font-semibold">{t("apps.catalogFeeds")}</div>
+          <div className="mt-1 text-xs text-hc-muted">{t("apps.catalogFeedsDescription")}</div>
         </div>
-        <Badge>{isLoading ? "Loading" : `${sources.length} sources`}</Badge>
+        <Badge>{isLoading ? t("common.loading") : t("apps.sourcesCount", { count: sources.length })}</Badge>
       </div>
 
       <div className="grid gap-3 border-b border-hc-outline px-5 py-4 lg:grid-cols-[minmax(180px,260px)_1fr_auto_auto]">
         <Input
-          placeholder="Feed name"
+          placeholder={t("apps.feedName")}
           value={form.name}
           onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
         />
@@ -976,18 +983,18 @@ function CatalogSourcesPanel({
           value={form.trust_mode}
           onChange={(event) => setForm((prev) => ({ ...prev, trust_mode: event.target.value as AppCatalogSource["trust_mode"] }))}
         >
-          <option value="manual">manual</option>
-          <option value="dev">dev</option>
-          <option value="verified">verified</option>
-          <option value="official">official</option>
+          <option value="manual">{translateAppValue("manual", t)}</option>
+          <option value="dev">{translateAppValue("dev", t)}</option>
+          <option value="verified">{translateAppValue("verified", t)}</option>
+          <option value="official">{translateAppValue("official", t)}</option>
         </select>
         <Button onClick={() => void onCreate()} disabled={!form.name.trim() || !form.feed_url.trim() || isMutating}>
-          Add feed
+          {t("apps.addFeed")}
         </Button>
       </div>
 
       {sources.length === 0 ? (
-        <div className="px-5 py-5 text-sm text-hc-muted">No feed sources yet.</div>
+        <div className="px-5 py-5 text-sm text-hc-muted">{t("apps.noFeedSources")}</div>
       ) : (
         <div className="divide-y divide-hc-outline/70">
           {sources.map((source) => (
@@ -995,12 +1002,12 @@ function CatalogSourcesPanel({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="font-medium">{source.name}</div>
-                  <Badge tone={source.is_enabled ? "good" : "neutral"}>{source.is_enabled ? "enabled" : "disabled"}</Badge>
-                  <Badge>{source.trust_mode}</Badge>
+                  <Badge tone={source.is_enabled ? "good" : "neutral"}>{t(source.is_enabled ? "common.on" : "common.off")}</Badge>
+                  <Badge>{translateAppValue(source.trust_mode, t)}</Badge>
                 </div>
                 <div className="mt-1 break-all text-xs text-hc-muted">{source.feed_url}</div>
                 <div className="mt-1 text-xs text-hc-muted">
-                  Last sync: {formatDate(source.last_sync_at)}
+                  {t("apps.lastSync", { date: formatDate(source.last_sync_at) })}
                   {source.last_error ? ` / ${source.last_error}` : ""}
                 </div>
               </div>
@@ -1011,17 +1018,17 @@ function CatalogSourcesPanel({
                     disabled={isMutating || !source.is_enabled || (source.trust_mode !== "verified" && source.trust_mode !== "official")}
                     onClick={() => void onSetAutoRefresh(source, !source.auto_refresh_enabled)}
                   />
-                  Auto refresh
+                  {t("apps.autoRefresh")}
                 </label>
                 <Button variant="outlined" disabled={!source.is_enabled || isMutating} onClick={() => void onSync(source)}>
-                  Sync
+                  {t("apps.sync")}
                 </Button>
                 <Button
                   variant="ghost"
                   disabled={isMutating}
                   onClick={() => void onSetEnabled(source, !source.is_enabled)}
                 >
-                  {source.is_enabled ? "Disable" : "Enable"}
+                  {t(source.is_enabled ? "common.disable" : "common.enable")}
                 </Button>
               </div>
             </div>
@@ -1053,7 +1060,8 @@ function CatalogAppDetail({
   onSetPublication: (entry: AppCatalogEntry, published: boolean) => Promise<void>;
   isMutating: boolean;
 }) {
-  const runtimeStatus = getCatalogRuntimeStatus(entry);
+  const { t } = useLocalization();
+  const runtimeStatus = getCatalogRuntimeStatus(entry, t);
   const needsLicenseAction = Boolean(installed) && entry.license_state.required && !entry.license_state.selected_active_license;
   const canPublish = Boolean(installed?.enabled !== false && installed);
 
@@ -1062,25 +1070,25 @@ function CatalogAppDetail({
       <SectionHeader
         title={entry.app_name}
         description={entry.app_id}
-        meta={<Button size="sm" variant="outlined" onClick={onBack}>Back to catalog</Button>}
+        meta={<Button size="sm" variant="outlined" onClick={onBack}>{t("apps.backToCatalog")}</Button>}
       />
       <div className="flex flex-wrap gap-1.5 border-t border-hc-outline px-4 py-3">
-        <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>{entry.trust_status}</Badge>
+        <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>{translateAppValue(entry.trust_status, t)}</Badge>
         <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
-        {entry.license_required ? <Badge tone="warn">license required</Badge> : <Badge tone="good">free</Badge>}
-        {entry.published ? <Badge tone="good">published to feed</Badge> : <Badge>{entry.publish_status}</Badge>}
+        {entry.license_required ? <Badge tone="warn">{t("apps.licenseRequired")}</Badge> : <Badge tone="good">{t("apps.free")}</Badge>}
+        {entry.published ? <Badge tone="good">{t("apps.publishedToFeed")}</Badge> : <Badge>{translateAppValue(entry.publish_status, t)}</Badge>}
       </div>
       <dl className="grid border-t border-hc-outline md:grid-cols-2">
-        <DetailCell label="Source" value={`${entry.source_type} · ${entry.namespace ?? "no namespace"}`} />
-        <DetailCell label="Runtime" value={runtimeStatus.detail ?? runtimeStatus.label} />
-        <DetailCell label="Summary" value={entry.summary ?? "No summary"} />
-        <DetailCell label="License issuer" value={entry.license_issuer_url ?? "Not configured"} />
+        <DetailCell label={t("apps.source")} value={`${translateAppValue(entry.source_type, t)} · ${entry.namespace ?? t("apps.noNamespace")}`} />
+        <DetailCell label={t("apps.runtime")} value={runtimeStatus.detail ?? runtimeStatus.label} />
+        <DetailCell label={t("apps.summary")} value={entry.summary ?? t("apps.noSummary")} />
+        <DetailCell label={t("apps.licenseIssuer")} value={entry.license_issuer_url ?? t("common.notConfigured")} />
       </dl>
       <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
-        {!installed && <Button variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>Install application</Button>}
-        {installed && needsLicenseAction && <Button variant="tonal" disabled={isMutating} onClick={() => entry.license_issuer_url ? void onActivateLicense(entry) : onLicense(entry.app_id)}>{entry.license_issuer_url ? "Activate license" : "Open licensing"}</Button>}
-        <Button variant={entry.published ? "tonal" : "outlined"} disabled={isMutating || (!entry.published && !canPublish)} onClick={() => void onSetPublication(entry, !entry.published)}>{entry.published ? "Unpublish" : "Publish"}</Button>
-        <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry).then(onBack)}>Remove from catalog</Button>
+        {!installed && <Button variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>{t("apps.installApplication")}</Button>}
+        {installed && needsLicenseAction && <Button variant="tonal" disabled={isMutating} onClick={() => entry.license_issuer_url ? void onActivateLicense(entry) : onLicense(entry.app_id)}>{t(entry.license_issuer_url ? "apps.activateLicense" : "apps.openLicensing")}</Button>}
+        <Button variant={entry.published ? "tonal" : "outlined"} disabled={isMutating || (!entry.published && !canPublish)} onClick={() => void onSetPublication(entry, !entry.published)}>{t(entry.published ? "apps.unpublish" : "apps.publish")}</Button>
+        <Button variant="ghost" disabled={isMutating} onClick={() => void onDelete(entry).then(onBack)}>{t("apps.removeFromCatalog")}</Button>
       </div>
     </Card>
   );
@@ -1110,29 +1118,30 @@ function CatalogTable({
   onOpen: (entry: AppCatalogEntry) => void;
   isMutating: boolean;
 }) {
+  const { t } = useLocalization();
   if (isLoading) {
-    return <div className="px-5 py-6 text-sm text-hc-muted">Loading catalog...</div>;
+    return <div className="px-5 py-6 text-sm text-hc-muted">{t("apps.loadingCatalog")}</div>;
   }
 
   if (entries.length === 0) {
-    return <div className="px-5 py-6 text-sm text-hc-muted">No catalog entries yet.</div>;
+    return <div className="px-5 py-6 text-sm text-hc-muted">{t("apps.noCatalogEntries")}</div>;
   }
 
   return (
     <Table className="rounded-none border-0 shadow-none">
       <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
         <tr>
-          <th className="px-5 py-3 font-semibold">Application</th>
-          <th className="px-5 py-3 font-semibold">Source</th>
-          <th className="px-5 py-3 font-semibold">License</th>
-          <th className="px-5 py-3 font-semibold">Status</th>
-          <th className="px-5 py-3 font-semibold">Actions</th>
+          <th className="px-5 py-3 font-semibold">{t("licensing.application")}</th>
+          <th className="px-5 py-3 font-semibold">{t("apps.source")}</th>
+          <th className="px-5 py-3 font-semibold">{t("apps.license")}</th>
+          <th className="px-5 py-3 font-semibold">{t("common.status")}</th>
+          <th className="px-5 py-3 font-semibold">{t("common.actions")}</th>
         </tr>
       </thead>
       <tbody>
         {entries.map((entry) => {
           const installed = installedByAppId.get(entry.app_id);
-          const runtimeStatus = getCatalogRuntimeStatus(entry);
+          const runtimeStatus = getCatalogRuntimeStatus(entry, t);
           return (
             <tr key={entry.app_id}>
               <td>
@@ -1140,24 +1149,24 @@ function CatalogTable({
                 <div className="truncate text-xs text-hc-muted" title={entry.app_id}>{entry.app_id}</div>
               </td>
               <td className="text-sm">
-                <span>{entry.source_type}</span><span className="ml-2 text-xs text-hc-muted">{entry.namespace ?? "no namespace"}</span>
+                <span>{translateAppValue(entry.source_type, t)}</span><span className="ml-2 text-xs text-hc-muted">{entry.namespace ?? t("apps.noNamespace")}</span>
               </td>
               <td>
-                {entry.license_required ? <Badge tone="warn">required</Badge> : <Badge tone="good">free</Badge>}
+                {entry.license_required ? <Badge tone="warn">{t("apps.required")}</Badge> : <Badge tone="good">{t("apps.free")}</Badge>}
               </td>
               <td>
                 <div className="flex flex-wrap gap-1.5" title={runtimeStatus.detail ?? undefined}>
                   <Badge tone={entry.trust_status === "official" || entry.trust_status === "verified" ? "good" : "neutral"}>
-                    {entry.trust_status}
+                    {translateAppValue(entry.trust_status, t)}
                   </Badge>
                   <Badge tone={runtimeStatus.tone}>{runtimeStatus.label}</Badge>
-                  {entry.published ? <Badge tone="good">feed</Badge> : <Badge>{entry.publish_status}</Badge>}
+                  {entry.published ? <Badge tone="good">{t("apps.feed")}</Badge> : <Badge>{translateAppValue(entry.publish_status, t)}</Badge>}
                 </div>
               </td>
               <td>
                 <div className="flex justify-end gap-1.5">
-                  {!installed && <Button size="sm" variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>Install</Button>}
-                  <Button size="sm" variant="ghost" onClick={() => onOpen(entry)}>Open</Button>
+                  {!installed && <Button size="sm" variant="outlined" disabled={isMutating} onClick={() => onInstall(entry)}>{t("apps.install")}</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => onOpen(entry)}>{t("common.open")}</Button>
                 </div>
               </td>
             </tr>
@@ -1199,45 +1208,45 @@ function InstalledAppDetail({
   onUninstall: (app: InstalledApp) => void;
   isMutating: boolean;
 }) {
-  const status = getInstalledStatus(app, registrySlugs);
-  const { locale } = useLocalization();
+  const { locale, t } = useLocalization();
+  const status = getInstalledStatus(app, registrySlugs, t);
   const localization = readAppLocalization(app);
   const effectiveLocale = localization.supportedLocales.includes(locale) ? locale : localization.defaultLocale;
 
   return (
     <Card className="overflow-hidden p-0">
-      <SectionHeader title={pickAppDisplayName(app)} description={app.app_id} meta={<Button size="sm" variant="outlined" onClick={onBack}>Back to installed apps</Button>} />
+      <SectionHeader title={pickAppDisplayName(app)} description={app.app_id} meta={<Button size="sm" variant="outlined" onClick={onBack}>{t("apps.backToInstalled")}</Button>} />
       <div className="flex flex-wrap gap-1.5 border-t border-hc-outline px-4 py-3">
         <Badge tone={status.tone}>{status.label}</Badge>
         {app.app_version && <Badge>{app.app_version}</Badge>}
-        {app.update_signal && <Badge tone="warn">update signal</Badge>}
-        {app.catalog_update?.state === "available" && <Badge tone="warn">catalog update available</Badge>}
-        {app.managed_runtime && <Badge tone="good">Core-managed runtime</Badge>}
+        {app.update_signal && <Badge tone="warn">{t("apps.updateSignal")}</Badge>}
+        {app.catalog_update?.state === "available" && <Badge tone="warn">{t("apps.catalogUpdateAvailable")}</Badge>}
+        {app.managed_runtime && <Badge tone="good">{t("apps.managedRuntime")}</Badge>}
         <Badge tone={effectiveLocale === locale ? "good" : "neutral"}>{getLocaleLabel(effectiveLocale)}</Badge>
       </div>
       <dl className="grid border-t border-hc-outline md:grid-cols-2">
-        <DetailCell label="Runtime" value={status.detail ?? status.label} />
-        <DetailCell label="Runtime owner" value={app.managed_runtime ? `${app.managed_runtime.compose_project} / ${app.managed_runtime.service_name}` : "External"} />
-        <DetailCell label="Entitlement" value={app.resolved_entitlement ? `${app.resolved_entitlement.tier}, valid to ${formatDate(app.resolved_entitlement.valid_to)}` : "No active entitlement"} />
-        <DetailCell label="Languages" value={localization.supportedLocales.map(getLocaleLabel).join(", ")} />
+        <DetailCell label={t("apps.runtime")} value={status.detail ?? status.label} />
+        <DetailCell label={t("apps.runtimeOwner")} value={app.managed_runtime ? `${app.managed_runtime.compose_project} / ${app.managed_runtime.service_name}` : t("apps.external")} />
+        <DetailCell label={t("apps.entitlement")} value={app.resolved_entitlement ? t("apps.validTo", { tier: app.resolved_entitlement.tier, date: formatDate(app.resolved_entitlement.valid_to) }) : t("apps.noActiveEntitlement")} />
+        <DetailCell label={t("apps.languages")} value={localization.supportedLocales.map(getLocaleLabel).join(", ")} />
         <DetailCell label="UI URL" value={app.ui_url} />
-        <DetailCell label="Catalog state" value={app.catalog_update ? `${app.catalog_update.state} · ${app.catalog_update.source_type} / ${app.catalog_update.trust_status}` : "Not checked"} />
+        <DetailCell label={t("apps.catalogState")} value={app.catalog_update ? `${app.catalog_update.state} · ${app.catalog_update.source_type} / ${app.catalog_update.trust_status}` : t("apps.notChecked")} />
       </dl>
       {app.update_signal && <div className="border-t border-hc-warning/30 bg-hc-warning/10 px-4 py-3 text-sm">
-        <div className="font-semibold text-hc-warning">Update reported by {app.update_signal.source}</div>
-        <div className="mt-1 text-xs text-hc-muted">{app.update_signal.note ?? "No note"} · {formatDate(app.update_signal.reported_at)}</div>
+        <div className="font-semibold text-hc-warning">{t("apps.updateReportedBy", { source: app.update_signal.source })}</div>
+        <div className="mt-1 text-xs text-hc-muted">{app.update_signal.note ?? t("apps.noNote")} · {formatDate(app.update_signal.reported_at)}</div>
       </div>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
-        <Button variant="tonal" onClick={() => onLicense(app.app_id)}>Licensing</Button>
-        <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>Check update</Button>
-        {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>Clear signal</Button>}
-        <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>Issue token</Button>
-        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => void onRotateRuntimeToken(app)}>Rotate runtime token</Button>}
-        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => onUpdateRuntime(app)}>Update runtime</Button>}
-        {app.managed_runtime && <Button variant="ghost" disabled={isMutating} onClick={() => void onStopRuntime(app)}>Stop runtime</Button>}
-        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>Refresh catalog</Button>
-        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>Refresh artifact</Button>
-        <Button variant="ghost" onClick={() => onUninstall(app)}>Uninstall</Button>
+        <Button variant="tonal" onClick={() => onLicense(app.app_id)}>{t("nav.licensing")}</Button>
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>{t("apps.checkUpdate")}</Button>
+        {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>{t("apps.clearSignal")}</Button>}
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>{t("apps.issueToken")}</Button>
+        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => void onRotateRuntimeToken(app)}>{t("apps.rotateRuntimeToken")}</Button>}
+        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => onUpdateRuntime(app)}>{t("apps.updateRuntime")}</Button>}
+        {app.managed_runtime && <Button variant="ghost" disabled={isMutating} onClick={() => void onStopRuntime(app)}>{t("apps.stopRuntime")}</Button>}
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>{t("apps.refreshCatalog")}</Button>
+        <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>{t("apps.refreshArtifact")}</Button>
+        <Button variant="ghost" onClick={() => onUninstall(app)}>{t("apps.uninstall")}</Button>
       </div>
     </Card>
   );
@@ -1256,28 +1265,29 @@ function InstalledTable({
   onLicense: (appId: string) => void;
   onOpen: (app: InstalledApp) => void;
 }) {
+  const { t } = useLocalization();
   if (isLoading) {
-    return <div className="px-5 py-6 text-sm text-hc-muted">Loading installed apps...</div>;
+    return <div className="px-5 py-6 text-sm text-hc-muted">{t("apps.loadingInstalled")}</div>;
   }
 
   if (apps.length === 0) {
-    return <div className="px-5 py-6 text-sm text-hc-muted">No installed apps.</div>;
+    return <div className="px-5 py-6 text-sm text-hc-muted">{t("apps.noInstalled")}</div>;
   }
 
   return (
     <Table className="rounded-none border-0 shadow-none">
       <thead className="border-b border-hc-outline text-xs uppercase tracking-wide text-hc-muted">
         <tr>
-          <th className="px-5 py-3 font-semibold">Application</th>
-          <th className="px-5 py-3 font-semibold">Runtime</th>
-          <th className="px-5 py-3 font-semibold">Entitlement</th>
-          <th className="px-5 py-3 font-semibold">Updates</th>
-          <th className="px-5 py-3 font-semibold">Actions</th>
+          <th className="px-5 py-3 font-semibold">{t("licensing.application")}</th>
+          <th className="px-5 py-3 font-semibold">{t("apps.runtime")}</th>
+          <th className="px-5 py-3 font-semibold">{t("apps.entitlement")}</th>
+          <th className="px-5 py-3 font-semibold">{t("apps.updates")}</th>
+          <th className="px-5 py-3 font-semibold">{t("common.actions")}</th>
         </tr>
       </thead>
       <tbody>
         {apps.map((app) => {
-          const status = getInstalledStatus(app, registrySlugs);
+          const status = getInstalledStatus(app, registrySlugs, t);
           return (
             <tr key={app.app_id}>
               <td>
@@ -1289,23 +1299,23 @@ function InstalledTable({
               </td>
               <td className="text-sm">
                 {app.resolved_entitlement ? (
-                  <span>{app.resolved_entitlement.tier} <span className="text-xs text-hc-muted">to {formatDate(app.resolved_entitlement.valid_to)}</span></span>
+                  <span>{t("apps.validTo", { tier: app.resolved_entitlement.tier, date: formatDate(app.resolved_entitlement.valid_to) })}</span>
                 ) : (
-                  <span className="text-hc-muted">none selected</span>
+                  <span className="text-hc-muted">{t("apps.noneSelected")}</span>
                 )}
               </td>
               <td>
                 <div className="flex flex-wrap gap-1.5">
-                  {app.update_signal && <Badge tone="warn">signal</Badge>}
-                  {app.catalog_update?.state === "available" && <Badge tone="warn">available</Badge>}
-                  {app.catalog_update?.state === "same" && <Badge tone="good">current</Badge>}
-                  {!app.update_signal && !app.catalog_update && <span className="text-xs text-hc-muted">not checked</span>}
+                  {app.update_signal && <Badge tone="warn">{t("apps.signal")}</Badge>}
+                  {app.catalog_update?.state === "available" && <Badge tone="warn">{t("apps.available")}</Badge>}
+                  {app.catalog_update?.state === "same" && <Badge tone="good">{t("apps.current")}</Badge>}
+                  {!app.update_signal && !app.catalog_update && <span className="text-xs text-hc-muted">{t("apps.notChecked")}</span>}
                 </div>
               </td>
               <td>
                 <div className="flex justify-end gap-1.5">
-                  <Button size="sm" variant="ghost" onClick={() => onLicense(app.app_id)}>Licensing</Button>
-                  <Button size="sm" variant="ghost" onClick={() => onOpen(app)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onLicense(app.app_id)}>{t("nav.licensing")}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onOpen(app)}>{t("common.open")}</Button>
                 </div>
               </td>
             </tr>
@@ -1323,6 +1333,7 @@ function AppTokenDialog({
   state: AppTokenDialogState;
   onClose: () => void;
 }) {
+  const { t } = useLocalization();
   if (state.status === "idle") {
     return null;
   }
@@ -1332,12 +1343,12 @@ function AppTokenDialog({
   };
 
   return (
-    <Dialog open title="App token" onClose={onClose}>
+    <Dialog open title={t("apps.tokenTitle")} onClose={onClose}>
       <div className="space-y-4">
         <div>
           <div className="text-lg font-semibold">{pickAppDisplayName(state.app)}</div>
           <div className="mt-1 text-sm text-hc-muted">
-            Short-lived app token for Core app-auth endpoints. Expires {formatDate(state.token.expires_at)}.
+            {t("apps.tokenDescription", { date: formatDate(state.token.expires_at) })}
           </div>
         </div>
         <Textarea
@@ -1347,9 +1358,9 @@ function AppTokenDialog({
         />
         <div className="flex justify-end gap-2">
           <Button variant="outlined" onClick={copyToken}>
-            Copy token
+            {t("apps.copyToken")}
           </Button>
-          <Button onClick={onClose}>Done</Button>
+          <Button onClick={onClose}>{t("common.done")}</Button>
         </div>
       </div>
     </Dialog>
@@ -1371,6 +1382,7 @@ function CatalogInstallDialog({
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }) {
+  const { t } = useLocalization();
   if (state.status === "idle") {
     return null;
   }
@@ -1385,24 +1397,24 @@ function CatalogInstallDialog({
     (!runtimeApprovalConfirmed || !plan.package_sha256 || !plan.package_url || !plan.compose_file);
 
   return (
-    <Dialog open title={operation === "update" ? "Update runtime" : "Install app"} disableClose={isRunning} onClose={onClose}>
+    <Dialog open title={t(operation === "update" ? "apps.updateRuntime" : "apps.installApp")} disableClose={isRunning} onClose={onClose}>
       <div>
-        <div className="text-lg font-semibold">{operation === "update" ? "Update" : "Install"} {entry.app_name}</div>
+        <div className="text-lg font-semibold">{t(operation === "update" ? "apps.update" : "apps.install")} {entry.app_name}</div>
         <div className="mt-3 rounded-hc-md border border-hc-outline bg-hc-surface-variant p-3">
           <div className="text-sm font-medium">{entry.app_id}</div>
           <div className="mt-1 text-xs text-hc-muted">{entry.base_url}</div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {entry.license_required ? <Badge tone="warn">license required</Badge> : <Badge tone="good">free</Badge>}
-            <Badge>{entry.trust_status}</Badge>
+            {entry.license_required ? <Badge tone="warn">{t("apps.licenseRequired")}</Badge> : <Badge tone="good">{t("apps.free")}</Badge>}
+            <Badge>{translateAppValue(entry.trust_status, t)}</Badge>
           </div>
         </div>
 
         {state.status !== "result" && operation === "install" && (
           <div className="mt-4 grid gap-2">
             {[
-              ["external", "External service", "Install the app registry record and use its existing base URL."],
-              ["stage_only", "Stage only", "Save the selected plan without installing the runtime registry entry."],
-              ["compose", "Core-managed compose", "Let Core approve and run the app compose bundle when runtime support exists."],
+              ["external", t("apps.externalService"), t("apps.externalServiceDescription")],
+              ["stage_only", t("apps.stageOnly"), t("apps.stageOnlyDescription")],
+              ["compose", t("apps.managedCompose"), t("apps.managedComposeDescription")],
             ].map(([value, label, description]) => (
               <label
                 key={value}
@@ -1427,16 +1439,16 @@ function CatalogInstallDialog({
         )}
 
         <div className="mt-4 rounded-hc-md border border-hc-outline bg-hc-surface p-3 text-xs">
-          <div className="font-semibold uppercase tracking-wide text-hc-muted">Deployment plan</div>
+          <div className="font-semibold uppercase tracking-wide text-hc-muted">{t("apps.deploymentPlan")}</div>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-            <PlanItem label="Mode" value={plan.mode} />
-            <PlanItem label="Service" value={plan.service_name} />
-            <PlanItem label="Internal URL" value={plan.internal_base_url} />
-            <PlanItem label="Compose project" value={plan.compose_project} />
-            <PlanItem label="Compose file" value={plan.compose_file ?? "not declared"} />
+            <PlanItem label={t("apps.mode")} value={translateAppValue(plan.mode, t)} />
+            <PlanItem label={t("apps.service")} value={plan.service_name} />
+            <PlanItem label={t("apps.internalUrl")} value={plan.internal_base_url} />
+            <PlanItem label={t("apps.composeProject")} value={plan.compose_project} />
+            <PlanItem label={t("apps.composeFile")} value={plan.compose_file ?? t("apps.notDeclared")} />
             <PlanItem label="Manifest SHA-256" value={entry.manifest_hash} />
-            <PlanItem label="Package SHA-256" value={plan.package_sha256 ?? "not declared"} />
-            <PlanItem label="Host access" value={plan.host_mounts_allowed ? "allowed" : "blocked"} />
+            <PlanItem label="Package SHA-256" value={plan.package_sha256 ?? t("apps.notDeclared")} />
+            <PlanItem label={t("apps.hostAccess")} value={t(plan.host_mounts_allowed ? "apps.allowed" : "apps.blocked")} />
           </dl>
         </div>
 
@@ -1450,28 +1462,28 @@ function CatalogInstallDialog({
               disabled={isRunning || !plan.package_sha256 || !plan.package_url || !plan.compose_file}
             />
             <span>
-              <span className="block font-medium text-hc-text">Approve Core-managed runtime {operation === "update" ? "update" : "start"}</span>
+              <span className="block font-medium text-hc-text">{t("apps.approveManagedRuntime", { operation: t(operation === "update" ? "apps.update" : "apps.start") })}</span>
               <span className="mt-1 block text-xs text-hc-muted">
-                I reviewed the manifest and package hashes and authorize Core to build and {operation === "update" ? "replace" : "start"} this Compose service.
+                {t("apps.approveManagedRuntimeDescription", { operation: t(operation === "update" ? "apps.replace" : "apps.start") })}
               </span>
               {(!plan.package_sha256 || !plan.package_url || !plan.compose_file) && (
                 <span className="mt-2 block text-xs text-hc-danger">
-                  The catalog entry must declare package URL, package SHA-256, and Compose file before this runtime can be approved.
+                  {t("apps.approvalRequirements")}
                 </span>
               )}
             </span>
           </label>
         )}
 
-        {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">{operation === "update" ? "Runtime update" : "Installation"} is running...</div>}
+        {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">{t(operation === "update" ? "apps.runtimeUpdateRunning" : "apps.installationRunning")}</div>}
 
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={isRunning}>
-            {state.status === "result" ? "Close" : "Cancel"}
+            {t(state.status === "result" ? "common.close" : "common.cancel")}
           </Button>
           {state.status !== "result" && (
             <Button onClick={() => void onConfirm()} disabled={isRunning || composeApprovalBlocked}>
-              {isRunning ? "Running..." : "Approve"}
+              {t(isRunning ? "apps.running" : "apps.approve")}
             </Button>
           )}
         </div>
@@ -1502,11 +1514,12 @@ function UninstallDialog({
   onClose: () => void;
   onConfirm: (app: InstalledApp) => Promise<void>;
 }) {
+  const { t } = useLocalization();
   return (
-    <Dialog open={state.status !== "idle"} title="Uninstall app" disableClose={state.status === "running"} onClose={onClose}>
+    <Dialog open={state.status !== "idle"} title={t("apps.uninstallTitle")} disableClose={state.status === "running"} onClose={onClose}>
       {state.status === "confirm" && (
         <div>
-          <div className="text-lg font-semibold">Confirm uninstall</div>
+          <div className="text-lg font-semibold">{t("apps.confirmUninstall")}</div>
           <div className="mt-3 rounded-hc-md border border-hc-outline bg-hc-surface-variant p-3 text-sm">
             <div className="font-medium">{pickAppDisplayName(state.app)}</div>
             <div className="mt-1 text-xs text-hc-muted">{state.app.app_id}</div>
@@ -1519,41 +1532,40 @@ function UninstallDialog({
               onChange={(event) => setConfirmChecked(event.target.checked)}
             />
             <span>
-              Remove this app from Core. Core-managed containers will also be removed; external runtimes are not
-              affected.
+              {t("apps.uninstallDescription")}
             </span>
           </label>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" disabled={!confirmChecked} onClick={() => void onConfirm(state.app)}>
-              Uninstall
+              {t("apps.uninstall")}
             </Button>
           </div>
         </div>
       )}
 
-      {state.status === "running" && <div className="text-sm text-hc-muted">Uninstall is running...</div>}
+      {state.status === "running" && <div className="text-sm text-hc-muted">{t("apps.uninstallRunning")}</div>}
 
       {state.status === "success" && (
         <div>
-          <div className="text-lg font-semibold">Uninstall completed</div>
+          <div className="text-lg font-semibold">{t("apps.uninstallCompleted")}</div>
           <div className="mt-5 flex justify-end">
-            <Button onClick={onClose}>Close</Button>
+            <Button onClick={onClose}>{t("common.close")}</Button>
           </div>
         </div>
       )}
 
       {state.status === "error" && (
         <div>
-          <div className="text-lg font-semibold text-hc-danger">Uninstall failed</div>
+          <div className="text-lg font-semibold text-hc-danger">{t("apps.uninstallFailed")}</div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Close
+              {t("common.close")}
             </Button>
             <Button variant="danger" onClick={() => void onConfirm(state.app)}>
-              Retry
+              {t("apps.retry")}
             </Button>
           </div>
         </div>

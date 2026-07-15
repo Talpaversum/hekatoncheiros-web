@@ -80,10 +80,10 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
 
   const appGroups = useMemo(() => registry?.items ?? [], [registry?.items]);
   const helpCategories = useMemo(() => {
-    const platformCategories = getVisiblePlatformHelpGuides(privileges).map((guide) => guide.category);
-    const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? "Applications"));
+    const platformCategories = getVisiblePlatformHelpGuides(privileges, t).map((guide) => guide.category);
+    const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? t("help.categoryApplications")));
     return Array.from(new Set([...platformCategories, ...appCategories])).sort((a, b) => a.localeCompare(b));
-  }, [appGroups, privileges]);
+  }, [appGroups, privileges, t]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-hc-outline bg-hc-topbar">
@@ -244,7 +244,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                 {languageError && <div className="mt-1 text-xs text-hc-danger">{t("settings.languageError")}</div>}
               </div>
               <div className="mt-2 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
-                {t("settings.tenantMode", { mode: tenantMode ?? "unknown" })}
+                {t("settings.tenantMode", { mode: tenantMode ?? t("common.unknown") })}
               </div>
             </Menu>
           </div>
@@ -254,18 +254,18 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               className="rounded-full"
               aria-expanded={userOpen}
             >
-              <Avatar initials={initials} title={userId ?? "Profil"} />
+              <Avatar initials={initials} title={userId ?? t("account.profile")} />
             </button>
             <Menu open={userOpen} onClose={() => setUserOpen(false)} className="w-56">
               <div className="px-3 py-2">
                 <div className="text-sm font-medium">{displayName ?? userId ?? t("common.user")}</div>
-                <div className="text-xs text-hc-muted">Session account</div>
+                <div className="text-xs text-hc-muted">{t("topbar.sessionAccount")}</div>
               </div>
               <button
                 onClick={openAccount}
                 className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
               >
-                Account context
+                {t("topbar.accountContext")}
               </button>
               <button
                 onClick={handleLogout}

@@ -1,47 +1,49 @@
 import { Card } from "../../ui-kit/components/Card";
 import { MetricStrip, PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
 import { useContextQuery } from "../../data/api/context";
+import { useLocalization } from "../../localization/LocalizationProvider";
 
 export function DashboardPage() {
   const { data, isLoading } = useContextQuery();
   const licenseCount = data?.licenses ? Object.keys(data.licenses).length : 0;
+  const { t } = useLocalization();
 
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="Dashboard"
-        title="Overview"
-        description={data ? `Operational context for ${data.tenant.name ?? data.tenant.id}.` : "Loading operational context..."}
+        eyebrow={t("nav.dashboard")}
+        title={t("nav.overview")}
+        description={data ? t("dashboard.operationalContext", { tenant: data.tenant.name ?? data.tenant.id ?? t("common.noTenant") }) : t("dashboard.loadingContext")}
         actions={(
           <MetricStrip items={[
-            { label: "Privileges", value: data?.privileges.length ?? 0 },
-            { label: "Licenses", value: licenseCount },
-            { label: "Delegation", value: data?.actor.impersonating ? "On" : "Off", tone: data?.actor.impersonating ? "warning" : "neutral" },
+            { label: t("dashboard.privileges"), value: data?.privileges.length ?? 0 },
+            { label: t("dashboard.licenses"), value: licenseCount },
+            { label: t("dashboard.delegation"), value: data?.actor.impersonating ? t("common.on") : t("common.off"), tone: data?.actor.impersonating ? "warning" : "neutral" },
           ]} />
         )}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
         <Card className="overflow-hidden p-0">
-          <SectionHeader title="Current context" description="Identity and tenant applied to API requests in this session." />
+          <SectionHeader title={t("dashboard.currentContext")} description={t("dashboard.currentContextDescription")} />
           {isLoading ? (
-            <div className="border-t border-hc-outline px-4 py-6 text-sm text-hc-muted">Loading...</div>
+            <div className="border-t border-hc-outline px-4 py-6 text-sm text-hc-muted">{t("common.loading")}</div>
           ) : (
             <dl className="grid border-t border-hc-outline sm:grid-cols-2">
-              <ContextItem label="User" value={data?.actor.display_name ?? data?.actor.email ?? data?.actor.user_id ?? "-"} detail={data?.actor.user_id} />
-              <ContextItem label="Effective user" value={data?.actor.effective_user_id ?? "-"} detail={data?.actor.impersonating ? "Delegated session" : "Direct session"} />
-              <ContextItem label="Tenant" value={data?.tenant.name ?? data?.tenant.id ?? "-"} detail={data?.tenant.id ?? undefined} />
-              <ContextItem label="Tenant mode" value={data?.tenant.mode ?? "-"} detail={data?.tenant.primary_domain ?? undefined} />
+              <ContextItem label={t("dashboard.user")} value={data?.actor.display_name ?? data?.actor.email ?? data?.actor.user_id ?? "-"} detail={data?.actor.user_id} />
+              <ContextItem label={t("dashboard.effectiveUser")} value={data?.actor.effective_user_id ?? "-"} detail={data?.actor.impersonating ? t("dashboard.delegatedSession") : t("dashboard.directSession")} />
+              <ContextItem label={t("dashboard.tenant")} value={data?.tenant.name ?? data?.tenant.id ?? "-"} detail={data?.tenant.id ?? undefined} />
+              <ContextItem label={t("dashboard.tenantMode")} value={data?.tenant.mode ?? "-"} detail={data?.tenant.primary_domain ?? undefined} />
             </dl>
           )}
         </Card>
 
         <Card className="overflow-hidden p-0">
-          <SectionHeader title="Session access" description="Effective permissions after tenant resolution." meta={<StatusBadge tone="success">active</StatusBadge>} />
+          <SectionHeader title={t("dashboard.sessionAccess")} description={t("dashboard.sessionAccessDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
           <div className="border-t border-hc-outline p-3">
             <div className="flex max-h-52 flex-wrap gap-1.5 overflow-auto">
               {(data?.privileges ?? []).map((privilege) => <StatusBadge key={privilege}>{privilege}</StatusBadge>)}
-              {!isLoading && (data?.privileges.length ?? 0) === 0 && <div className="px-1 py-3 text-sm text-hc-muted">No effective privileges.</div>}
+              {!isLoading && (data?.privileges.length ?? 0) === 0 && <div className="px-1 py-3 text-sm text-hc-muted">{t("dashboard.noPrivileges")}</div>}
             </div>
           </div>
         </Card>

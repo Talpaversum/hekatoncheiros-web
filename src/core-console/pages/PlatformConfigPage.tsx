@@ -39,6 +39,7 @@ import { Switch } from "../../ui-kit/components/Switch";
 import { Table } from "../../ui-kit/components/Table";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 import { TabBar } from "../../ui-kit/components/TabBar";
+import { useLocalization } from "../../localization/LocalizationProvider";
 
 type IdentityTab = "users" | "tenants" | "roles";
 
@@ -54,7 +55,14 @@ function readIdentityDetailId(pathname: string, type: "users" | "tenants") {
   return decodeURIComponent(pathname.slice(marker.length).split("/")[0] ?? "") || null;
 }
 
+function translateConfigStatus(status: string, t: ReturnType<typeof useLocalization>["t"]) {
+  if (status === "active") return t("config.active");
+  if (status === "disabled") return t("config.disabled");
+  return status;
+}
+
 export function PlatformConfigPage() {
+  const { t } = useLocalization();
   const location = useLocation();
   const navigate = useNavigate();
   const section = location.pathname.split("/")[3] ?? "";
@@ -145,18 +153,18 @@ export function PlatformConfigPage() {
 
     const normalized = origin.trim();
     if (!normalized) {
-      setError("Origin is required.");
+      setError(t("platform.originRequired"));
       return;
     }
 
     if (httpOriginDetected && !allowHttp) {
-      setError("You must explicitly enable Allow HTTP for an http:// origin.");
+      setError(t("platform.httpConfirmation"));
       return;
     }
 
     try {
       await createMutation.mutateAsync({ origin: normalized, note: note.trim() || null });
-      setMessage("Trusted origin added.");
+      setMessage(t("platform.originAdded"));
       setOrigin("");
       setNote("");
       setAllowHttp(false);
@@ -175,7 +183,7 @@ export function PlatformConfigPage() {
       });
       setInstanceName(null);
       setPublicBaseUrl(null);
-      setMessage("Platform instance settings were updated.");
+      setMessage(t("platform.instanceUpdated"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -199,7 +207,7 @@ export function PlatformConfigPage() {
       setShowCreateUser(false);
       setSelectedUserId(created.id);
       navigate(`/core/platform/identity/users/${encodeURIComponent(created.id)}`);
-      setMessage("User was created.");
+      setMessage(t("platform.userCreated"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -220,7 +228,7 @@ export function PlatformConfigPage() {
       setNewTenantDomain("");
       setShowCreateTenant(false);
       navigate(`/core/platform/identity/tenants/${encodeURIComponent(created.id)}`);
-      setMessage("Tenant was created.");
+      setMessage(t("platform.tenantCreated"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -236,14 +244,14 @@ export function PlatformConfigPage() {
     };
     const definition = privilegeCatalog.find((item) => item.id === grantPrivilege);
     if (definition?.scope === "platform" && nextGrant.tenant_id) {
-      setError("Platform privilege cannot be scoped to a tenant.");
+      setError(t("platform.platformPrivilegeScope"));
       return;
     }
     const exists = selectedUser.privileges.some(
       (item) => item.privilege === nextGrant.privilege && item.tenant_id === nextGrant.tenant_id,
     );
     if (exists) {
-      setError("This privilege grant already exists.");
+      setError(t("platform.grantExists"));
       return;
     }
 
@@ -253,7 +261,7 @@ export function PlatformConfigPage() {
       await replaceUserPrivileges.mutateAsync({ id: selectedUser.id, grants: [...selectedUser.privileges, nextGrant] });
       setGrantPrivilege("");
       setGrantTenantId("");
-      setMessage("Privilege grant was added.");
+      setMessage(t("platform.grantAdded"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -267,7 +275,7 @@ export function PlatformConfigPage() {
         id: user.id,
         grants: user.privileges.filter((item) => item.privilege !== grant.privilege || item.tenant_id !== grant.tenant_id),
       });
-      setMessage("Privilege grant was removed.");
+      setMessage(t("platform.grantRemoved"));
     } catch (err) {
       setError(readErrorMessage(err));
     }
@@ -307,74 +315,74 @@ export function PlatformConfigPage() {
     <div className="space-y-4">
       <ToastNotice message={toastMessage} tone={toastTone} onDismiss={dismissToast} />
 
-      <PageHeader eyebrow="Configuration" title="Platform configuration" description="Instance-wide controls for trust, app distribution, and platform governance." />
+      <PageHeader eyebrow={t("config.configuration")} title={t("platform.title")} description={t("platform.description")} />
 
       {(section === "platform" || section === "") && <>
         <MetricStrip items={[
-          { label: "Trusted origins", value: origins.length },
-          { label: "Users", value: identityUsers.length },
-          { label: "Tenants", value: identityTenants.length },
-          { label: "Feed export", value: "On", tone: "success" },
+          { label: t("platform.trustedOrigins"), value: origins.length },
+          { label: t("platform.users"), value: identityUsers.length },
+          { label: t("platform.tenants"), value: identityTenants.length },
+          { label: t("platform.feedExport"), value: t("common.on"), tone: "success" },
         ]} />
         <Card className="mt-4 overflow-hidden p-0">
-          <SectionHeader title="Instance state" description="Stable identifiers and platform-owned capabilities." meta={<StatusBadge tone="success">active</StatusBadge>} />
+          <SectionHeader title={t("platform.instanceState")} description={t("platform.instanceStateDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
           <dl className="grid border-t border-hc-outline md:grid-cols-3">
-            <SummaryCell label="Instance" value={platformInstance?.name ?? "Core"} detail={platformInstance?.instance_id ?? "Loading..."} />
-            <SummaryCell label="Tenant mode" value="Core-owned" detail="Controlled by deployment policy" />
-            <SummaryCell label="Publish tokens" value="Planned" detail="Namespace and CI pre-approval" />
+            <SummaryCell label={t("platform.instance")} value={platformInstance?.name ?? "Core"} detail={platformInstance?.instance_id ?? t("common.loading")} />
+            <SummaryCell label={t("platform.tenantMode")} value={t("platform.coreOwned")} detail={t("platform.deploymentPolicy")} />
+            <SummaryCell label={t("platform.publishTokens")} value={t("common.planned")} detail={t("platform.namespaceApproval")} />
           </dl>
         </Card>
       </>}
 
       <div className="grid gap-4">
         {section === "instance" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Platform instance" description="Public identity used by feeds, operators, and future trust metadata." meta={<StatusBadge tone="success">active</StatusBadge>} />
+          <SectionHeader title={t("platform.platformInstance")} description={t("platform.platformInstanceDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
           <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-2">
-            <Field label="Instance name">
+            <Field label={t("platform.instanceName")}>
               <Input value={effectiveInstanceName} onChange={(event) => setInstanceName(event.target.value)} />
             </Field>
-            <Field label="Public base URL">
+            <Field label={t("platform.publicBaseUrl")}>
               <Input value={effectivePublicBaseUrl} onChange={(event) => setPublicBaseUrl(event.target.value)} placeholder="https://core.example.com" />
             </Field>
           </div>
           <div className="flex justify-end border-t border-hc-outline px-4 py-3">
             <Button onClick={() => void handleSaveInstance()} disabled={!effectiveInstanceName.trim() || updatePlatformInstance.isPending}>
-              Save instance
+              {t("platform.saveInstance")}
             </Button>
           </div>
         </Card>}
 
         {section === "trusted-origins" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Trusted install origins" description="Exact-match origin allowlist (scheme, host and port) for manifest installation." meta={<StatusBadge>{origins.length} origins</StatusBadge>} />
+          <SectionHeader title={t("platform.trustedInstallOrigins")} description={t("platform.originsDescription")} meta={<StatusBadge>{t("platform.originsCount", { count: origins.length })}</StatusBadge>} />
 
           <div className="grid gap-3 border-y border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-            <Field label="Origin">
+            <Field label={t("platform.origin")}>
               <Input placeholder="http://127.0.0.1:4010" value={origin} onChange={(e) => setOrigin(e.target.value)} />
             </Field>
-            <Field label="Note">
-              <Input placeholder="Local inventory app" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Field label={t("platform.note")}>
+              <Input placeholder={t("platform.notePlaceholder")} value={note} onChange={(e) => setNote(e.target.value)} />
             </Field>
 
             <Button onClick={() => void handleCreate()} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Adding…" : "Add origin"}
+              {t(createMutation.isPending ? "platform.adding" : "platform.addOrigin")}
             </Button>
             {httpOriginDetected && (
               <label className="flex items-center gap-2 text-sm text-hc-danger md:col-span-3">
                 <input type="checkbox" checked={allowHttp} onChange={(e) => setAllowHttp(e.target.checked)} />
-                Allow HTTP for this origin (unsecured transport)
+                {t("platform.allowHttp")}
               </label>
             )}
           </div>
 
           <div className="border-b border-hc-outline p-3">
-            <Input value={originSearch} onChange={(event) => setOriginSearch(event.target.value)} placeholder="Search origins" />
+            <Input value={originSearch} onChange={(event) => setOriginSearch(event.target.value)} placeholder={t("platform.searchOrigins")} />
           </div>
           <div>
-            {isLoading && <div className="px-4 py-6 text-sm text-hc-muted">Loading trusted origins...</div>}
-            {!isLoading && origins.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">No trusted origins.</div>}
-            {!isLoading && origins.length > 0 && filteredOrigins.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">No matching origins.</div>}
+            {isLoading && <div className="px-4 py-6 text-sm text-hc-muted">{t("platform.loadingOrigins")}</div>}
+            {!isLoading && origins.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("platform.noOrigins")}</div>}
+            {!isLoading && origins.length > 0 && filteredOrigins.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("platform.noMatchingOrigins")}</div>}
             {filteredOrigins.length > 0 && <div className="hidden grid-cols-[minmax(15rem,1.4fr)_minmax(10rem,1fr)_7rem_10rem_auto] gap-3 border-b border-hc-outline bg-hc-surface-variant/40 px-4 py-2 text-xs font-semibold uppercase text-hc-muted lg:grid">
-              <div>Origin</div><div>Note</div><div>Status</div><div>Created</div><div className="text-right">Actions</div>
+              <div>{t("platform.origin")}</div><div>{t("platform.note")}</div><div>{t("platform.status")}</div><div>{t("platform.created")}</div><div className="text-right">{t("platform.actions")}</div>
             </div>}
             {filteredOrigins.map((item) => (
               <TrustedOriginRow
@@ -390,11 +398,11 @@ export function PlatformConfigPage() {
         </Card>}
 
         {section === "app-distribution" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="App distribution governance" description="Catalog feed import/export is managed in Applications. This area owns its platform policy." meta={<StatusBadge tone="warning">partly active</StatusBadge>} />
+          <SectionHeader title={t("platform.distribution")} description={t("platform.distributionDescription")} meta={<StatusBadge tone="warning">{t("platform.partlyActive")}</StatusBadge>} />
           <div className="grid border-t border-hc-outline md:grid-cols-3 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Public feed" status="active" detail="Only admin-published installed apps are exported." />
-            <ConfigTile title="Publish requests" status="planned" detail="User/developer proposals awaiting admin approval." />
-            <ConfigTile title="Publish tokens" status="planned" detail="Admin-issued pre-approval for namespaces, apps, or CI pipelines." />
+            <ConfigTile title={t("platform.publicFeed")} status={t("common.active")} detail={t("platform.publicFeedDescription")} />
+            <ConfigTile title={t("platform.publishRequests")} status={t("common.planned")} detail={t("platform.publishRequestsDescription")} />
+            <ConfigTile title={t("platform.publishTokens")} status={t("common.planned")} detail={t("platform.publishTokensDescription")} />
           </div>
         </Card>}
 
@@ -404,9 +412,9 @@ export function PlatformConfigPage() {
           <TabBar
             active={activeIdentityTab}
             items={[
-              { id: "users", label: "Users", count: identityUsers.length },
-              { id: "tenants", label: "Tenants", count: identityTenants.length },
-              { id: "roles", label: "Roles" },
+              { id: "users", label: t("platform.users"), count: identityUsers.length },
+              { id: "tenants", label: t("platform.tenants"), count: identityTenants.length },
+              { id: "roles", label: t("platform.roles") },
             ]}
             onChange={(tab) => navigate(tab === "users" ? "/core/platform/identity" : `/core/platform/identity/${tab}`)}
           />
@@ -419,22 +427,22 @@ export function PlatformConfigPage() {
               onSave={(payload) => updateUser.mutateAsync(payload)}
               onPasswordReset={(password) => resetPassword.mutateAsync({ id: userDetail.id, password })}
               busy={updateUser.isPending || resetPassword.isPending}
-            /> : <Card><div className="text-sm text-hc-muted">User not found.</div></Card>
+            /> : <Card><div className="text-sm text-hc-muted">{t("platform.userNotFound")}</div></Card>
           ) : <Card className="overflow-hidden p-0">
             <SectionHeader
-              title="Users"
-              description="Platform identities. Open one user to edit profile fields or reset the password."
-              meta={<div className="flex items-center gap-2"><StatusBadge>{identityUsers.length} users</StatusBadge><Button size="sm" onClick={() => setShowCreateUser((value) => !value)}>Add user</Button></div>}
+              title={t("platform.users")}
+              description={t("platform.usersDescription")}
+              meta={<div className="flex items-center gap-2"><StatusBadge>{t("platform.usersCount", { count: identityUsers.length })}</StatusBadge><Button size="sm" onClick={() => setShowCreateUser((value) => !value)}>{t("platform.addUser")}</Button></div>}
             />
             {showCreateUser && <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-5">
               <Input placeholder="usr_jana" value={newUserId} onChange={(event) => setNewUserId(event.target.value)} />
               <Input placeholder="jana@example.com" value={newUserEmail} onChange={(event) => setNewUserEmail(event.target.value)} />
-              <Input placeholder="Display name" value={newUserName} onChange={(event) => setNewUserName(event.target.value)} />
-              <Input type="password" placeholder="Initial password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} />
-              <Button onClick={() => void handleCreateUser()} disabled={createUser.isPending || !newUserId.trim() || !newUserEmail.trim() || newUserPassword.length < 8}>Create user</Button>
+              <Input placeholder={t("platform.displayName")} value={newUserName} onChange={(event) => setNewUserName(event.target.value)} />
+              <Input type="password" placeholder={t("platform.initialPassword")} value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} />
+              <Button onClick={() => void handleCreateUser()} disabled={createUser.isPending || !newUserId.trim() || !newUserEmail.trim() || newUserPassword.length < 8}>{t("platform.createUser")}</Button>
             </div>}
             <div className="border-t border-hc-outline p-3">
-              <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search users" />
+              <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={t("platform.searchUsers")} />
             </div>
             <IdentityUsersTable users={filteredIdentityUsers} onOpen={(user) => navigate(`/core/platform/identity/users/${encodeURIComponent(user.id)}`)} />
           </Card>)}
@@ -446,21 +454,21 @@ export function PlatformConfigPage() {
               onBack={() => navigate("/core/platform/identity/tenants")}
               onSave={(payload) => updateTenant.mutateAsync(payload)}
               busy={updateTenant.isPending}
-            /> : <Card><div className="text-sm text-hc-muted">Tenant not found.</div></Card>
+            /> : <Card><div className="text-sm text-hc-muted">{t("platform.tenantNotFound")}</div></Card>
           ) : <Card className="overflow-hidden p-0">
             <SectionHeader
-              title="Tenants"
-              description="Tenant records and their primary domains. Open one tenant to edit it."
-              meta={<div className="flex items-center gap-2"><StatusBadge>{identityTenants.length} tenants</StatusBadge><Button size="sm" onClick={() => setShowCreateTenant((value) => !value)}>Add tenant</Button></div>}
+              title={t("platform.tenants")}
+              description={t("platform.tenantsDescription")}
+              meta={<div className="flex items-center gap-2"><StatusBadge>{t("platform.tenantsCount", { count: identityTenants.length })}</StatusBadge><Button size="sm" onClick={() => setShowCreateTenant((value) => !value)}>{t("platform.addTenant")}</Button></div>}
             />
             {showCreateTenant && <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-4">
               <Input placeholder="tnt_partner" value={newTenantId} onChange={(event) => setNewTenantId(event.target.value)} />
-              <Input placeholder="Tenant name" value={newTenantName} onChange={(event) => setNewTenantName(event.target.value)} />
+              <Input placeholder={t("tenant.name")} value={newTenantName} onChange={(event) => setNewTenantName(event.target.value)} />
               <Input placeholder="primary.example.com" value={newTenantDomain} onChange={(event) => setNewTenantDomain(event.target.value)} />
-              <Button onClick={() => void handleCreateTenant()} disabled={createTenant.isPending || !newTenantId.trim() || !newTenantName.trim()}>Create tenant</Button>
+              <Button onClick={() => void handleCreateTenant()} disabled={createTenant.isPending || !newTenantId.trim() || !newTenantName.trim()}>{t("platform.createTenant")}</Button>
             </div>}
             <div className="border-t border-hc-outline p-3">
-              <Input value={tenantSearch} onChange={(event) => setTenantSearch(event.target.value)} placeholder="Search tenants" />
+              <Input value={tenantSearch} onChange={(event) => setTenantSearch(event.target.value)} placeholder={t("platform.searchTenants")} />
             </div>
             <IdentityTenantsTable tenants={filteredIdentityTenants} onOpen={(tenant) => navigate(`/core/platform/identity/tenants/${encodeURIComponent(tenant.id)}`)} />
           </Card>)}
@@ -468,41 +476,41 @@ export function PlatformConfigPage() {
           {activeIdentityTab === "roles" && <Card className="overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div>
-                <div className="text-sm font-semibold">RBAC grants</div>
-                <div className="mt-1 text-xs text-hc-muted">Assign platform-scoped and tenant-scoped privileges directly to users.</div>
+                <div className="text-sm font-semibold">{t("platform.rbacGrants")}</div>
+                <div className="mt-1 text-xs text-hc-muted">{t("platform.rbacDescription")}</div>
               </div>
-              <StatusBadge>{selectedUser?.privileges.length ?? 0} assigned</StatusBadge>
+              <StatusBadge>{t("common.assigned", { count: selectedUser?.privileges.length ?? 0 })}</StatusBadge>
             </div>
             <div className="grid gap-3 border-y border-hc-outline bg-hc-surface-variant/40 px-4 py-3 md:grid-cols-[minmax(12rem,1fr)_minmax(12rem,1fr)_minmax(12rem,1fr)_auto] md:items-end">
-              <Field label="User">
+              <Field label={t("tenant.user")}>
                 <Select value={selectedUser?.id ?? ""} onChange={(event) => setSelectedUserId(event.target.value)}>
                   {identityUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
                 </Select>
               </Field>
-              <Field label="Privilege">
+              <Field label={t("platform.privilege")}>
                 <Select value={grantPrivilege} onChange={(event) => setGrantPrivilege(event.target.value)}>
-                  <option value="">Select privilege</option>
+                  <option value="">{t("platform.selectPrivilege")}</option>
                   {privilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
                 </Select>
               </Field>
-              <Field label="Scope">
+              <Field label={t("platform.scope")}>
                 <Select value={grantTenantId} onChange={(event) => setGrantTenantId(event.target.value)}>
-                  <option value="">Platform / all tenants</option>
+                  <option value="">{t("platform.allTenants")}</option>
                   {identityTenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
                 </Select>
               </Field>
               <Button className="whitespace-nowrap" onClick={() => void handleAddGrant()} disabled={!selectedUser || !grantPrivilege || replaceUserPrivileges.isPending}>
-                Add grant
+                {t("platform.addGrant")}
               </Button>
             </div>
             {selectedUser && (
               <div>
                 <div className="hidden grid-cols-[minmax(14rem,1.4fr)_minmax(10rem,1fr)_auto] gap-4 border-b border-hc-outline px-4 py-2 text-xs font-semibold uppercase text-hc-muted md:grid">
-                  <div>Privilege</div>
-                  <div>Scope</div>
-                  <div className="w-16 text-right">Action</div>
+                  <div>{t("platform.privilege")}</div>
+                  <div>{t("platform.scope")}</div>
+                  <div className="w-16 text-right">{t("platform.action")}</div>
                 </div>
-                {selectedUser.privileges.length === 0 && <div className="px-4 py-6 text-center text-sm text-hc-muted">Selected user has no grants.</div>}
+                {selectedUser.privileges.length === 0 && <div className="px-4 py-6 text-center text-sm text-hc-muted">{t("platform.noGrants")}</div>}
                 {selectedUser.privileges.map((grant) => (
                   <PrivilegeGrantRow
                     key={`${grant.privilege}:${grant.tenant_id ?? "platform"}`}
@@ -519,11 +527,11 @@ export function PlatformConfigPage() {
         </div>}
 
         {section === "automation" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Automation" description="Scheduled feed sync and controlled runtime actions belong here." meta={<StatusBadge tone="success">active</StatusBadge>} />
+          <SectionHeader title={t("platform.automation")} description={t("platform.automationDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
           <div className="grid border-t border-hc-outline md:grid-cols-3 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Trusted feed refresh" status="active" detail="Opt-in refresh for verified and official catalog sources." />
-            <ConfigTile title="Compose runtime manager" status="active" detail="Start, stop, update, and rotate credentials for managed app bundles." />
-            <ConfigTile title="Policy audit" status="active" detail="Automatic feed and runtime decisions are recorded in the audit log." />
+            <ConfigTile title={t("platform.trustedFeedRefresh")} status={t("common.active")} detail={t("platform.trustedFeedRefreshDescription")} />
+            <ConfigTile title={t("platform.runtimeManager")} status={t("common.active")} detail={t("platform.runtimeManagerDescription")} />
+            <ConfigTile title={t("platform.policyAudit")} status={t("common.active")} detail={t("platform.policyAuditDescription")} />
           </div>
         </Card>}
       </div>
@@ -554,18 +562,19 @@ function SummaryCell({ label, value, detail }: { label: string; value: string; d
 }
 
 function IdentityUsersTable({ users, onOpen }: { users: IdentityUser[]; onOpen: (user: IdentityUser) => void }) {
-  if (users.length === 0) return <div className="border-t border-hc-outline px-4 py-8 text-center text-sm text-hc-muted">No users found.</div>;
+  const { t } = useLocalization();
+  if (users.length === 0) return <div className="border-t border-hc-outline px-4 py-8 text-center text-sm text-hc-muted">{t("platform.noUsers")}</div>;
 
   return (
     <Table className="rounded-none border-0 border-t shadow-none">
-      <thead><tr><th>Identity</th><th>User ID</th><th>Grants</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+      <thead><tr><th>{t("platform.identity")}</th><th>{t("platform.userId")}</th><th>{t("platform.grants")}</th><th>{t("platform.status")}</th><th className="text-right">{t("platform.action")}</th></tr></thead>
       <tbody>{users.map((user) => (
         <tr key={user.id}>
           <td><div className="font-medium">{user.display_name || user.email}</div><div className="text-xs text-hc-muted">{user.email}</div></td>
           <td className="font-mono text-xs">{user.id}</td>
           <td>{user.privileges.length}</td>
-          <td><StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{user.status}</StatusBadge></td>
-          <td className="text-right"><Button size="sm" variant="ghost" onClick={() => onOpen(user)}>Open</Button></td>
+          <td><StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{translateConfigStatus(user.status, t)}</StatusBadge></td>
+          <td className="text-right"><Button size="sm" variant="ghost" onClick={() => onOpen(user)}>{t("common.open")}</Button></td>
         </tr>
       ))}</tbody>
     </Table>
@@ -579,6 +588,7 @@ function IdentityUserDetail({ user, onBack, onSave, onPasswordReset, busy }: {
   onPasswordReset: (password: string) => Promise<unknown>;
   busy: boolean;
 }) {
+  const { t } = useLocalization();
   const [email, setEmail] = useState(user.email);
   const [displayName, setDisplayName] = useState(user.display_name ?? "");
   const [status, setStatus] = useState(user.status);
@@ -586,17 +596,17 @@ function IdentityUserDetail({ user, onBack, onSave, onPasswordReset, busy }: {
 
   return (
     <Card className="overflow-hidden p-0">
-      <SectionHeader title={user.display_name || user.email} description={`${user.email} · ${user.id}`} meta={<div className="flex items-center gap-2"><StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{user.status}</StatusBadge><Button size="sm" variant="outlined" onClick={onBack}>Back to users</Button></div>} />
+      <SectionHeader title={user.display_name || user.email} description={`${user.email} · ${user.id}`} meta={<div className="flex items-center gap-2"><StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{translateConfigStatus(user.status, t)}</StatusBadge><Button size="sm" variant="outlined" onClick={onBack}>{t("platform.backUsers")}</Button></div>} />
       <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
-        <Field label="Email"><Input value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
-        <Field label="Display name"><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" /></Field>
-        <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">active</option><option value="disabled">disabled</option></Select></Field>
+        <Field label={t("platform.email")}><Input value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+        <Field label={t("platform.displayName")}><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={t("platform.displayName")} /></Field>
+        <Field label={t("platform.status")}><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">{t("config.active")}</option><option value="disabled">{t("config.disabled")}</option></Select></Field>
       </div>
       <div className="flex justify-end border-t border-hc-outline px-4 py-3">
-        <Button onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, status })} disabled={busy || !email.trim()}>Save user</Button>
+        <Button onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, status })} disabled={busy || !email.trim()}>{t("platform.saveUser")}</Button>
       </div>
       <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/30 p-4 md:grid-cols-[1fr_auto] md:items-end">
-        <Field label="New password" hint="At least eight characters"><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
+        <Field label={t("platform.newPassword")} hint={t("platform.passwordHint")}><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
         <Button
           variant="outlined"
           onClick={() => {
@@ -604,27 +614,28 @@ function IdentityUserDetail({ user, onBack, onSave, onPasswordReset, busy }: {
           }}
           disabled={busy || password.length < 8}
         >
-          Reset password
+          {t("platform.resetPassword")}
         </Button>
       </div>
-      <div className="border-t border-hc-outline px-4 py-3 text-xs text-hc-muted">Created {new Date(user.created_at).toLocaleString()} · {user.privileges.length} privilege grants</div>
+      <div className="border-t border-hc-outline px-4 py-3 text-xs text-hc-muted">{t("platform.createdGrants", { date: new Date(user.created_at).toLocaleString(), count: user.privileges.length })}</div>
     </Card>
   );
 }
 
 function IdentityTenantsTable({ tenants, onOpen }: { tenants: IdentityTenant[]; onOpen: (tenant: IdentityTenant) => void }) {
-  if (tenants.length === 0) return <div className="border-t border-hc-outline px-4 py-8 text-center text-sm text-hc-muted">No tenants found.</div>;
+  const { t } = useLocalization();
+  if (tenants.length === 0) return <div className="border-t border-hc-outline px-4 py-8 text-center text-sm text-hc-muted">{t("platform.noTenants")}</div>;
 
   return (
     <Table className="rounded-none border-0 border-t shadow-none">
-      <thead><tr><th>Tenant</th><th>Tenant ID</th><th>Primary domain</th><th>Status</th><th className="text-right">Action</th></tr></thead>
+      <thead><tr><th>{t("platform.tenant")}</th><th>{t("platform.tenantId")}</th><th>{t("platform.primaryDomain")}</th><th>{t("platform.status")}</th><th className="text-right">{t("platform.action")}</th></tr></thead>
       <tbody>{tenants.map((tenant) => (
         <tr key={tenant.id}>
           <td className="font-medium">{tenant.name}</td>
           <td className="font-mono text-xs">{tenant.id}</td>
-          <td>{tenant.primary_domain ?? <span className="text-hc-muted">none</span>}</td>
-          <td><StatusBadge tone={tenant.status === "active" ? "success" : "neutral"}>{tenant.status}</StatusBadge></td>
-          <td className="text-right"><Button size="sm" variant="ghost" onClick={() => onOpen(tenant)}>Open</Button></td>
+          <td>{tenant.primary_domain ?? <span className="text-hc-muted">{t("common.none")}</span>}</td>
+          <td><StatusBadge tone={tenant.status === "active" ? "success" : "neutral"}>{translateConfigStatus(tenant.status, t)}</StatusBadge></td>
+          <td className="text-right"><Button size="sm" variant="ghost" onClick={() => onOpen(tenant)}>{t("common.open")}</Button></td>
         </tr>
       ))}</tbody>
     </Table>
@@ -637,22 +648,23 @@ function IdentityTenantDetail({ tenant, onBack, onSave, busy }: {
   onSave: (payload: { id: string; name?: string; primary_domain?: string | null; status?: string }) => Promise<unknown>;
   busy: boolean;
 }) {
+  const { t } = useLocalization();
   const [name, setName] = useState(tenant.name);
   const [primaryDomain, setPrimaryDomain] = useState(tenant.primary_domain ?? "");
   const [status, setStatus] = useState(tenant.status);
 
   return (
     <Card className="overflow-hidden p-0">
-      <SectionHeader title={tenant.name} description={tenant.id} meta={<div className="flex items-center gap-2"><StatusBadge tone={tenant.status === "active" ? "success" : "neutral"}>{tenant.status}</StatusBadge><Button size="sm" variant="outlined" onClick={onBack}>Back to tenants</Button></div>} />
+      <SectionHeader title={tenant.name} description={tenant.id} meta={<div className="flex items-center gap-2"><StatusBadge tone={tenant.status === "active" ? "success" : "neutral"}>{translateConfigStatus(tenant.status, t)}</StatusBadge><Button size="sm" variant="outlined" onClick={onBack}>{t("platform.backTenants")}</Button></div>} />
       <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
-        <Field label="Tenant name"><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
-        <Field label="Primary domain"><Input value={primaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder="Primary domain" /></Field>
-        <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">active</option><option value="disabled">disabled</option></Select></Field>
+        <Field label={t("tenant.name")}><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
+        <Field label={t("platform.primaryDomain")}><Input value={primaryDomain} onChange={(event) => setPrimaryDomain(event.target.value)} placeholder={t("platform.primaryDomain")} /></Field>
+        <Field label={t("platform.status")}><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">{t("config.active")}</option><option value="disabled">{t("config.disabled")}</option></Select></Field>
       </div>
       <div className="flex justify-end border-t border-hc-outline px-4 py-3">
-        <Button onClick={() => void onSave({ id: tenant.id, name: name.trim(), primary_domain: primaryDomain.trim() || null, status })} disabled={busy || !name.trim()}>Save tenant</Button>
+        <Button onClick={() => void onSave({ id: tenant.id, name: name.trim(), primary_domain: primaryDomain.trim() || null, status })} disabled={busy || !name.trim()}>{t("platform.saveTenant")}</Button>
       </div>
-      <div className="border-t border-hc-outline px-4 py-3 text-xs text-hc-muted">Created {new Date(tenant.created_at).toLocaleString()} · Updated {new Date(tenant.updated_at).toLocaleString()}</div>
+      <div className="border-t border-hc-outline px-4 py-3 text-xs text-hc-muted">{t("platform.createdUpdated", { created: new Date(tenant.created_at).toLocaleString(), updated: new Date(tenant.updated_at).toLocaleString() })}</div>
     </Card>
   );
 }
@@ -670,20 +682,21 @@ function PrivilegeGrantRow({
   onRemove: () => void;
   busy: boolean;
 }) {
+  const { t } = useLocalization();
   const definition = catalog.find((item) => item.id === grant.privilege);
   const tenant = tenants.find((item) => item.id === grant.tenant_id);
 
   return (
     <div className="grid gap-2 border-b border-hc-outline px-4 py-2.5 last:border-b-0 md:grid-cols-[minmax(14rem,1.4fr)_minmax(10rem,1fr)_auto] md:items-center md:gap-4">
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold">{definition?.label ?? "Custom privilege"}</div>
+        <div className="truncate text-sm font-semibold">{definition?.label ?? t("platform.customPrivilege")}</div>
         <div className="truncate font-mono text-xs text-hc-muted">{grant.privilege}</div>
       </div>
       <div>
-        <div className="text-sm">{tenant?.name ?? grant.tenant_id ?? "Platform"}</div>
-        <div className="text-xs text-hc-muted">{grant.tenant_id ? "Tenant" : "All tenants"}</div>
+        <div className="text-sm">{tenant?.name ?? grant.tenant_id ?? t("platform.platform")}</div>
+        <div className="text-xs text-hc-muted">{t(grant.tenant_id ? "platform.tenant" : "platform.allTenantsLabel")}</div>
       </div>
-      <Button className="justify-self-start px-2 py-1 text-xs md:w-16 md:justify-self-end" variant="ghost" onClick={onRemove} disabled={busy}>Remove</Button>
+      <Button className="justify-self-start px-2 py-1 text-xs md:w-16 md:justify-self-end" variant="ghost" onClick={onRemove} disabled={busy}>{t("platform.remove")}</Button>
     </div>
   );
 }
@@ -701,6 +714,7 @@ function TrustedOriginRow({
   onSaveNote: (nextNote: string) => void;
   busy: boolean;
 }) {
+  const { t } = useLocalization();
   const [editingNote, setEditingNote] = useState(item.note ?? "");
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -709,30 +723,30 @@ function TrustedOriginRow({
     <div className="border-b border-hc-outline last:border-b-0">
       <div className="grid gap-2 px-4 py-2.5 lg:grid-cols-[minmax(15rem,1.4fr)_minmax(10rem,1fr)_7rem_10rem_auto] lg:items-center lg:gap-3">
         <div className="min-w-0 truncate text-sm font-medium" title={item.origin}>{item.origin}</div>
-        <div className="min-w-0 truncate text-xs text-hc-muted" title={item.note ?? ""}>{item.note ?? "No note"}</div>
-        <StatusBadge tone={item.is_enabled ? "success" : "neutral"}>{item.is_enabled ? "enabled" : "disabled"}</StatusBadge>
+        <div className="min-w-0 truncate text-xs text-hc-muted" title={item.note ?? ""}>{item.note ?? t("platform.noNote")}</div>
+        <StatusBadge tone={item.is_enabled ? "success" : "neutral"}>{t(item.is_enabled ? "common.on" : "common.off")}</StatusBadge>
         <div className="text-xs text-hc-muted">{new Date(item.created_at).toLocaleDateString()}</div>
         <div className="flex items-center gap-2 lg:justify-end">
-          <Switch checked={item.is_enabled} onClick={onToggle} disabled={busy} aria-label={`${item.is_enabled ? "Disable" : "Enable"} ${item.origin}`} />
-          <Button size="sm" variant="ghost" onClick={() => setEditing((value) => !value)} disabled={busy}>Edit</Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete((prev) => !prev)} disabled={busy}>Delete</Button>
+          <Switch checked={item.is_enabled} onClick={onToggle} disabled={busy} aria-label={`${t(item.is_enabled ? "common.disable" : "common.enable")} ${item.origin}`} />
+          <Button size="sm" variant="ghost" onClick={() => setEditing((value) => !value)} disabled={busy}>{t("platform.edit")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete((prev) => !prev)} disabled={busy}>{t("platform.delete")}</Button>
         </div>
       </div>
 
       {editing && <div className="grid gap-2 border-t border-hc-outline bg-hc-surface-variant/30 px-4 py-3 md:grid-cols-[1fr_auto]">
-        <Input value={editingNote} onChange={(e) => setEditingNote(e.target.value)} placeholder="Note" />
-        <Button size="sm" variant="tonal" onClick={() => { onSaveNote(editingNote); setEditing(false); }} disabled={busy}>Save note</Button>
+        <Input value={editingNote} onChange={(e) => setEditingNote(e.target.value)} placeholder={t("platform.note")} />
+        <Button size="sm" variant="tonal" onClick={() => { onSaveNote(editingNote); setEditing(false); }} disabled={busy}>{t("platform.saveNote")}</Button>
       </div>}
 
       {confirmDelete && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hc-danger/30 bg-hc-danger/10 px-4 py-3">
-          <div className="text-sm text-hc-danger">Delete this trusted origin?</div>
+          <div className="text-sm text-hc-danger">{t("platform.deleteOrigin")}</div>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)} disabled={busy}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button size="sm" variant="danger" onClick={onDelete} disabled={busy}>
-              Confirm delete
+              {t("platform.confirmDelete")}
             </Button>
           </div>
         </div>

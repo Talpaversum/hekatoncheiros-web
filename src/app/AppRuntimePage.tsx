@@ -117,7 +117,7 @@ export function AppRuntimePage() {
         appContext.entitlement = entitlementResponse;
 
         if (!pluginResponse.ok) {
-          throw new Error(`Plugin module fetch failed: ${pluginResponse.status}`);
+          throw new Error(t("runtime.pluginFetchFailed", { status: pluginResponse.status }));
         }
 
         const pluginSource = await pluginResponse.text();
@@ -135,12 +135,12 @@ export function AppRuntimePage() {
         URL.revokeObjectURL(blobUrl);
 
         if (typeof mod.register !== "function") {
-          throw new Error("Plugin module must export register(appContext)");
+          throw new Error(t("runtime.pluginExportMissing"));
         }
 
         const registration = mod.register(appContext);
         if (!registration || !Array.isArray(registration.routes)) {
-          throw new Error("Plugin register(appContext) must return { routes: [] }");
+          throw new Error(t("runtime.pluginRoutesInvalid"));
         }
 
         if (!cancelled) {
@@ -149,7 +149,7 @@ export function AppRuntimePage() {
       } catch (error) {
         if (!cancelled) {
           setPlugin(null);
-          setPluginError(error instanceof Error ? error.message : "Failed to load plugin");
+          setPluginError(error instanceof Error ? error.message : t("runtime.failedLoad"));
         }
       } finally {
         if (!cancelled) {
@@ -163,7 +163,7 @@ export function AppRuntimePage() {
     return () => {
       cancelled = true;
     };
-  }, [appEntry, context?.privileges, locale]);
+  }, [appEntry, context?.privileges, locale, t]);
 
   if (!slug) {
     return <div className="text-sm text-hc-danger">{t("runtime.missingSlug")}</div>;
