@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { hasPrivilege } from "../../access/privileges";
 import { useAppCatalogQuery } from "../../data/api/app-catalog";
+import { useAuditEventsQuery } from "../../data/api/audit";
 import { useContextQuery } from "../../data/api/context";
 import { useTenantUsersQuery } from "../../data/api/identity";
 import { useInstalledAppsQuery } from "../../data/api/installed-apps";
@@ -16,6 +18,7 @@ type Widget = {
   description: string;
   status: "available" | "planned";
   tone?: "neutral" | "success" | "warning" | "danger" | "info";
+  href?: string;
 };
 
 export function DashboardPage() {
@@ -23,9 +26,13 @@ export function DashboardPage() {
   const privileges = data?.privileges ?? [];
   const canManageApps = hasPrivilege(privileges, "platform.apps.manage");
   const canManageTenant = hasPrivilege(privileges, "tenant.config.manage");
+  const canReadAudit = ["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read"].some((privilege) => hasPrivilege(privileges, privilege));
+  const [auditFrom] = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  const [auditTo] = useState(() => new Date().toISOString());
   const { data: catalogData } = useAppCatalogQuery(canManageApps);
   const { data: installedData } = useInstalledAppsQuery(canManageApps);
   const { data: tenantUsersData } = useTenantUsersQuery(canManageTenant);
+  const { data: auditData, isLoading: isAuditLoading } = useAuditEventsQuery(`from=${encodeURIComponent(auditFrom)}&to=${encodeURIComponent(auditTo)}&limit=50`, canReadAudit);
   const { t } = useLocalization();
 
   const catalog = catalogData?.items ?? [];
@@ -42,7 +49,7 @@ export function DashboardPage() {
     { id: "license-required", label: t("dashboard.appsRequiringLicense"), value: canManageApps ? appsRequiringLicense : "-", description: t("dashboard.appsRequiringLicenseDescription"), status: "available", tone: appsRequiringLicense > 0 ? "warning" : "neutral" },
     { id: "updates", label: t("dashboard.availableUpdates"), value: canManageApps ? availableUpdates : "-", description: t("dashboard.availableUpdatesDescription"), status: "available", tone: availableUpdates > 0 ? "warning" : "neutral" },
     { id: "users", label: t("dashboard.tenantUsers"), value: canManageTenant ? tenantUsersData?.items.length ?? 0 : "-", description: t("dashboard.tenantUsersDescription"), status: "available" },
-    { id: "audit", label: t("dashboard.recentAuditEvents"), value: "-", description: t("dashboard.recentAuditEventsDescription"), status: "planned" },
+    ...(canReadAudit ? [{ id: "audit", label: t("dashboard.recentAuditEvents"), value: isAuditLoading ? "…" : auditData?.next_cursor ? "50+" : auditData?.items.length ?? 0, description: t("dashboard.recentAuditEventsDescription"), status: "available" as const, tone: auditData?.items.some((event) => event.severity === "error" || event.severity === "critical") ? "warning" as const : "info" as const, href: "/core/audit?from=now-1d&to=now" }] : []),
     { id: "jobs", label: t("dashboard.failedJobs"), value: "-", description: t("dashboard.failedJobsDescription"), status: "planned" },
     { id: "health", label: t("dashboard.systemHealth"), value: "-", description: t("dashboard.systemHealthDescription"), status: "planned" },
     { id: "expiring", label: t("dashboard.expiringLicenses"), value: "-", description: t("dashboard.expiringLicensesDescription"), status: "planned" },
@@ -96,8 +103,8 @@ export function DashboardPage() {
 }
 
 function DashboardWidget({ widget, liveLabel, plannedLabel }: { widget: Widget; liveLabel: string; plannedLabel: string }) {
-  return (
-    <Card className="flex min-h-32 flex-col justify-between gap-4 p-4">
+  const content = (
+    <Card className={`flex min-h-32 flex-col justify-between gap-4 p-4 ${widget.href ? "transition hover:border-hc-primary hover:bg-hc-surface-variant/30" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="text-sm font-medium">{widget.label}</div>
         <StatusBadge tone={widget.status === "planned" ? "neutral" : widget.tone ?? "info"}>
@@ -110,6 +117,7 @@ function DashboardWidget({ widget, liveLabel, plannedLabel }: { widget: Widget; 
       </div>
     </Card>
   );
+  return widget.href ? <Link to={widget.href} className="rounded-hc-md focus:outline-none focus:ring-2 focus:ring-hc-primary/40">{content}</Link> : content;
 }
 
 function ContextItem({ label, value, detail }: { label: string; value: string; detail?: string | null }) {

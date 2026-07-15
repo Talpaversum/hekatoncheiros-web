@@ -62,7 +62,7 @@ export const en = {
   "dashboard.appsRequiringLicense": "Apps requiring license", "dashboard.appsRequiringLicenseDescription": "Catalog applications that declare a license requirement.",
   "dashboard.availableUpdates": "Available app updates", "dashboard.availableUpdatesDescription": "Runtime or catalog update signals requiring review.",
   "dashboard.tenantUsers": "Tenant users", "dashboard.tenantUsersDescription": "Users with access to the current tenant.",
-  "dashboard.recentAuditEvents": "Recent audit events", "dashboard.recentAuditEventsDescription": "Waiting for the tenant audit query API.",
+  "dashboard.recentAuditEvents": "Recent audit events", "dashboard.recentAuditEventsDescription": "Events visible to you during the last 24 hours.",
   "dashboard.failedJobs": "Failed jobs", "dashboard.failedJobsDescription": "Waiting for a shared background job API.",
   "dashboard.systemHealth": "System health", "dashboard.systemHealthDescription": "Waiting for aggregated service health data.",
   "dashboard.expiringLicenses": "Expiring licenses", "dashboard.expiringLicensesDescription": "Waiting for an unfiltered tenant license summary.",

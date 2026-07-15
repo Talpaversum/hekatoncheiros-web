@@ -63,7 +63,7 @@ export const cs: Record<MessageKey, string> = {
   "dashboard.appsRequiringLicense": "Aplikace vyžadující licenci", "dashboard.appsRequiringLicenseDescription": "Aplikace katalogu s deklarovaným požadavkem na licenci.",
   "dashboard.availableUpdates": "Dostupné aktualizace aplikací", "dashboard.availableUpdatesDescription": "Signály běhu nebo katalogu vyžadující kontrolu.",
   "dashboard.tenantUsers": "Uživatelé tenantu", "dashboard.tenantUsersDescription": "Uživatelé s přístupem k aktuálnímu tenantu.",
-  "dashboard.recentAuditEvents": "Nedávné auditní události", "dashboard.recentAuditEventsDescription": "Čeká na API pro dotazy nad auditem tenantu.",
+  "dashboard.recentAuditEvents": "Nedávné auditní události", "dashboard.recentAuditEventsDescription": "Události, které máte přístupné za posledních 24 hodin.",
   "dashboard.failedJobs": "Neúspěšné úlohy", "dashboard.failedJobsDescription": "Čeká na společné API úloh na pozadí.",
   "dashboard.systemHealth": "Stav systému", "dashboard.systemHealthDescription": "Čeká na agregovaná data o stavu služeb.",
   "dashboard.expiringLicenses": "Končící licence", "dashboard.expiringLicensesDescription": "Čeká na nefiltrovaný souhrn licencí tenantu.",
