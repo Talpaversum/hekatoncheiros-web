@@ -146,16 +146,10 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                     <div className="rounded-hc-sm px-3 py-2 text-xs text-hc-muted">{t("common.noApps")}</div>
                   )}
 
-                  {appGroups.map((app) => (
-                    <NavLink
-                      key={app.slug}
-                      to={`/app/${app.slug}`}
-                      onClick={() => setAppsOpen(false)}
-                      className="block rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"
-                    >
-                      {app.app_name ?? app.slug}
-                    </NavLink>
-                  ))}
+                  {appGroups.map((app) => {
+                    const available = app.runtime.status === "healthy" || app.runtime.status === "degraded";
+                    return available ? <NavLink key={app.slug} to={`/app/${app.slug}`} onClick={() => setAppsOpen(false)} className="flex items-center justify-between rounded-hc-sm px-3 py-2 text-sm text-hc-text hover:bg-hc-surface-variant"><span>{app.app_name ?? app.slug}</span><span className="text-xs text-hc-muted">{t(`runtime.status.${app.runtime.status}`)}</span></NavLink> : <div key={app.slug} title={t("runtime.unavailable")} className="flex cursor-not-allowed items-center justify-between rounded-hc-sm px-3 py-2 text-sm text-hc-muted opacity-70"><span>{app.app_name ?? app.slug}</span><span className="text-xs">{t(`runtime.status.${app.runtime.status}`)}</span></div>;
+                  })}
                 </div>
               </Menu>
             </div>

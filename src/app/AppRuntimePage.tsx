@@ -81,7 +81,7 @@ export function AppRuntimePage() {
   );
 
   useEffect(() => {
-    if (!appEntry) {
+    if (!appEntry || (appEntry.runtime.status !== "healthy" && appEntry.runtime.status !== "degraded")) {
       setPlugin(null);
       return;
     }
@@ -175,6 +175,10 @@ export function AppRuntimePage() {
 
   if (!appEntry) {
     return <div className="text-sm text-hc-danger">{t("runtime.notFound", { slug })}</div>;
+  }
+
+  if (appEntry.runtime.status !== "healthy" && appEntry.runtime.status !== "degraded") {
+    return <div className="rounded-hc-md border border-hc-warning/30 bg-hc-warning/10 p-6"><h1 className="text-lg font-semibold">{appEntry.app_name ?? appEntry.slug}</h1><p className="mt-2 text-sm text-hc-muted">{t("runtime.unavailable")}</p><div className="mt-3 text-xs uppercase text-hc-warning">{t(`runtime.status.${appEntry.runtime.status}`)}</div></div>;
   }
 
   if (pluginError) {

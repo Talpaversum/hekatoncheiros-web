@@ -91,6 +91,9 @@ export function PlatformConfigPage() {
   const [originSearch, setOriginSearch] = useState("");
   const [instanceName, setInstanceName] = useState<string | null>(null);
   const [publicBaseUrl, setPublicBaseUrl] = useState<string | null>(null);
+  const [healthInterval, setHealthInterval] = useState<number | null>(null);
+  const [healthTimeout, setHealthTimeout] = useState<number | null>(null);
+  const [healthFailures, setHealthFailures] = useState<number | null>(null);
   const [newUserId, setNewUserId] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
@@ -114,6 +117,9 @@ export function PlatformConfigPage() {
   const privilegeCatalog = privilegeCatalogData?.items ?? [];
   const effectiveInstanceName = instanceName ?? platformInstance?.name ?? "";
   const effectivePublicBaseUrl = publicBaseUrl ?? platformInstance?.public_base_url ?? "";
+  const effectiveHealthInterval = healthInterval ?? platformInstance?.runtime_health_interval_ms ?? 5000;
+  const effectiveHealthTimeout = healthTimeout ?? platformInstance?.runtime_health_timeout_ms ?? 1500;
+  const effectiveHealthFailures = healthFailures ?? platformInstance?.runtime_health_failure_threshold ?? 2;
   const selectedUser = identityUsers.find((item) => item.id === selectedUserId) ?? identityUsers[0];
   const userDetail = identityUsers.find((item) => item.id === userDetailId) ?? null;
   const tenantDetail = identityTenants.find((item) => item.id === tenantDetailId) ?? null;
@@ -180,9 +186,13 @@ export function PlatformConfigPage() {
       await updatePlatformInstance.mutateAsync({
         name: effectiveInstanceName.trim(),
         public_base_url: effectivePublicBaseUrl.trim() || null,
+        runtime_health_interval_ms: effectiveHealthInterval,
+        runtime_health_timeout_ms: effectiveHealthTimeout,
+        runtime_health_failure_threshold: effectiveHealthFailures,
       });
       setInstanceName(null);
       setPublicBaseUrl(null);
+      setHealthInterval(null); setHealthTimeout(null); setHealthFailures(null);
       setMessage(t("platform.instanceUpdated"));
     } catch (err) {
       setError(readErrorMessage(err));
@@ -344,6 +354,9 @@ export function PlatformConfigPage() {
             <Field label={t("platform.publicBaseUrl")}>
               <Input value={effectivePublicBaseUrl} onChange={(event) => setPublicBaseUrl(event.target.value)} placeholder="https://core.example.com" />
             </Field>
+            <Field label={t("platform.healthInterval")}><Input type="number" min={1000} max={300000} value={effectiveHealthInterval} onChange={(event) => setHealthInterval(Number(event.target.value))} /></Field>
+            <Field label={t("platform.healthTimeout")}><Input type="number" min={100} max={30000} value={effectiveHealthTimeout} onChange={(event) => setHealthTimeout(Number(event.target.value))} /></Field>
+            <Field label={t("platform.healthFailures")}><Input type="number" min={1} max={10} value={effectiveHealthFailures} onChange={(event) => setHealthFailures(Number(event.target.value))} /></Field>
           </div>
           <div className="flex justify-end border-t border-hc-outline px-4 py-3">
             <Button onClick={() => void handleSaveInstance()} disabled={!effectiveInstanceName.trim() || updatePlatformInstance.isPending}>

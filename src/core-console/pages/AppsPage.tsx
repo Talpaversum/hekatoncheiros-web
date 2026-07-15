@@ -821,7 +821,6 @@ export function AppsPage() {
           <div className="border-b border-hc-outline p-3"><Input value={installedSearch} onChange={(event) => setInstalledSearch(event.target.value)} placeholder={t("apps.searchInstalled")} /></div>
           <InstalledTable
             apps={filteredInstalled}
-            registrySlugs={registrySlugs}
             isLoading={installedLoading}
             onLicense={(appId) => {
               navigate(`/core/licensing?app=${encodeURIComponent(appId)}`);
@@ -1184,6 +1183,7 @@ function InstalledAppDetail({
   const status = getInstalledStatus(app, registrySlugs, t);
   const localization = readAppLocalization(app);
   const effectiveLocale = localization.supportedLocales.includes(locale) ? locale : localization.defaultLocale;
+  const runtimeTone = app.runtime_health.status === "healthy" ? "good" : app.runtime_health.status === "degraded" ? "warn" : "danger";
 
   return (
     <Card className="overflow-hidden p-0">
@@ -1193,11 +1193,12 @@ function InstalledAppDetail({
         {app.app_version && <Badge>{app.app_version}</Badge>}
         {app.update_signal && <Badge tone="warn">{t("apps.updateSignal")}</Badge>}
         {app.catalog_update?.state === "available" && <Badge tone="warn">{t("apps.catalogUpdateAvailable")}</Badge>}
-        {app.managed_runtime && <Badge tone="good">{t("apps.managedRuntime")}</Badge>}
+        {app.managed_runtime && <Badge>{t("apps.managedRuntime")}</Badge>}
+        <Badge tone={runtimeTone}>{t(`runtime.status.${app.runtime_health.status}`)}</Badge>
         <Badge tone={effectiveLocale === locale ? "good" : "neutral"}>{getLocaleLabel(effectiveLocale)}</Badge>
       </div>
       <dl className="grid border-t border-hc-outline md:grid-cols-2">
-        <DetailCell label={t("apps.runtime")} value={status.detail ?? status.label} />
+        <DetailCell label={t("apps.runtime")} value={t(`runtime.status.${app.runtime_health.status}`)} />
         <DetailCell label={t("apps.runtimeOwner")} value={app.managed_runtime ? `${app.managed_runtime.compose_project} / ${app.managed_runtime.service_name}` : t("apps.external")} />
         <DetailCell label={t("apps.entitlement")} value={app.resolved_entitlement ? t("apps.validTo", { tier: app.resolved_entitlement.tier, date: formatDate(app.resolved_entitlement.valid_to) }) : t("apps.noActiveEntitlement")} />
         <DetailCell label={t("apps.languages")} value={localization.supportedLocales.map(getLocaleLabel).join(", ")} />
@@ -1226,13 +1227,11 @@ function InstalledAppDetail({
 
 function InstalledTable({
   apps,
-  registrySlugs,
   isLoading,
   onLicense,
   onOpen,
 }: {
   apps: InstalledApp[];
-  registrySlugs: Set<string>;
   isLoading: boolean;
   onLicense: (appId: string) => void;
   onOpen: (app: InstalledApp) => void;
@@ -1259,15 +1258,16 @@ function InstalledTable({
       </thead>
       <tbody>
         {apps.map((app) => {
-          const status = getInstalledStatus(app, registrySlugs, t);
+          const runtimeTone = app.runtime_health.status === "healthy" ? "good" : app.runtime_health.status === "degraded" ? "warn" : "danger";
           return (
             <tr key={app.app_id}>
               <td>
                 <div className="font-medium">{pickAppDisplayName(app)}</div>
                 <div className="truncate text-xs text-hc-muted" title={app.app_id}>{app.app_id}{app.app_version ? ` · ${app.app_version}` : ""}</div>
               </td>
-              <td title={status.detail ?? undefined}>
-                <Badge tone={status.tone}>{status.label}</Badge>
+              <td title={app.runtime_health.message ?? undefined}>
+                <Badge tone={runtimeTone}>{t(`runtime.status.${app.runtime_health.status}`)}</Badge>
+                {app.runtime_health.last_checked_at && <div className="mt-1 text-xs text-hc-muted">{formatDate(app.runtime_health.last_checked_at)}</div>}
               </td>
               <td className="text-sm">
                 {app.resolved_entitlement ? (

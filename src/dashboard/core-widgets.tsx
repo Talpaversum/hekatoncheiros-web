@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAppCatalogQuery } from "../data/api/app-catalog";
+import { useAppRegistryQuery } from "../data/api/app-registry";
 import { useAuditEventsQuery } from "../data/api/audit";
 import { useContextQuery } from "../data/api/context";
 import { useTenantUsersQuery } from "../data/api/identity";
@@ -73,6 +74,7 @@ function AuditSettings({ value, onChange }: DashboardWidgetSettingsProps) {
   return <div className="grid gap-3 sm:grid-cols-2"><Field label={t("dashboard.settingTimeHours")}><Input type="number" min={1} max={720} value={Number(value["hours"] ?? 24)} onChange={(event) => onChange({ ...value, hours: Number(event.target.value) })} /></Field><Field label={t("dashboard.settingEventLimit")}><Select value={Number(value["limit"] ?? 50)} onChange={(event) => onChange({ ...value, limit: Number(event.target.value) })}>{[10, 25, 50, 100, 200].map((limit) => <option key={limit} value={limit}>{limit}</option>)}</Select></Field><Field label={t("dashboard.settingSeverity")} className="sm:col-span-2"><Select value={(value["severity"] as string[] | undefined)?.join(",") ?? ""} onChange={(event) => onChange({ ...value, severity: event.target.value ? event.target.value.split(",") : [] })}><option value="">{t("dashboard.allSeverities")}</option><option value="warning,error,critical">{t("dashboard.importantSeverities")}</option><option value="error,critical">{t("dashboard.errorsOnly")}</option></Select></Field></div>;
 }
 function UnavailableWidget() { const { t } = useLocalization(); return <div className="py-2 text-sm text-hc-muted">{t("dashboard.dataUnavailable")}</div>; }
+function AppRuntimeHealthWidget({ size }: DashboardWidgetProps) { const query = useAppRegistryQuery(true); const { t } = useLocalization(); if (query.isLoading || query.isError) return <QueryState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()} />; const limit = size === "small" ? 2 : size === "medium" ? 4 : 8; const items = [...(query.data?.items ?? [])].sort((a, b) => Number(a.runtime.status === "healthy") - Number(b.runtime.status === "healthy")).slice(0, limit); return items.length ? <div className="divide-y divide-hc-outline">{items.map((app) => <div key={app.app_id} className="flex items-center justify-between gap-2 py-2 text-xs"><span className="truncate font-medium">{app.app_name ?? app.slug}</span><span className={app.runtime.status === "healthy" ? "text-hc-success" : app.runtime.status === "degraded" ? "text-hc-warning" : "text-hc-danger"}>{t(`runtime.status.${app.runtime.status}`)}</span></div>)}</div> : <div className="text-sm text-hc-muted">{t("common.noApps")}</div>; }
 
 let registered = false;
 export function registerCoreDashboardWidgets() {
@@ -87,4 +89,5 @@ export function registerCoreDashboardWidgets() {
   registerDashboardWidget({ ...common, presentation: "list", id: "core.failed-jobs", titleKey: "dashboard.failedJobs", descriptionKey: "dashboard.failedJobsDescription", categoryKey: "dashboard.categorySystem", requiredPrivileges: ["platform.superadmin"], defaultVisible: false, defaultPosition: 70, component: UnavailableWidget });
   registerDashboardWidget({ ...common, presentation: "summary", id: "core.system-health", titleKey: "dashboard.systemHealth", descriptionKey: "dashboard.systemHealthDescription", categoryKey: "dashboard.categorySystem", requiredPrivileges: ["platform.superadmin"], defaultVisible: false, defaultPosition: 80, component: UnavailableWidget });
   registerDashboardWidget({ ...common, presentation: "list", id: "core.expiring-licenses", titleKey: "dashboard.expiringLicenses", descriptionKey: "dashboard.expiringLicensesDescription", categoryKey: "dashboard.categoryLicensing", requiredPrivileges: ["core.licensing.read"], defaultVisible: false, defaultPosition: 90, component: UnavailableWidget });
+  registerDashboardWidget({ ...common, presentation: "list", supportedSizes: ["small", "medium", "wide"], id: "core.app-runtime-health", titleKey: "dashboard.appRuntimeHealth", descriptionKey: "dashboard.appRuntimeHealthDescription", categoryKey: "dashboard.categorySystem", requiredPrivileges: [], defaultVisible: true, defaultPosition: 65, component: AppRuntimeHealthWidget });
 }

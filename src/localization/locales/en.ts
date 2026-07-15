@@ -4,6 +4,7 @@ import { auditResources } from "../audit-resources";
 import { dashboardResources } from "../dashboard-resources";
 
 export const en = {
+  "runtime.unavailable": "This application is currently unavailable.", "runtime.status.unknown": "Unavailable", "runtime.status.starting": "Starting", "runtime.status.healthy": "Available", "runtime.status.degraded": "Degraded", "runtime.status.unreachable": "Unavailable", "runtime.status.stopped": "Stopped",
   "nav.dashboard": "Dashboard", "nav.apps": "Apps", "nav.licensing": "Licensing", "nav.help": "Help",
   "nav.manageApps": "Manage apps", "nav.allGuides": "All guides", "nav.account": "Account",
   "nav.security": "Security", "nav.session": "Session", "nav.overview": "Overview", "nav.profile": "Profile",

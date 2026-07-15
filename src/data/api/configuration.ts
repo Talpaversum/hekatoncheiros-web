@@ -15,6 +15,9 @@ export type PlatformInstanceSettings = {
   instance_id: string;
   name: string;
   public_base_url: string | null;
+  runtime_health_interval_ms: number;
+  runtime_health_timeout_ms: number;
+  runtime_health_failure_threshold: number;
   updated_at: string;
 };
 
@@ -56,7 +59,7 @@ export function useUpdatePlatformInstanceSettingsMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name?: string; public_base_url?: string | null }) =>
+    mutationFn: (payload: { name?: string; public_base_url?: string | null; runtime_health_interval_ms?: number; runtime_health_timeout_ms?: number; runtime_health_failure_threshold?: number }) =>
       authFetch<PlatformInstanceSettings>("/platform/instance", {
         method: "PATCH",
         body: JSON.stringify(payload),

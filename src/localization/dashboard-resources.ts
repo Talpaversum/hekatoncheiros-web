@@ -17,6 +17,7 @@ const en = {
   "dashboard.installedCount": "{{count}} installed", "dashboard.activeUsers": "{{count}} active", "dashboard.dataUnavailable": "No data available",
   "dashboard.noTenantLicenses": "No active tenant licenses", "dashboard.noAppsRequireLicense": "No applications require a license",
   "dashboard.moreApps": "+{{count}} more",
+  "dashboard.appRuntimeHealth": "Application runtime status", "dashboard.appRuntimeHealthDescription": "Current availability of installed applications.",
 } as const;
 
 const cs: Record<keyof typeof en, string> = {
@@ -38,6 +39,7 @@ const cs: Record<keyof typeof en, string> = {
   "dashboard.installedCount": "Nainstalováno: {{count}}", "dashboard.activeUsers": "Aktivní: {{count}}", "dashboard.dataUnavailable": "Nejsou dostupná žádná data",
   "dashboard.noTenantLicenses": "Žádné aktivní licence tenantu", "dashboard.noAppsRequireLicense": "Žádná aplikace nevyžaduje licenci",
   "dashboard.moreApps": "+{{count}} dalších",
+  "dashboard.appRuntimeHealth": "Stav běhu aplikací", "dashboard.appRuntimeHealthDescription": "Aktuální dostupnost nainstalovaných aplikací.",
 };
 
 export const dashboardResources = { en, cs };

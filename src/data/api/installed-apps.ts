@@ -25,6 +25,7 @@ export type InstalledApp = {
     created_at: string;
     updated_at: string;
   } | null;
+  runtime_health: { status: "unknown" | "starting" | "healthy" | "degraded" | "unreachable" | "stopped"; last_checked_at: string | null; last_healthy_at: string | null; status_changed_at: string; consecutive_failures: number; message: string | null };
   catalog_update: {
     state: "available" | "same" | "stale" | "baseline_missing";
     update_available: boolean | null;
@@ -109,6 +110,7 @@ export function useInstalledAppsQuery(enabled = true) {
     queryKey: ["installed-apps"],
     queryFn: () => authFetch<{ items: InstalledApp[] }>("/apps/installed"),
     enabled,
+    refetchInterval: enabled ? 5000 : false,
   });
 }
 

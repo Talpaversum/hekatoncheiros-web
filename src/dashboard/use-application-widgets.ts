@@ -22,6 +22,7 @@ export function useApplicationDashboardWidgets(enabled = true) {
     const load = async () => {
       const [reactShim, jsxRuntimeShim] = await Promise.all([import("../app/runtime/react-shim"), import("../app/runtime/jsx-runtime-shim")]);
       await Promise.all(registry.items.map(async (entry) => {
+        if (entry.runtime.status !== "healthy" && entry.runtime.status !== "degraded") return;
         let blobUrl: string | null = null;
         try {
           const response = await fetch(new URL(entry.ui_url, window.location.origin));

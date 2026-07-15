@@ -1,4 +1,5 @@
 const en = {
+  "platform.healthInterval": "Runtime check interval (ms)", "platform.healthTimeout": "Runtime check timeout (ms)", "platform.healthFailures": "Failures before unavailable",
   "config.configuration": "Configuration", "config.never": "Never", "config.active": "active", "config.disabled": "disabled",
   "authors.jwksRequired": "JWKS must contain at least one public key.", "authors.title": "Application authors", "authors.authors": "Authors",
   "authors.rootKeys": "Root keys", "authors.revocations": "Revocations", "authors.trustSync": "Trust sync", "authors.current": "Current", "authors.missing": "Missing",
@@ -68,6 +69,7 @@ const en = {
 
 const cs: Record<keyof typeof en, string> = {
   ...en,
+  "platform.healthInterval": "Interval kontroly běhu (ms)", "platform.healthTimeout": "Timeout kontroly běhu (ms)", "platform.healthFailures": "Počet selhání před nedostupností",
   "config.configuration": "Nastavení", "config.never": "Nikdy", "config.active": "aktivní", "config.disabled": "zakázáno",
   "authors.jwksRequired": "JWKS musí obsahovat alespoň jeden veřejný klíč.", "authors.title": "Autoři aplikací", "authors.authors": "Autoři",
   "authors.rootKeys": "Kořenové klíče", "authors.revocations": "Odvolání", "authors.trustSync": "Synchronizace důvěry", "authors.current": "Aktuální", "authors.missing": "Chybí",

@@ -27,6 +27,7 @@ export type AppRegistryEntry = {
     path: string;
     required_privileges?: string[];
   }>;
+  runtime: { status: "unknown" | "starting" | "healthy" | "degraded" | "unreachable" | "stopped"; last_checked_at: string | null; last_healthy_at: string | null; status_changed_at: string; consecutive_failures: number; message: string | null };
 };
 
 export function useAppRegistryQuery(enabled = true) {
@@ -34,5 +35,6 @@ export function useAppRegistryQuery(enabled = true) {
     queryKey: ["app-registry"],
     queryFn: () => authFetch<{ items: AppRegistryEntry[] }>("/apps/registry"),
     enabled,
+    refetchInterval: enabled ? 5000 : false,
   });
 }

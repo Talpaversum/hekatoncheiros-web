@@ -5,6 +5,7 @@ import { dashboardResources } from "../dashboard-resources";
 import type { MessageKey } from "./en";
 
 export const cs: Record<MessageKey, string> = {
+  "runtime.unavailable": "Tato aplikace je momentálně nedostupná.", "runtime.status.unknown": "Nedostupná", "runtime.status.starting": "Spouští se", "runtime.status.healthy": "Dostupná", "runtime.status.degraded": "Omezená", "runtime.status.unreachable": "Nedostupná", "runtime.status.stopped": "Zastavená",
   "nav.dashboard": "Přehled", "nav.apps": "Aplikace", "nav.licensing": "Licencování", "nav.help": "Nápověda",
   "nav.manageApps": "Správa aplikací", "nav.allGuides": "Všechny návody", "nav.account": "Účet",
   "nav.security": "Zabezpečení", "nav.session": "Relace", "nav.overview": "Přehled", "nav.profile": "Profil",
