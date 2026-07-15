@@ -41,7 +41,6 @@ import { getLocaleLabel } from "../../localization/resources";
 import {
   useAppEntitlementsQuery,
   useClearSelectionMutation,
-  useOfflineIngestMutation,
   useSetSelectionMutation,
   useStartLicenseOAuthMutation,
 } from "../../data/api/licensing";
@@ -57,7 +56,7 @@ import { TabBar } from "../../ui-kit/components/TabBar";
 import { Textarea } from "../../ui-kit/components/Textarea";
 import { ToastNotice } from "../../ui-kit/components/ToastNotice";
 
-type Tab = "catalog" | "feeds" | "installed" | "licensing";
+type Tab = "catalog" | "feeds" | "installed" | "license-binding";
 
 type UninstallState =
   | { status: "idle" }
@@ -195,8 +194,8 @@ function readTabFromPath(pathname: string): Tab {
   if (pathname.startsWith("/core/apps/installed")) {
     return "installed";
   }
-  if (pathname.endsWith("/licensing")) {
-    return "licensing";
+  if (pathname.endsWith("/license-binding")) {
+    return "license-binding";
   }
   return "catalog";
 }
@@ -257,7 +256,6 @@ export function AppsPage() {
   const rotateManagedRuntimeToken = useRotateManagedAppRuntimeTokenMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
-  const offlineIngestMutation = useOfflineIngestMutation();
   const startLicenseOAuth = useStartLicenseOAuthMutation(tenantId);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -267,7 +265,6 @@ export function AppsPage() {
   const [sourceForm, setSourceForm] = useState({ name: "", feed_url: "", trust_mode: "manual" as AppCatalogSource["trust_mode"] });
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [selectedEntitlementId, setSelectedEntitlementId] = useState("");
-  const [offlineToken, setOfflineToken] = useState("");
   const [installDialog, setInstallDialog] = useState<InstallDialogState>({ status: "idle" });
   const [runtimeApprovalConfirmed, setRuntimeApprovalConfirmed] = useState(false);
   const [appTokenDialog, setAppTokenDialog] = useState<AppTokenDialogState>({ status: "idle" });
@@ -491,7 +488,7 @@ export function AppsPage() {
     resetNotices();
     if (!entry.license_issuer_url) {
       setSelectedAppId(entry.app_id);
-      navigate("/core/apps/licensing");
+      navigate(`/core/licensing?app=${encodeURIComponent(entry.app_id)}`);
       return;
     }
 
@@ -636,20 +633,6 @@ export function AppsPage() {
     }
   };
 
-  const handleIngestOffline = async () => {
-    if (!offlineToken.trim()) {
-      return;
-    }
-    resetNotices();
-    try {
-      const result = await offlineIngestMutation.mutateAsync({ token: offlineToken.trim() });
-      setOfflineToken("");
-      setMessage(t("apps.message.offlineImported", { result: result.verification_result }));
-    } catch (error) {
-      setActionError(formatActionError(error, t));
-    }
-  };
-
   if (!canManageApps) {
     return (
       <Card>
@@ -717,7 +700,7 @@ export function AppsPage() {
           { id: "catalog", label: t("nav.catalog"), count: catalog.length },
           { id: "feeds", label: t("nav.feedSources"), count: catalogSources.length },
           { id: "installed", label: t("apps.installed"), count: installed.length },
-          { id: "licensing", label: t("nav.licensing") },
+          { id: "license-binding", label: t("nav.licenseBinding") },
         ]}
         onChange={(tab) => navigate(tab === "catalog" ? "/core/apps" : `/core/apps/${tab}`)}
       />
@@ -743,7 +726,7 @@ export function AppsPage() {
             installed={installedByAppId.get(catalogDetail.app_id)}
             onBack={() => navigate("/core/apps")}
             onInstall={openInstallDialog}
-            onLicense={(appId) => { setSelectedAppId(appId); navigate("/core/apps/licensing"); }}
+            onLicense={(appId) => navigate(`/core/licensing?app=${encodeURIComponent(appId)}`)}
             onActivateLicense={handleActivateLicense}
             onDelete={handleDeleteCatalogEntry}
             onSetPublication={handleSetCatalogEntryPublication}
@@ -815,7 +798,7 @@ export function AppsPage() {
             app={installedDetail}
             registrySlugs={registrySlugs}
             onBack={() => navigate("/core/apps/installed")}
-            onLicense={(appId) => { setSelectedAppId(appId); navigate("/core/apps/licensing"); }}
+            onLicense={(appId) => navigate(`/core/licensing?app=${encodeURIComponent(appId)}`)}
             onCheckUpdate={handleCheckUpdate}
             onClearUpdateSignal={handleClearUpdateSignal}
             onIssueAppToken={handleIssueAppToken}
@@ -841,18 +824,22 @@ export function AppsPage() {
             registrySlugs={registrySlugs}
             isLoading={installedLoading}
             onLicense={(appId) => {
-              setSelectedAppId(appId);
-              navigate("/core/apps/licensing");
+              navigate(`/core/licensing?app=${encodeURIComponent(appId)}`);
             }}
             onOpen={(app) => navigate(`/core/apps/installed/${encodeURIComponent(app.app_id)}`)}
           />
         </Card>
       )}
 
-      {activeTab === "licensing" && (
-        <Card id="licensing" className="rounded-hc-md">
-          <div className="grid gap-5 lg:grid-cols-[minmax(260px,360px)_1fr]">
-            <section>
+      {activeTab === "license-binding" && (
+        <Card id="license-binding" className="rounded-hc-md p-0">
+          <SectionHeader
+            title={t("apps.licenseBinding")}
+            description={t("apps.licenseBindingDescription")}
+            meta={<Button variant="outlined" onClick={() => navigate(effectiveSelectedAppId ? `/core/licensing?app=${encodeURIComponent(effectiveSelectedAppId)}` : "/core/licensing")}>{t("apps.openMainLicensing")}</Button>}
+          />
+          <div className="border-t border-hc-outline p-4">
+            <section className="max-w-2xl">
               <div className="text-sm font-semibold">{t("apps.tenantLicenseSelection")}</div>
               <Field label={t("licensing.application")} className="mt-3">
                 <Select
@@ -890,21 +877,6 @@ export function AppsPage() {
                 </Button>
                 <Button variant="outlined" onClick={() => void handleClearSelection()} disabled={!effectiveSelectedAppId || clearSelectionMutation.isPending}>
                   {t("apps.clear")}
-                </Button>
-              </div>
-            </section>
-
-            <section>
-              <div className="text-sm font-semibold">{t("apps.offlineImport")}</div>
-              <Textarea
-                className="mt-3 min-h-40"
-                value={offlineToken}
-                onChange={(event) => setOfflineToken(event.target.value)}
-                placeholder={t("apps.pasteLicense")}
-              />
-              <div className="mt-3 flex justify-end">
-                <Button onClick={() => void handleIngestOffline()} disabled={!offlineToken.trim() || offlineIngestMutation.isPending}>
-                  {offlineIngestMutation.isPending ? t("apps.importing") : t("apps.importLicense")}
                 </Button>
               </div>
             </section>
@@ -1237,7 +1209,7 @@ function InstalledAppDetail({
         <div className="mt-1 text-xs text-hc-muted">{app.update_signal.note ?? t("apps.noNote")} · {formatDate(app.update_signal.reported_at)}</div>
       </div>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
-        <Button variant="tonal" onClick={() => onLicense(app.app_id)}>{t("nav.licensing")}</Button>
+        <Button variant="tonal" onClick={() => onLicense(app.app_id)}>{t("apps.manageLicense")}</Button>
         <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>{t("apps.checkUpdate")}</Button>
         {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>{t("apps.clearSignal")}</Button>}
         <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>{t("apps.issueToken")}</Button>
@@ -1314,7 +1286,7 @@ function InstalledTable({
               </td>
               <td>
                 <div className="flex justify-end gap-1.5">
-                  <Button size="sm" variant="ghost" onClick={() => onLicense(app.app_id)}>{t("nav.licensing")}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onLicense(app.app_id)}>{t("apps.manageLicense")}</Button>
                   <Button size="sm" variant="ghost" onClick={() => onOpen(app)}>{t("common.open")}</Button>
                 </div>
               </td>

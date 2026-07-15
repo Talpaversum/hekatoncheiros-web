@@ -40,7 +40,7 @@ const platformHelpGuideDefinitions: HelpGuideDefinition[] = [
     key: "activateLicense",
     categoryKey: "help.categoryLicensing",
     stepCount: 4,
-    path: "/core/apps/licensing",
+    path: "/core/licensing/activation",
   },
   {
     key: "allowHttp",

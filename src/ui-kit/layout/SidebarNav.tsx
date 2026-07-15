@@ -15,7 +15,6 @@ const sidebarConfig = [
     titleKey: "nav.dashboard",
     items: [
       { to: "/core/dashboard", labelKey: "nav.overview" },
-      { to: "/core/dashboard#context", labelKey: "nav.contextSnapshot" },
     ],
   },
   {
@@ -27,9 +26,10 @@ const sidebarConfig = [
   },
   {
     prefix: "/core/account",
-    titleKey: "nav.account",
+    titleKey: "settings.user",
     items: [
-      { to: "/core/account", labelKey: "nav.session" },
+      { to: "/core/account", labelKey: "nav.profile" },
+      { to: "/core/account/session", labelKey: "nav.session" },
       { to: "/core/account/security", labelKey: "nav.security" },
     ],
   },
@@ -40,23 +40,25 @@ const sidebarConfig = [
       { to: "/core/apps", labelKey: "nav.catalog" },
       { to: "/core/apps/feeds", labelKey: "nav.feedSources" },
       { to: "/core/apps/installed", labelKey: "nav.installedApps" },
-      { to: "/core/apps/licensing", labelKey: "nav.tenantLicensing" },
+      { to: "/core/apps/license-binding", labelKey: "nav.licenseBinding" },
     ],
   },
   {
     prefix: "/core/licensing",
     titleKey: "nav.licensing",
     items: [
-      { to: "/core/licensing", labelKey: "nav.licenseInventory" },
-      { to: "/core/licensing/import", labelKey: "nav.offlineImport" },
-      { to: "/core/licensing/activation", labelKey: "nav.oauthActivation" },
+      { to: "/core/licensing", labelKey: "nav.overview" },
+      { to: "/core/licensing/entitlements", labelKey: "nav.entitlements" },
+      { to: "/core/licensing/activation", labelKey: "nav.activateFromVendor" },
+      { to: "/core/licensing/import", labelKey: "nav.importOfflineLicense" },
+      { to: "/core/licensing/selections", labelKey: "nav.activeSelections" },
     ],
   },
   {
     prefix: "/core/platform",
-    titleKey: "settings.platform",
+    titleKey: "nav.platformSettings",
     items: [
-      { to: "/core/platform", labelKey: "nav.platformDashboard" },
+      { to: "/core/platform", labelKey: "nav.overview" },
       { to: "/core/platform/instance", labelKey: "nav.instance" },
       { to: "/core/platform/trusted-origins", labelKey: "nav.trustedOrigins" },
       { to: "/core/platform/app-distribution", labelKey: "nav.appDistribution" },
@@ -67,12 +69,12 @@ const sidebarConfig = [
   },
   {
     prefix: "/core/tenant",
-    titleKey: "nav.tenantConfiguration",
+    titleKey: "nav.tenantSettings",
     items: [
-      { to: "/core/tenant", labelKey: "nav.platformDashboard" },
-      { to: "/core/tenant/details", labelKey: "nav.tenantDetails" },
-      { to: "/core/tenant/users", labelKey: "nav.usersRoles" },
-      { to: "/core/tenant/apps", labelKey: "nav.appsLicenses" },
+      { to: "/core/tenant", labelKey: "nav.overview" },
+      { to: "/core/tenant/details", labelKey: "nav.details" },
+      { to: "/core/tenant/users", labelKey: "nav.usersPrivileges" },
+      { to: "/core/tenant/apps", labelKey: "nav.appsLicenseStatus" },
       { to: "/core/tenant/audit", labelKey: "nav.auditContext" },
     ],
   },

@@ -30,6 +30,8 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const updateAccount = useUpdateAccountMutation();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
   const [appsOpen, setAppsOpen] = useState(false);
+  const [desktopAdministrationOpen, setDesktopAdministrationOpen] = useState(false);
+  const [mobileAdministrationOpen, setMobileAdministrationOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -65,16 +67,20 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
 
   const openAccount = () => {
     setUserOpen(false);
+    setDesktopAdministrationOpen(false);
+    setMobileAdministrationOpen(false);
     navigate("/core/account");
   };
 
   const openPlatformConfig = () => {
-    setSettingsOpen(false);
+    setDesktopAdministrationOpen(false);
+    setMobileAdministrationOpen(false);
     navigate("/core/platform");
   };
 
   const openTenantConfig = () => {
-    setSettingsOpen(false);
+    setDesktopAdministrationOpen(false);
+    setMobileAdministrationOpen(false);
     navigate("/core/tenant");
   };
 
@@ -89,12 +95,12 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
     <header className="sticky top-0 z-40 border-b border-hc-outline bg-hc-topbar">
       <div className="flex h-14 items-center justify-between gap-3 px-4 lg:px-5">
         <div className="flex min-w-0 items-center gap-3 lg:gap-5">
-          <div className="hidden text-base font-semibold lg:block">Hekatoncheiros</div>
-          <nav className="flex min-w-0 items-center gap-1 overflow-visible text-sm">
+          <div className="text-base font-semibold">Hekatoncheiros</div>
+          <nav className="hidden min-w-0 items-center gap-1 overflow-visible text-sm sm:flex">
             <NavLink
               to="/core/dashboard"
               className={({ isActive }) =>
-                `hidden rounded-hc-sm px-3 py-2 transition sm:block ${
+                  `rounded-hc-sm px-3 py-2 transition ${
                   isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted hover:text-hc-text"
                 }`
               }
@@ -105,6 +111,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               <button
                 onClick={() => {
                   setHelpOpen(false);
+                  setDesktopAdministrationOpen(false);
                   setAppsOpen((prev) => !prev);
                 }}
                 className="rounded-hc-sm px-3 py-2 text-hc-muted transition hover:text-hc-text"
@@ -159,6 +166,50 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               <button
                 onClick={() => {
                   setAppsOpen(false);
+                  setHelpOpen(false);
+                  setDesktopAdministrationOpen((prev) => !prev);
+                }}
+                className={`rounded-hc-sm px-3 py-2 transition ${
+                  location.pathname.startsWith("/core/account") ||
+                  location.pathname.startsWith("/core/tenant") ||
+                  location.pathname.startsWith("/core/platform")
+                    ? "bg-hc-surface text-hc-text"
+                    : "text-hc-muted hover:text-hc-text"
+                }`}
+                aria-expanded={desktopAdministrationOpen}
+              >
+                {t("nav.administration")} ▾
+              </button>
+              <Menu open={desktopAdministrationOpen} onClose={() => setDesktopAdministrationOpen(false)} className="left-0 right-auto w-64">
+                <button
+                  onClick={openAccount}
+                  className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+                >
+                  {t("settings.user")}
+                </button>
+                {hasPrivilege(privileges, "tenant.config.manage") && (
+                  <button
+                    onClick={openTenantConfig}
+                    className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+                  >
+                    {t("settings.tenant")}
+                  </button>
+                )}
+                {hasPrivilege(privileges, "platform.superadmin") && (
+                  <button
+                    onClick={openPlatformConfig}
+                    className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
+                  >
+                    {t("settings.platform")}
+                  </button>
+                )}
+              </Menu>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setAppsOpen(false);
+                  setDesktopAdministrationOpen(false);
                   setHelpOpen((prev) => !prev);
                 }}
                 className={`rounded-hc-sm px-3 py-2 transition ${
@@ -206,22 +257,6 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               ⚙
             </IconButton>
             <Menu open={settingsOpen} onClose={() => setSettingsOpen(false)} className="w-64">
-              {hasPrivilege(privileges, "platform.superadmin") && (
-                <button
-                  onClick={openPlatformConfig}
-                  className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
-                >
-                  {t("settings.platform")}
-                </button>
-              )}
-              {hasPrivilege(privileges, "tenant.config.manage") && (
-                <button
-                  onClick={openTenantConfig}
-                  className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant"
-                >
-                  {t("settings.tenant")}
-                </button>
-              )}
               <div className="flex items-center justify-between rounded-hc-sm px-3 py-2">
                 <div>
                   <div className="text-sm font-medium">{t("settings.darkMode")}</div>
@@ -277,6 +312,34 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
           </div>
         </div>
       </div>
+      <nav className="flex flex-wrap items-center gap-1 border-t border-hc-outline px-2 py-1 text-xs sm:hidden">
+        <NavLink to="/core/dashboard" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
+          {t("nav.dashboard")}
+        </NavLink>
+        <NavLink to="/core/apps" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
+          {t("nav.apps")}
+        </NavLink>
+        <NavLink to="/core/licensing" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
+          {t("nav.licensing")}
+        </NavLink>
+        <div className="relative">
+          <button
+            className={`whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${location.pathname.startsWith("/core/account") || location.pathname.startsWith("/core/tenant") || location.pathname.startsWith("/core/platform") ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}
+            onClick={() => setMobileAdministrationOpen((prev) => !prev)}
+            aria-expanded={mobileAdministrationOpen}
+          >
+            {t("nav.administration")}
+          </button>
+          <Menu open={mobileAdministrationOpen} onClose={() => setMobileAdministrationOpen(false)} className="right-0 w-56">
+            <button onClick={openAccount} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.user")}</button>
+            {hasPrivilege(privileges, "tenant.config.manage") && <button onClick={openTenantConfig} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.tenant")}</button>}
+            {hasPrivilege(privileges, "platform.superadmin") && <button onClick={openPlatformConfig} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.platform")}</button>}
+          </Menu>
+        </div>
+        <NavLink to="/core/help" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
+          {t("nav.help")}
+        </NavLink>
+      </nav>
     </header>
   );
 }

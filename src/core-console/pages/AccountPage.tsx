@@ -36,6 +36,7 @@ export function AccountPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isSecurity = location.pathname.endsWith("/security");
+  const isSession = location.pathname.endsWith("/session");
   const privileges = context?.privileges ?? [];
   const effectiveDisplayName = displayName ?? account?.display_name ?? "";
   const effectiveEmail = email ?? account?.email ?? "";
@@ -84,23 +85,16 @@ export function AccountPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow={t("account.eyebrow")}
-        title={isSecurity ? t("nav.security") : t("account.profile")}
+        eyebrow={t("settings.user")}
+        title={isSecurity ? t("nav.security") : isSession ? t("nav.session") : t("nav.profile")}
         description={t("account.description")}
         actions={<Button variant="outlined" onClick={handleLogout}>{t("common.signOut")}</Button>}
       />
 
       <ToastNotice message={error ?? message} tone={error ? "danger" : "success"} onDismiss={resetNotices} />
 
-      {!isSecurity && (
+      {!isSecurity && !isSession && (
         <>
-          <MetricStrip items={[
-            { label: t("account.metricAccount"), value: account?.status ?? "-", tone: account?.status === "active" ? "success" : "neutral" },
-            { label: t("account.metricTenantMode"), value: context?.tenant.mode ?? "-" },
-            { label: t("account.metricPrivileges"), value: privileges.length },
-            { label: t("account.metricDelegation"), value: context?.actor.impersonating ? t("common.on") : t("common.off"), tone: context?.actor.impersonating ? "warning" : "neutral" },
-          ]} />
-
           <Card className="overflow-hidden p-0">
             <SectionHeader title={t("account.profileFields")} description={`${account?.id ?? t("common.loading")} · ${context?.tenant.name ?? context?.tenant.id ?? t("common.noTenant")}`} meta={<StatusBadge>{account?.status ?? "-"}</StatusBadge>} />
             <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
@@ -123,6 +117,17 @@ export function AccountPage() {
             </div>
           </Card>
 
+        </>
+      )}
+
+      {isSession && (
+        <>
+          <MetricStrip items={[
+            { label: t("account.metricAccount"), value: account?.status ?? "-", tone: account?.status === "active" ? "success" : "neutral" },
+            { label: t("account.metricTenantMode"), value: context?.tenant.mode ?? "-" },
+            { label: t("account.metricPrivileges"), value: privileges.length },
+            { label: t("account.metricDelegation"), value: context?.actor.impersonating ? t("common.on") : t("common.off"), tone: context?.actor.impersonating ? "warning" : "neutral" },
+          ]} />
           <Card className="overflow-hidden p-0">
             <SectionHeader title={t("account.privilegesTitle")} description={t("account.privilegesDescription")} meta={<StatusBadge>{t("common.assigned", { count: privileges.length })}</StatusBadge>} />
             <div className="flex flex-wrap gap-1.5 border-t border-hc-outline p-3">

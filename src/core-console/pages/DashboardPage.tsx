@@ -1,12 +1,52 @@
-import { Card } from "../../ui-kit/components/Card";
-import { MetricStrip, PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
+import type { ReactNode } from "react";
+
+import { hasPrivilege } from "../../access/privileges";
+import { useAppCatalogQuery } from "../../data/api/app-catalog";
 import { useContextQuery } from "../../data/api/context";
+import { useTenantUsersQuery } from "../../data/api/identity";
+import { useInstalledAppsQuery } from "../../data/api/installed-apps";
 import { useLocalization } from "../../localization/LocalizationProvider";
+import { Card } from "../../ui-kit/components/Card";
+import { PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
+
+type Widget = {
+  id: string;
+  label: string;
+  value: ReactNode;
+  description: string;
+  status: "available" | "planned";
+  tone?: "neutral" | "success" | "warning" | "danger" | "info";
+};
 
 export function DashboardPage() {
   const { data, isLoading } = useContextQuery();
-  const licenseCount = data?.licenses ? Object.keys(data.licenses).length : 0;
+  const privileges = data?.privileges ?? [];
+  const canManageApps = hasPrivilege(privileges, "platform.apps.manage");
+  const canManageTenant = hasPrivilege(privileges, "tenant.config.manage");
+  const { data: catalogData } = useAppCatalogQuery(canManageApps);
+  const { data: installedData } = useInstalledAppsQuery(canManageApps);
+  const { data: tenantUsersData } = useTenantUsersQuery(canManageTenant);
   const { t } = useLocalization();
+
+  const catalog = catalogData?.items ?? [];
+  const installed = installedData?.items ?? [];
+  const licenseCount = data?.licenses ? Object.keys(data.licenses).length : 0;
+  const appsRequiringLicense = catalog.filter((app) => app.license_required).length;
+  const availableUpdates = installed.filter(
+    (app) => app.catalog_update?.state === "available" || app.update_signal?.update_available === true,
+  ).length;
+
+  const widgets: Widget[] = [
+    { id: "licenses", label: t("dashboard.tenantLicenses"), value: licenseCount, description: t("dashboard.tenantLicensesDescription"), status: "available" },
+    { id: "installed", label: t("dashboard.installedApps"), value: canManageApps ? installed.length : "-", description: t("dashboard.installedAppsDescription"), status: "available" },
+    { id: "license-required", label: t("dashboard.appsRequiringLicense"), value: canManageApps ? appsRequiringLicense : "-", description: t("dashboard.appsRequiringLicenseDescription"), status: "available", tone: appsRequiringLicense > 0 ? "warning" : "neutral" },
+    { id: "updates", label: t("dashboard.availableUpdates"), value: canManageApps ? availableUpdates : "-", description: t("dashboard.availableUpdatesDescription"), status: "available", tone: availableUpdates > 0 ? "warning" : "neutral" },
+    { id: "users", label: t("dashboard.tenantUsers"), value: canManageTenant ? tenantUsersData?.items.length ?? 0 : "-", description: t("dashboard.tenantUsersDescription"), status: "available" },
+    { id: "audit", label: t("dashboard.recentAuditEvents"), value: "-", description: t("dashboard.recentAuditEventsDescription"), status: "planned" },
+    { id: "jobs", label: t("dashboard.failedJobs"), value: "-", description: t("dashboard.failedJobsDescription"), status: "planned" },
+    { id: "health", label: t("dashboard.systemHealth"), value: "-", description: t("dashboard.systemHealthDescription"), status: "planned" },
+    { id: "expiring", label: t("dashboard.expiringLicenses"), value: "-", description: t("dashboard.expiringLicensesDescription"), status: "planned" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -14,14 +54,17 @@ export function DashboardPage() {
         eyebrow={t("nav.dashboard")}
         title={t("nav.overview")}
         description={data ? t("dashboard.operationalContext", { tenant: data.tenant.name ?? data.tenant.id ?? t("common.noTenant") }) : t("dashboard.loadingContext")}
-        actions={(
-          <MetricStrip items={[
-            { label: t("dashboard.privileges"), value: data?.privileges.length ?? 0 },
-            { label: t("dashboard.licenses"), value: licenseCount },
-            { label: t("dashboard.delegation"), value: data?.actor.impersonating ? t("common.on") : t("common.off"), tone: data?.actor.impersonating ? "warning" : "neutral" },
-          ]} />
-        )}
       />
+
+      <section aria-labelledby="dashboard-widgets">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 id="dashboard-widgets" className="text-sm font-semibold">{t("dashboard.operations")}</h2>
+          <div className="text-xs text-hc-muted">{t("dashboard.frontendLayout")}</div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {widgets.map((widget) => <DashboardWidget key={widget.id} widget={widget} liveLabel={t("common.live")} plannedLabel={t("common.planned")} />)}
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
         <Card className="overflow-hidden p-0">
@@ -39,16 +82,33 @@ export function DashboardPage() {
         </Card>
 
         <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("dashboard.sessionAccess")} description={t("dashboard.sessionAccessDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
+          <SectionHeader title={t("dashboard.myPrivileges")} description={t("dashboard.sessionAccessDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
           <div className="border-t border-hc-outline p-3">
             <div className="flex max-h-52 flex-wrap gap-1.5 overflow-auto">
-              {(data?.privileges ?? []).map((privilege) => <StatusBadge key={privilege}>{privilege}</StatusBadge>)}
-              {!isLoading && (data?.privileges.length ?? 0) === 0 && <div className="px-1 py-3 text-sm text-hc-muted">{t("dashboard.noPrivileges")}</div>}
+              {privileges.map((privilege) => <StatusBadge key={privilege}>{privilege}</StatusBadge>)}
+              {!isLoading && privileges.length === 0 && <div className="px-1 py-3 text-sm text-hc-muted">{t("dashboard.noPrivileges")}</div>}
             </div>
           </div>
         </Card>
       </div>
     </div>
+  );
+}
+
+function DashboardWidget({ widget, liveLabel, plannedLabel }: { widget: Widget; liveLabel: string; plannedLabel: string }) {
+  return (
+    <Card className="flex min-h-32 flex-col justify-between gap-4 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm font-medium">{widget.label}</div>
+        <StatusBadge tone={widget.status === "planned" ? "neutral" : widget.tone ?? "info"}>
+          {widget.status === "planned" ? plannedLabel : liveLabel}
+        </StatusBadge>
+      </div>
+      <div>
+        <div className="text-2xl font-semibold leading-none">{widget.value}</div>
+        <div className="mt-2 text-xs text-hc-muted">{widget.description}</div>
+      </div>
+    </Card>
   );
 }
 

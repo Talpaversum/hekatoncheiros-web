@@ -151,7 +151,7 @@ export function TenantConfigPage() {
         </Card>}
 
         {section === "users" && <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("tenant.usersRoles")} description={t("tenant.usersRolesDescription")} meta={<StatusBadge>{t("tenant.usersCount", { count: tenantUsers.length })}</StatusBadge>} />
+          <SectionHeader title={t("nav.usersPrivileges")} description={t("tenant.usersRolesDescription")} meta={<StatusBadge>{t("tenant.usersCount", { count: tenantUsers.length })}</StatusBadge>} />
 
           <div className="grid gap-3 border-y border-hc-outline bg-hc-surface-variant/40 px-4 py-3 md:grid-cols-[minmax(14rem,1fr)_minmax(14rem,1fr)_auto] md:items-end">
             <Field label={t("tenant.user")}>
