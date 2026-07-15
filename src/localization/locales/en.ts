@@ -1,5 +1,6 @@
 import { appsResources } from "../apps-resources";
 import { configResources } from "../config-resources";
+import { auditResources } from "../audit-resources";
 
 export const en = {
   "nav.dashboard": "Dashboard", "nav.apps": "Apps", "nav.licensing": "Licensing", "nav.help": "Help",
@@ -185,6 +186,7 @@ export const en = {
   "runtime.pluginRoutesInvalid": "Plugin register(appContext) must return { routes: [] }", "runtime.failedLoad": "Failed to load plugin",
   ...appsResources.en,
   ...configResources.en,
+  ...auditResources.en,
 } as const;
 
 export type MessageKey = keyof typeof en;

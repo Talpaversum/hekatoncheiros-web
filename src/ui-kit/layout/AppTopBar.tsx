@@ -84,6 +84,13 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
     navigate("/core/tenant");
   };
 
+  const openAudit = () => {
+    setDesktopAdministrationOpen(false);
+    setMobileAdministrationOpen(false);
+    navigate("/core/audit");
+  };
+  const canReadAudit = ["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read"].some((privilege) => hasPrivilege(privileges, privilege));
+
   const appGroups = useMemo(() => registry?.items ?? [], [registry?.items]);
   const helpCategories = useMemo(() => {
     const platformCategories = getVisiblePlatformHelpGuides(privileges, t).map((guide) => guide.category);
@@ -203,6 +210,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                     {t("settings.platform")}
                   </button>
                 )}
+                {canReadAudit && <button onClick={openAudit} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("nav.auditLog")}</button>}
               </Menu>
             </div>
             <div className="relative">
@@ -334,6 +342,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
             <button onClick={openAccount} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.user")}</button>
             {hasPrivilege(privileges, "tenant.config.manage") && <button onClick={openTenantConfig} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.tenant")}</button>}
             {hasPrivilege(privileges, "platform.superadmin") && <button onClick={openPlatformConfig} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("settings.platform")}</button>}
+            {canReadAudit && <button onClick={openAudit} className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-text hover:bg-hc-surface-variant">{t("nav.auditLog")}</button>}
           </Menu>
         </div>
         <NavLink to="/core/help" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>

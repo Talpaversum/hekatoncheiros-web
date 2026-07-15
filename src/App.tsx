@@ -11,6 +11,7 @@ import { LicensingPage } from "./core-console/pages/LicensingPage";
 import { PlatformConfigPage } from "./core-console/pages/PlatformConfigPage";
 import { TenantConfigPage } from "./core-console/pages/TenantConfigPage";
 import { AppRuntimePage } from "./app/AppRuntimePage";
+import { AuditLogPage } from "./core-console/pages/AuditLogPage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="account/*" element={<AccountPage />} />
         <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing/*" element={<LicensingPage />} />
+        <Route path="audit" element={<AuditLogPage />} />
         <Route
           path="platform/*"
           element={

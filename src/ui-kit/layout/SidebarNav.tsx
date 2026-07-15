@@ -11,6 +11,11 @@ type SidebarNavProps = PropsWithChildren<{
 
 const sidebarConfig = [
   {
+    prefix: "/core/audit",
+    titleKey: "nav.auditLog",
+    items: [{ to: "/core/audit", labelKey: "nav.auditLog" }],
+  },
+  {
     prefix: "/core/dashboard",
     titleKey: "nav.dashboard",
     items: [
@@ -80,7 +85,7 @@ const sidebarConfig = [
   },
 ];
 
-export function SidebarNav({ children }: SidebarNavProps) {
+export function SidebarNav({ children, privileges = [] }: SidebarNavProps) {
   const { t } = useLocalization();
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
@@ -94,7 +99,8 @@ export function SidebarNav({ children }: SidebarNavProps) {
         items: appEntry.nav_entries.map((entry) => ({ to: entry.path, label: entry.label })),
       }
     : (() => {
-        const section = sidebarConfig.find((item) => location.pathname.startsWith(item.prefix)) ?? fallbackSection;
+        let section = sidebarConfig.find((item) => location.pathname.startsWith(item.prefix)) ?? fallbackSection;
+        if (section.prefix === "/core/audit" && !["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read", "platform.superadmin"].some((item) => privileges.includes(item))) section = fallbackSection;
         return {
           title: t(section.titleKey),
           items: section.items.map((item) => ({

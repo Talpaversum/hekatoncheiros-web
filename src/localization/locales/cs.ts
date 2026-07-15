@@ -1,5 +1,6 @@
 import { appsResources } from "../apps-resources";
 import { configResources } from "../config-resources";
+import { auditResources } from "../audit-resources";
 import type { MessageKey } from "./en";
 
 export const cs: Record<MessageKey, string> = {
@@ -186,4 +187,5 @@ export const cs: Record<MessageKey, string> = {
   "runtime.pluginRoutesInvalid": "Plugin register(appContext) musí vrátit { routes: [] }", "runtime.failedLoad": "Plugin se nepodařilo načíst",
   ...appsResources.cs,
   ...configResources.cs,
+  ...auditResources.cs,
 };
