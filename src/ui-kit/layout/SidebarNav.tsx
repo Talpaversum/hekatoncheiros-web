@@ -36,6 +36,7 @@ const sidebarConfig = [
       { to: "/core/account", labelKey: "nav.profile" },
       { to: "/core/account/session", labelKey: "nav.session" },
       { to: "/core/account/security", labelKey: "nav.security" },
+      { to: "/core/account/dashboard", labelKey: "nav.dashboardSettings" },
     ],
   },
   {

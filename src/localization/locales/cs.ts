@@ -1,6 +1,7 @@
 import { appsResources } from "../apps-resources";
 import { configResources } from "../config-resources";
 import { auditResources } from "../audit-resources";
+import { dashboardResources } from "../dashboard-resources";
 import type { MessageKey } from "./en";
 
 export const cs: Record<MessageKey, string> = {
@@ -188,4 +189,5 @@ export const cs: Record<MessageKey, string> = {
   ...appsResources.cs,
   ...configResources.cs,
   ...auditResources.cs,
+  ...dashboardResources.cs,
 };

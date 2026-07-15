@@ -1,131 +1,79 @@
-import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Component, useState, type ErrorInfo, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { hasPrivilege } from "../../access/privileges";
-import { useAppCatalogQuery } from "../../data/api/app-catalog";
-import { useAuditEventsQuery } from "../../data/api/audit";
 import { useContextQuery } from "../../data/api/context";
-import { useTenantUsersQuery } from "../../data/api/identity";
-import { useInstalledAppsQuery } from "../../data/api/installed-apps";
+import { registerCoreDashboardWidgets } from "../../dashboard/core-widgets";
+import type { DashboardWidgetDefinition, WidgetSettings, WidgetSize } from "../../dashboard/widget-contract";
+import { useDashboardPreferences } from "../../dashboard/use-dashboard-preferences";
+import { useApplicationDashboardWidgets } from "../../dashboard/use-application-widgets";
 import { useLocalization } from "../../localization/LocalizationProvider";
+import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
-import { PageHeader, SectionHeader, StatusBadge } from "../../ui-kit/components/Page";
+import { Dialog } from "../../ui-kit/components/Dialog";
+import { Input } from "../../ui-kit/components/Input";
+import { PageHeader } from "../../ui-kit/components/Page";
 
-type Widget = {
-  id: string;
-  label: string;
-  value: ReactNode;
-  description: string;
-  status: "available" | "planned";
-  tone?: "neutral" | "success" | "warning" | "danger" | "info";
-  href?: string;
-};
+registerCoreDashboardWidgets();
 
 export function DashboardPage() {
-  const { data, isLoading } = useContextQuery();
-  const privileges = data?.privileges ?? [];
-  const canManageApps = hasPrivilege(privileges, "platform.apps.manage");
-  const canManageTenant = hasPrivilege(privileges, "tenant.config.manage");
-  const canReadAudit = ["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read"].some((privilege) => hasPrivilege(privileges, privilege));
-  const [auditFrom] = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  const [auditTo] = useState(() => new Date().toISOString());
-  const { data: catalogData } = useAppCatalogQuery(canManageApps);
-  const { data: installedData } = useInstalledAppsQuery(canManageApps);
-  const { data: tenantUsersData } = useTenantUsersQuery(canManageTenant);
-  const { data: auditData, isLoading: isAuditLoading } = useAuditEventsQuery(`from=${encodeURIComponent(auditFrom)}&to=${encodeURIComponent(auditTo)}&limit=50`, canReadAudit);
+  const { data: context, isLoading } = useContextQuery();
   const { t } = useLocalization();
+  useApplicationDashboardWidgets(Boolean(context));
+  const dashboard = useDashboardPreferences(context?.privileges ?? []);
+  const queryClient = useQueryClient();
+  const [menuWidget, setMenuWidget] = useState<string | null>(null);
+  const [configureWidget, setConfigureWidget] = useState<DashboardWidgetDefinition | null>(null);
+  const [draftSettings, setDraftSettings] = useState<WidgetSettings>({});
+  const [addOpen, setAddOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [dragging, setDragging] = useState<string | null>(null);
 
-  const catalog = catalogData?.items ?? [];
-  const installed = installedData?.items ?? [];
-  const licenseCount = data?.licenses ? Object.keys(data.licenses).length : 0;
-  const appsRequiringLicense = catalog.filter((app) => app.license_required).length;
-  const availableUpdates = installed.filter(
-    (app) => app.catalog_update?.state === "available" || app.update_signal?.update_available === true,
-  ).length;
+  const openConfiguration = (definition: DashboardWidgetDefinition) => {
+    setDraftSettings(dashboard.preferences.widgets[definition.id]?.settings ?? definition.defaultSettings);
+    setConfigureWidget(definition); setMenuWidget(null);
+  };
+  const hidden = dashboard.hidden.filter((definition) => `${widgetTitle(definition, t)} ${widgetCategory(definition, t)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  const groups = new Map<string, DashboardWidgetDefinition[]>();
+  for (const definition of hidden) {
+    const category = widgetCategory(definition, t);
+    groups.set(category, [...(groups.get(category) ?? []), definition]);
+  }
 
-  const widgets: Widget[] = [
-    { id: "licenses", label: t("dashboard.tenantLicenses"), value: licenseCount, description: t("dashboard.tenantLicensesDescription"), status: "available" },
-    { id: "installed", label: t("dashboard.installedApps"), value: canManageApps ? installed.length : "-", description: t("dashboard.installedAppsDescription"), status: "available" },
-    { id: "license-required", label: t("dashboard.appsRequiringLicense"), value: canManageApps ? appsRequiringLicense : "-", description: t("dashboard.appsRequiringLicenseDescription"), status: "available", tone: appsRequiringLicense > 0 ? "warning" : "neutral" },
-    { id: "updates", label: t("dashboard.availableUpdates"), value: canManageApps ? availableUpdates : "-", description: t("dashboard.availableUpdatesDescription"), status: "available", tone: availableUpdates > 0 ? "warning" : "neutral" },
-    { id: "users", label: t("dashboard.tenantUsers"), value: canManageTenant ? tenantUsersData?.items.length ?? 0 : "-", description: t("dashboard.tenantUsersDescription"), status: "available" },
-    ...(canReadAudit ? [{ id: "audit", label: t("dashboard.recentAuditEvents"), value: isAuditLoading ? "…" : auditData?.next_cursor ? "50+" : auditData?.items.length ?? 0, description: t("dashboard.recentAuditEventsDescription"), status: "available" as const, tone: auditData?.items.some((event) => event.severity === "error" || event.severity === "critical") ? "warning" as const : "info" as const, href: "/core/audit?from=now-1d&to=now" }] : []),
-    { id: "jobs", label: t("dashboard.failedJobs"), value: "-", description: t("dashboard.failedJobsDescription"), status: "planned" },
-    { id: "health", label: t("dashboard.systemHealth"), value: "-", description: t("dashboard.systemHealthDescription"), status: "planned" },
-    { id: "expiring", label: t("dashboard.expiringLicenses"), value: "-", description: t("dashboard.expiringLicensesDescription"), status: "planned" },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow={t("nav.dashboard")}
-        title={t("nav.overview")}
-        description={data ? t("dashboard.operationalContext", { tenant: data.tenant.name ?? data.tenant.id ?? t("common.noTenant") }) : t("dashboard.loadingContext")}
-      />
-
-      <section aria-labelledby="dashboard-widgets">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 id="dashboard-widgets" className="text-sm font-semibold">{t("dashboard.operations")}</h2>
-          <div className="text-xs text-hc-muted">{t("dashboard.frontendLayout")}</div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {widgets.map((widget) => <DashboardWidget key={widget.id} widget={widget} liveLabel={t("common.live")} plannedLabel={t("common.planned")} />)}
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
-        <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("dashboard.currentContext")} description={t("dashboard.currentContextDescription")} />
-          {isLoading ? (
-            <div className="border-t border-hc-outline px-4 py-6 text-sm text-hc-muted">{t("common.loading")}</div>
-          ) : (
-            <dl className="grid border-t border-hc-outline sm:grid-cols-2">
-              <ContextItem label={t("dashboard.user")} value={data?.actor.display_name ?? data?.actor.email ?? data?.actor.user_id ?? "-"} detail={data?.actor.user_id} />
-              <ContextItem label={t("dashboard.effectiveUser")} value={data?.actor.effective_user_id ?? "-"} detail={data?.actor.impersonating ? t("dashboard.delegatedSession") : t("dashboard.directSession")} />
-              <ContextItem label={t("dashboard.tenant")} value={data?.tenant.name ?? data?.tenant.id ?? "-"} detail={data?.tenant.id ?? undefined} />
-              <ContextItem label={t("dashboard.tenantMode")} value={data?.tenant.mode ?? "-"} detail={data?.tenant.primary_domain ?? undefined} />
-            </dl>
-          )}
-        </Card>
-
-        <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("dashboard.myPrivileges")} description={t("dashboard.sessionAccessDescription")} meta={<StatusBadge tone="success">{t("common.active")}</StatusBadge>} />
-          <div className="border-t border-hc-outline p-3">
-            <div className="flex max-h-52 flex-wrap gap-1.5 overflow-auto">
-              {privileges.map((privilege) => <StatusBadge key={privilege}>{privilege}</StatusBadge>)}
-              {!isLoading && privileges.length === 0 && <div className="px-1 py-3 text-sm text-hc-muted">{t("dashboard.noPrivileges")}</div>}
-            </div>
-          </div>
-        </Card>
+  return <div className="space-y-4">
+    <PageHeader eyebrow={t("nav.dashboard")} title={t("nav.overview")} description={context ? t("dashboard.operationalContext", { tenant: context.tenant.name ?? context.tenant.id ?? t("common.noTenant") }) : t("dashboard.loadingContext")} actions={<Button onClick={() => setAddOpen(true)}>+ {t("dashboard.addWidget")}</Button>} />
+    {dashboard.isSaving && <div className="text-right text-xs text-hc-muted">{t("dashboard.savingLayout")}</div>}
+    {isLoading || dashboard.query.isLoading ? <DashboardSkeleton /> : dashboard.visible.length ? (
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {dashboard.visible.map((definition) => {
+          const preference = dashboard.preferences.widgets[definition.id];
+          return <WidgetCard key={definition.id} definition={definition} size={preference.size} settings={preference.settings} menuOpen={menuWidget === definition.id} onMenu={() => setMenuWidget((current) => current === definition.id ? null : definition.id)} onConfigure={() => openConfiguration(definition)} onRefresh={() => { void definition.refresh?.(); void queryClient.invalidateQueries(); setMenuWidget(null); }} onHide={() => { dashboard.hide(definition.id); setMenuWidget(null); }} onResize={(size) => dashboard.resize(definition.id, size)} dragging={dragging === definition.id} onDragStart={() => setDragging(definition.id)} onDrop={() => { if (dragging) dashboard.reorder(dragging, definition.id); setDragging(null); }} t={t} />;
+        })}
       </div>
-    </div>
-  );
+    ) : <Card className="py-12 text-center"><div className="text-sm text-hc-muted">{t("dashboard.noWidgets")}</div><Button className="mt-3" onClick={() => setAddOpen(true)}>+ {t("dashboard.addWidget")}</Button></Card>}
+
+    <Dialog open={addOpen} title={t("dashboard.addWidget")} onClose={() => setAddOpen(false)}><div className="space-y-4"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{t("dashboard.addWidget")}</h2><Button variant="ghost" onClick={() => setAddOpen(false)}>×</Button></div><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("dashboard.searchWidgets")} autoFocus />
+      <div className="max-h-[60vh] space-y-4 overflow-y-auto">{[...groups.entries()].map(([category, definitions]) => <section key={category}><h3 className="mb-1.5 text-xs font-semibold uppercase text-hc-muted">{category}</h3><div className="grid gap-2">{definitions.map((definition) => <button key={definition.id} type="button" className="rounded-hc-md border border-hc-outline p-3 text-left transition hover:border-hc-primary hover:bg-hc-surface-variant focus:outline-none focus:ring-2 focus:ring-hc-primary/40" onClick={() => { dashboard.show(definition.id); setAddOpen(false); setSearch(""); }}><span className="block text-sm font-semibold">{widgetTitle(definition, t)}</span>{(definition.description || definition.descriptionKey) && <span className="mt-1 block text-xs text-hc-muted">{definition.description ?? t(definition.descriptionKey!)}</span>}</button>)}</div></section>)}{hidden.length === 0 && <div className="py-8 text-center text-sm text-hc-muted">{t("dashboard.noAvailableWidgets")}</div>}</div>
+    </div></Dialog>
+
+    <Dialog open={Boolean(configureWidget)} title={configureWidget ? widgetTitle(configureWidget, t) : undefined} onClose={() => setConfigureWidget(null)}><div className="space-y-4"><div className="flex items-center justify-between"><div><div className="text-xs uppercase text-hc-muted">{t("dashboard.configureWidget")}</div><h2 className="text-lg font-semibold">{configureWidget ? widgetTitle(configureWidget, t) : ""}</h2></div><Button variant="ghost" onClick={() => setConfigureWidget(null)}>×</Button></div>{configureWidget?.settingsComponent ? <configureWidget.settingsComponent value={draftSettings} onChange={setDraftSettings} /> : <div className="text-sm text-hc-muted">{t("dashboard.noWidgetSettings")}</div>}<div className="flex justify-end gap-2"><Button variant="outlined" onClick={() => setConfigureWidget(null)}>{t("common.cancel")}</Button><Button onClick={() => { if (configureWidget) dashboard.configure(configureWidget.id, draftSettings); setConfigureWidget(null); }}>{t("common.save")}</Button></div></div></Dialog>
+  </div>;
 }
 
-function DashboardWidget({ widget, liveLabel, plannedLabel }: { widget: Widget; liveLabel: string; plannedLabel: string }) {
-  const content = (
-    <Card className={`flex min-h-32 flex-col justify-between gap-4 p-4 ${widget.href ? "transition hover:border-hc-primary hover:bg-hc-surface-variant/30" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-medium">{widget.label}</div>
-        <StatusBadge tone={widget.status === "planned" ? "neutral" : widget.tone ?? "info"}>
-          {widget.status === "planned" ? plannedLabel : liveLabel}
-        </StatusBadge>
-      </div>
-      <div>
-        <div className="text-2xl font-semibold leading-none">{widget.value}</div>
-        <div className="mt-2 text-xs text-hc-muted">{widget.description}</div>
-      </div>
-    </Card>
-  );
-  return widget.href ? <Link to={widget.href} className="rounded-hc-md focus:outline-none focus:ring-2 focus:ring-hc-primary/40">{content}</Link> : content;
+function WidgetCard({ definition, size, settings, menuOpen, onMenu, onConfigure, onRefresh, onHide, onResize, dragging, onDragStart, onDrop, t }: { definition: DashboardWidgetDefinition; size: WidgetSize; settings: WidgetSettings; menuOpen: boolean; onMenu(): void; onConfigure(): void; onRefresh(): void; onHide(): void; onResize(size: WidgetSize): void; dragging: boolean; onDragStart(): void; onDrop(): void; t(key: string): string }) {
+  const Component = definition.component;
+  const span = size === "wide" ? "md:col-span-2 xl:col-span-4" : size === "medium" ? "md:col-span-2" : "";
+  return <Card className={`${span} relative flex flex-col self-start overflow-visible p-0 ${dragging ? "opacity-50" : ""}`} draggable onDragStart={onDragStart} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+    <div className="flex cursor-grab items-start justify-between gap-3 border-b border-hc-outline px-4 py-2.5 active:cursor-grabbing"><div className="min-w-0"><h2 className="truncate text-sm font-semibold">{widgetTitle(definition, t)}</h2><div className="mt-0.5 truncate text-xs text-hc-muted">{widgetCategory(definition, t)}</div></div><div className="relative shrink-0"><button type="button" className="rounded-hc-sm px-2 py-1 text-lg leading-none text-hc-muted hover:bg-hc-surface-variant focus:outline-none focus:ring-2 focus:ring-hc-primary/40" onClick={onMenu} aria-expanded={menuOpen} aria-label={t("dashboard.widgetMenu")}>⋮</button>{menuOpen && <div className="absolute right-0 top-8 z-30 w-44 rounded-hc-md border border-hc-outline bg-hc-surface p-1.5 shadow-xl"><button className="w-full rounded-hc-sm px-3 py-2 text-left text-sm hover:bg-hc-surface-variant" onClick={onConfigure}>{t("dashboard.configureWidget")}</button><button className="w-full rounded-hc-sm px-3 py-2 text-left text-sm hover:bg-hc-surface-variant" onClick={onRefresh}>{t("dashboard.refreshWidget")}</button><div className="my-1 border-t border-hc-outline" /><div className="px-3 py-1 text-xs text-hc-muted">{t("dashboard.widgetSize")}</div><div className="flex gap-1 px-2 pb-1">{definition.supportedSizes.map((option) => <button key={option} className={`rounded px-2 py-1 text-xs ${size === option ? "bg-hc-primary text-hc-on-primary" : "bg-hc-surface-variant"}`} onClick={() => onResize(option)}>{t(`dashboard.size.${option}`)}</button>)}</div><div className="my-1 border-t border-hc-outline" /><button className="w-full rounded-hc-sm px-3 py-2 text-left text-sm text-hc-danger hover:bg-hc-danger/10" onClick={onHide}>{t("dashboard.hideWidget")}</button></div>}</div></div>
+    <div className="min-h-0 flex-1 p-3"><WidgetErrorBoundary fallback={t("dashboard.widgetError")}><Component settings={settings} size={size} /></WidgetErrorBoundary></div>
+  </Card>;
 }
 
-function ContextItem({ label, value, detail }: { label: string; value: string; detail?: string | null }) {
-  return (
-    <div className="border-b border-hc-outline px-4 py-3 last:border-b-0 sm:odd:border-r">
-      <dt className="text-xs font-medium text-hc-muted">{label}</dt>
-      <dd className="mt-1 truncate text-sm font-semibold" title={value}>{value}</dd>
-      {detail && detail !== value && <div className="mt-0.5 truncate text-xs text-hc-muted" title={detail}>{detail}</div>}
-    </div>
-  );
+function DashboardSkeleton() { return <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 6 }, (_, index) => <Card key={index} className="h-40 animate-pulse bg-hc-surface-variant/40" />)}</div>; }
+class WidgetErrorBoundary extends Component<{ children: ReactNode; fallback: string }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error("Dashboard widget failed", error, info); }
+  render() { return this.state.failed ? <div className="py-3 text-sm text-hc-danger">{this.props.fallback}</div> : this.props.children; }
 }
+function widgetTitle(definition: DashboardWidgetDefinition, t: (key: string) => string) { return definition.title ?? t(definition.titleKey); }
+function widgetCategory(definition: DashboardWidgetDefinition, t: (key: string) => string) { return definition.category ?? t(definition.categoryKey); }

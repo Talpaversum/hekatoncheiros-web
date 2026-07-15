@@ -1,6 +1,7 @@
 import { appsResources } from "../apps-resources";
 import { configResources } from "../config-resources";
 import { auditResources } from "../audit-resources";
+import { dashboardResources } from "../dashboard-resources";
 
 export const en = {
   "nav.dashboard": "Dashboard", "nav.apps": "Apps", "nav.licensing": "Licensing", "nav.help": "Help",
@@ -187,6 +188,7 @@ export const en = {
   ...appsResources.en,
   ...configResources.en,
   ...auditResources.en,
+  ...dashboardResources.en,
 } as const;
 
 export type MessageKey = keyof typeof en;

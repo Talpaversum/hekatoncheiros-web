@@ -1,0 +1,43 @@
+const en = {
+  "nav.dashboardSettings": "Dashboard",
+  "dashboard.addWidget": "Add widget", "dashboard.searchWidgets": "Search widgets", "dashboard.noAvailableWidgets": "No available widgets match your search.",
+  "dashboard.noWidgets": "Your dashboard has no visible widgets.", "dashboard.savingLayout": "Saving dashboard...", "dashboard.widgetMenu": "Widget menu",
+  "dashboard.configureWidget": "Configure", "dashboard.refreshWidget": "Refresh", "dashboard.hideWidget": "Hide widget", "dashboard.widgetSize": "Widget size",
+  "dashboard.size.small": "S", "dashboard.size.medium": "M", "dashboard.size.wide": "L", "dashboard.noWidgetSettings": "This widget has no additional settings.",
+  "dashboard.categoryAccounting": "Accounting", "dashboard.categorySystem": "System", "dashboard.categoryLicensing": "Licensing", "dashboard.categoryIdentity": "Identity",
+  "dashboard.auditWidgetDescription": "Visible audit events during the last {{hours}} hours.", "dashboard.settingTimeHours": "Time range in hours",
+  "dashboard.settingEventLimit": "Maximum displayed events", "dashboard.settingSeverity": "Severity filter", "dashboard.allSeverities": "All severities",
+  "dashboard.importantSeverities": "Warning, error and critical", "dashboard.errorsOnly": "Error and critical",
+  "dashboard.manageTitle": "Dashboard widgets", "dashboard.manageDescription": "Enable hidden widgets and review the saved per-user layout.",
+  "dashboard.visibleCount": "{{count}} visible", "dashboard.enableWidget": "Enable", "dashboard.disableWidget": "Disable",
+  "dashboard.resetTitle": "Dashboard preferences", "dashboard.resetDescription": "Restore the current registry defaults or remove the saved configuration and initialize it again.",
+  "dashboard.restoreDefaults": "Restore defaults", "dashboard.resetLayout": "Reset layout",
+  "dashboard.widgetError": "Data could not be loaded.", "dashboard.retry": "Retry", "dashboard.viewAll": "View all",
+  "dashboard.noAuditEvents": "No recent audit events", "dashboard.noUpdates": "No updates available",
+  "dashboard.installedCount": "{{count}} installed", "dashboard.activeUsers": "{{count}} active", "dashboard.dataUnavailable": "No data available",
+  "dashboard.noTenantLicenses": "No active tenant licenses", "dashboard.noAppsRequireLicense": "No applications require a license",
+  "dashboard.moreApps": "+{{count}} more",
+} as const;
+
+const cs: Record<keyof typeof en, string> = {
+  "nav.dashboardSettings": "Dashboard",
+  "dashboard.addWidget": "Přidat widget", "dashboard.searchWidgets": "Hledat widgety", "dashboard.noAvailableWidgets": "Hledání neodpovídají žádné dostupné widgety.",
+  "dashboard.noWidgets": "Dashboard nemá žádné viditelné widgety.", "dashboard.savingLayout": "Ukládání dashboardu...", "dashboard.widgetMenu": "Nabídka widgetu",
+  "dashboard.configureWidget": "Nastavit", "dashboard.refreshWidget": "Obnovit", "dashboard.hideWidget": "Skrýt widget", "dashboard.widgetSize": "Velikost widgetu",
+  "dashboard.size.small": "S", "dashboard.size.medium": "M", "dashboard.size.wide": "L", "dashboard.noWidgetSettings": "Tento widget nemá další nastavení.",
+  "dashboard.categoryAccounting": "Účtování", "dashboard.categorySystem": "Systém", "dashboard.categoryLicensing": "Licencování", "dashboard.categoryIdentity": "Identity",
+  "dashboard.auditWidgetDescription": "Dostupné auditní události za posledních {{hours}} hodin.", "dashboard.settingTimeHours": "Časový rozsah v hodinách",
+  "dashboard.settingEventLimit": "Maximum zobrazených událostí", "dashboard.settingSeverity": "Filtr závažnosti", "dashboard.allSeverities": "Všechny závažnosti",
+  "dashboard.importantSeverities": "Varování, chyba a kritická", "dashboard.errorsOnly": "Chyba a kritická",
+  "dashboard.manageTitle": "Widgety dashboardu", "dashboard.manageDescription": "Zapněte skryté widgety a spravujte uložené rozložení uživatele.",
+  "dashboard.visibleCount": "Viditelné: {{count}}", "dashboard.enableWidget": "Zapnout", "dashboard.disableWidget": "Vypnout",
+  "dashboard.resetTitle": "Předvolby dashboardu", "dashboard.resetDescription": "Obnovte výchozí stav aktuálního registru nebo odstraňte uloženou konfiguraci a inicializujte ji znovu.",
+  "dashboard.restoreDefaults": "Obnovit výchozí", "dashboard.resetLayout": "Resetovat rozložení",
+  "dashboard.widgetError": "Data se nepodařilo načíst.", "dashboard.retry": "Zkusit znovu", "dashboard.viewAll": "Zobrazit vše",
+  "dashboard.noAuditEvents": "Žádné nedávné auditní události", "dashboard.noUpdates": "Nejsou dostupné žádné aktualizace",
+  "dashboard.installedCount": "Nainstalováno: {{count}}", "dashboard.activeUsers": "Aktivní: {{count}}", "dashboard.dataUnavailable": "Nejsou dostupná žádná data",
+  "dashboard.noTenantLicenses": "Žádné aktivní licence tenantu", "dashboard.noAppsRequireLicense": "Žádná aplikace nevyžaduje licenci",
+  "dashboard.moreApps": "+{{count}} dalších",
+};
+
+export const dashboardResources = { en, cs };
