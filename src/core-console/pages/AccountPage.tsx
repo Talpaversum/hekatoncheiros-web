@@ -6,7 +6,7 @@ import { useContextQuery } from "../../data/api/context";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { clearTokens } from "../../data/auth/storage";
 import { useLocalization } from "../../localization/LocalizationProvider";
-import { locales, type Locale } from "../../localization/resources";
+import { localeOptions, type Locale } from "../../localization/resources";
 import { Button } from "../../ui-kit/components/Button";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
@@ -112,7 +112,7 @@ export function AccountPage() {
               </Field>
               <Field label={t("account.language")}>
                 <Select value={effectiveLocale} onChange={(event) => setPreferredLocale(event.target.value as Locale)}>
-                  {locales.map((locale) => <option key={locale} value={locale}>{locale.toUpperCase()}</option>)}
+                  {localeOptions.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.value.toUpperCase()})</option>)}
                 </Select>
               </Field>
             </div>

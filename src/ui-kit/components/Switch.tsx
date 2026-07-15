@@ -13,6 +13,7 @@ export function Switch({ checked, className, ...props }: SwitchProps) {
       aria-checked={checked}
       className={cn(
         "relative inline-flex h-6 w-11 items-center rounded-full border border-transparent transition",
+        "disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "bg-hc-primary" : "bg-hc-surface-variant",
         className,
       )}

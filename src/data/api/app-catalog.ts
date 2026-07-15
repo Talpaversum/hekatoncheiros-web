@@ -75,6 +75,7 @@ export type AppCatalogSource = {
   feed_url: string | null;
   trust_mode: "dev" | "manual" | "verified" | "official";
   is_enabled: boolean;
+  auto_refresh_enabled: boolean;
   last_sync_at: string | null;
   last_error: string | null;
   created_by: string | null;
@@ -214,6 +215,21 @@ export function useSetCatalogSourceEnabledMutation() {
   });
 }
 
+export function useSetCatalogSourceAutoRefreshMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, autoRefreshEnabled }: { id: string; autoRefreshEnabled: boolean }) =>
+      authFetch<AppCatalogSource>(`/apps/catalog/sources/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ auto_refresh_enabled: autoRefreshEnabled }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["app-catalog-sources"] });
+    },
+  });
+}
+
 export function useSyncCatalogSourceMutation() {
   const queryClient = useQueryClient();
 
@@ -247,6 +263,25 @@ export function useInstallCatalogEntryMutation() {
       authFetch<InstallCatalogEntryResponse>(`/apps/catalog/entries/${encodeURIComponent(appId)}/install`, {
         method: "POST",
         body: JSON.stringify({ mode, approval }),
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["app-catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["installed-apps"] }),
+        queryClient.invalidateQueries({ queryKey: ["app-registry"] }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateManagedAppRuntimeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ appId, approval }: { appId: string; approval: AppRuntimeStartApproval }) =>
+      authFetch<InstallCatalogEntryResponse>(`/apps/installed/${encodeURIComponent(appId)}/runtime/update`, {
+        method: "POST",
+        body: JSON.stringify({ mode: "compose", approval }),
       }),
     onSuccess: async () => {
       await Promise.all([

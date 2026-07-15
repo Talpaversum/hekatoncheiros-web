@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
 
 import { locales, resources, type Locale } from "./resources";
 
@@ -17,20 +17,21 @@ function initialLocale(): Locale {
 
 export function LocalizationProvider({ children }: PropsWithChildren) {
   const [locale, updateLocale] = useState<Locale>(initialLocale);
+  const setLocale = useCallback((next: Locale) => {
+    localStorage.setItem("hc.locale", next);
+    document.documentElement.lang = next;
+    updateLocale(next);
+  }, []);
   const value = useMemo<LocalizationContextValue>(() => ({
     locale,
-    setLocale(next) {
-      localStorage.setItem("hc.locale", next);
-      document.documentElement.lang = next;
-      updateLocale(next);
-    },
+    setLocale,
     t(key, values = {}) {
       const template = resources[locale][key] ?? resources.en[key] ?? key;
       return template.replace(/\{\{([a-zA-Z][a-zA-Z0-9_]*)\}\}/g, (_match, name: string) =>
         Object.hasOwn(values, name) ? String(values[name]) : `{{${name}}}`,
       );
     },
-  }), [locale]);
+  }), [locale, setLocale]);
   return <LocalizationContext.Provider value={value}>{children}</LocalizationContext.Provider>;
 }
 

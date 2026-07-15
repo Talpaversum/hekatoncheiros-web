@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { AuthorsPanel } from "./AuthorsPanel";
+
 import {
   usePlatformInstanceSettingsQuery,
   useUpdatePlatformInstanceSettingsMutation,
@@ -396,6 +398,8 @@ export function PlatformConfigPage() {
           </div>
         </Card>}
 
+        {section === "authors" && <AuthorsPanel />}
+
         {section === "identity" && <div className="grid gap-4">
           <TabBar
             active={activeIdentityTab}
@@ -515,11 +519,11 @@ export function PlatformConfigPage() {
         </div>}
 
         {section === "automation" && <Card className="overflow-hidden p-0">
-          <SectionHeader title="Automation" description="Scheduled feed sync and controlled runtime actions belong here." meta={<StatusBadge>planned</StatusBadge>} />
+          <SectionHeader title="Automation" description="Scheduled feed sync and controlled runtime actions belong here." meta={<StatusBadge tone="success">active</StatusBadge>} />
           <div className="grid border-t border-hc-outline md:grid-cols-3 md:divide-x md:divide-hc-outline">
-            <ConfigTile title="Scheduled feed sync" status="planned" detail="Periodic sync for selected catalog sources." />
-            <ConfigTile title="Compose runtime manager" status="planned" detail="Start/stop/update app compose bundles with audit." />
-            <ConfigTile title="Policy audit" status="planned" detail="Review feed and runtime decisions over time." />
+            <ConfigTile title="Trusted feed refresh" status="active" detail="Opt-in refresh for verified and official catalog sources." />
+            <ConfigTile title="Compose runtime manager" status="active" detail="Start, stop, update, and rotate credentials for managed app bundles." />
+            <ConfigTile title="Policy audit" status="active" detail="Automatic feed and runtime decisions are recorded in the audit log." />
           </div>
         </Card>}
       </div>

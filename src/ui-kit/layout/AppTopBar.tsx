@@ -3,12 +3,15 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { hasPrivilege } from "../../access/privileges";
 import { getHelpCategoryPath, getVisiblePlatformHelpGuides } from "../../core-console/pages/help-guides";
+import { useUpdateAccountMutation } from "../../data/api/account";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { clearTokens } from "../../data/auth/storage";
 import { useLocalization } from "../../localization/LocalizationProvider";
+import { localeOptions, type Locale } from "../../localization/resources";
 import { Avatar } from "../components/Avatar";
 import { IconButton } from "../components/IconButton";
 import { Menu } from "../components/Menu";
+import { Select } from "../components/Select";
 import { Switch } from "../components/Switch";
 import { useTheme } from "../theme/useTheme";
 
@@ -23,12 +26,14 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggle } = useTheme();
-  const { t } = useLocalization();
+  const { locale, setLocale, t } = useLocalization();
+  const updateAccount = useUpdateAccountMutation();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
   const [appsOpen, setAppsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [languageError, setLanguageError] = useState(false);
 
   const initials = useMemo(() => {
     const source = displayName || userId;
@@ -44,6 +49,18 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const handleLogout = () => {
     clearTokens();
     navigate("/login");
+  };
+
+  const handleLocaleChange = async (next: Locale) => {
+    const previous = locale;
+    setLanguageError(false);
+    setLocale(next);
+    try {
+      await updateAccount.mutateAsync({ preferred_locale: next });
+    } catch {
+      setLocale(previous);
+      setLanguageError(true);
+    }
   };
 
   const openAccount = () => {
@@ -211,6 +228,20 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
                   <div className="text-xs text-hc-muted">{t("settings.switchAppearance")}</div>
                 </div>
                 <Switch checked={isDark} onClick={toggle} />
+              </div>
+              <div className="border-t border-hc-outline px-3 py-2">
+                <label className="text-xs font-medium text-hc-muted" htmlFor="topbar-language">{t("settings.language")}</label>
+                <Select
+                  id="topbar-language"
+                  className="mt-1"
+                  value={locale}
+                  disabled={updateAccount.isPending}
+                  onChange={(event) => void handleLocaleChange(event.target.value as Locale)}
+                >
+                  {localeOptions.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.value.toUpperCase()})</option>)}
+                </Select>
+                {updateAccount.isPending && <div className="mt-1 text-xs text-hc-muted">{t("settings.languageSaving")}</div>}
+                {languageError && <div className="mt-1 text-xs text-hc-danger">{t("settings.languageError")}</div>}
               </div>
               <div className="mt-2 rounded-hc-sm px-3 py-2 text-xs text-hc-muted">
                 {t("settings.tenantMode", { mode: tenantMode ?? "unknown" })}

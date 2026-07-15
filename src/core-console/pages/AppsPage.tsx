@@ -10,9 +10,11 @@ import {
   useDeleteCatalogEntryMutation,
   useInstallCatalogEntryMutation,
   useRefreshCatalogEntryFromInstalledMutation,
+  useSetCatalogSourceAutoRefreshMutation,
   useSetCatalogSourceEnabledMutation,
   useSetCatalogEntryPublicationMutation,
   useSyncCatalogSourceMutation,
+  useUpdateManagedAppRuntimeMutation,
   type AppCatalogEntry,
   type AppCatalogSource,
   type AppRuntimeStartApproval,
@@ -26,12 +28,16 @@ import {
   useIssueInstalledAppTokenMutation,
   useInstalledAppsQuery,
   useRefreshInstalledAppArtifactMutation,
+  useRotateManagedAppRuntimeTokenMutation,
+  useStopManagedAppRuntimeMutation,
   useUninstallAppMutation,
   type IssueInstalledAppTokenResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { useContextQuery } from "../../data/api/context";
+import { useLocalization } from "../../localization/LocalizationProvider";
+import { getLocaleLabel } from "../../localization/resources";
 import {
   useAppEntitlementsQuery,
   useClearSelectionMutation,
@@ -45,6 +51,7 @@ import { Dialog } from "../../ui-kit/components/Dialog";
 import { Input } from "../../ui-kit/components/Input";
 import { Field, MetricStrip, PageHeader, SectionHeader } from "../../ui-kit/components/Page";
 import { Select } from "../../ui-kit/components/Select";
+import { Switch } from "../../ui-kit/components/Switch";
 import { Table } from "../../ui-kit/components/Table";
 import { TabBar } from "../../ui-kit/components/TabBar";
 import { Textarea } from "../../ui-kit/components/Textarea";
@@ -61,10 +68,10 @@ type UninstallState =
 
 type InstallDialogState =
   | { status: "idle" }
-  | { status: "confirm"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
-  | { status: "running"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
-  | { status: "result"; entry: AppCatalogEntry; message: string; plan: CatalogDeploymentPlan }
-  | { status: "error"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; error: string; plan: CatalogDeploymentPlan };
+  | { status: "confirm"; operation: "install" | "update"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
+  | { status: "running"; operation: "install" | "update"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; plan: CatalogDeploymentPlan }
+  | { status: "result"; operation: "install" | "update"; entry: AppCatalogEntry; message: string; plan: CatalogDeploymentPlan }
+  | { status: "error"; operation: "install" | "update"; entry: AppCatalogEntry; mode: InstallCatalogEntryMode; error: string; plan: CatalogDeploymentPlan };
 
 type AppTokenDialogState =
   | { status: "idle" }
@@ -88,6 +95,17 @@ function Badge({ tone = "neutral", children }: { tone?: "neutral" | "good" | "wa
 function pickAppDisplayName(app: InstalledApp) {
   const appName = app.manifest?.["app_name"];
   return typeof appName === "string" && appName.trim().length > 0 ? appName : app.app_name ?? app.app_id;
+}
+
+function readAppLocalization(app: InstalledApp) {
+  const localization = app.manifest?.["localization"] as
+    | { default_locale?: unknown; supported_locales?: unknown }
+    | undefined;
+  const supportedLocales = Array.isArray(localization?.supported_locales)
+    ? localization.supported_locales.filter((value): value is string => typeof value === "string")
+    : ["en"];
+  const defaultLocale = typeof localization?.default_locale === "string" ? localization.default_locale : "en";
+  return { defaultLocale, supportedLocales: supportedLocales.length > 0 ? supportedLocales : [defaultLocale] };
 }
 
 function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>) {
@@ -217,15 +235,19 @@ export function AppsPage() {
   const refreshCatalogFromInstalled = useRefreshCatalogEntryFromInstalledMutation();
   const createCatalogSource = useCreateCatalogSourceMutation();
   const setCatalogSourceEnabled = useSetCatalogSourceEnabledMutation();
+  const setCatalogSourceAutoRefresh = useSetCatalogSourceAutoRefreshMutation();
   const syncCatalogSource = useSyncCatalogSourceMutation();
   const deleteCatalogEntry = useDeleteCatalogEntryMutation();
   const installCatalogEntry = useInstallCatalogEntryMutation();
+  const updateManagedRuntime = useUpdateManagedAppRuntimeMutation();
   const setCatalogEntryPublication = useSetCatalogEntryPublicationMutation();
   const uninstallMutation = useUninstallAppMutation();
   const refreshArtifactMutation = useRefreshInstalledAppArtifactMutation();
   const checkUpdateMutation = useCheckInstalledAppUpdateMutation();
   const clearUpdateSignalMutation = useClearInstalledAppUpdateSignalMutation();
   const issueAppTokenMutation = useIssueInstalledAppTokenMutation();
+  const stopManagedRuntime = useStopManagedAppRuntimeMutation();
+  const rotateManagedRuntimeToken = useRotateManagedAppRuntimeTokenMutation();
   const setSelectionMutation = useSetSelectionMutation();
   const clearSelectionMutation = useClearSelectionMutation();
   const offlineIngestMutation = useOfflineIngestMutation();
@@ -340,11 +362,38 @@ export function AppsPage() {
     }
   };
 
+  const handleSetCatalogSourceAutoRefresh = async (source: AppCatalogSource, autoRefreshEnabled: boolean) => {
+    resetNotices();
+    try {
+      await setCatalogSourceAutoRefresh.mutateAsync({ id: source.id, autoRefreshEnabled });
+      setMessage(`${source.name} automatic refresh was ${autoRefreshEnabled ? "enabled" : "disabled"}.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
   const openInstallDialog = (entry: AppCatalogEntry) => {
     resetNotices();
     setRuntimeApprovalConfirmed(false);
     const mode = "external";
-    setInstallDialog({ status: "confirm", entry, mode, plan: buildCatalogDeploymentPlan(entry, mode) });
+    setInstallDialog({ status: "confirm", operation: "install", entry, mode, plan: buildCatalogDeploymentPlan(entry, mode) });
+  };
+
+  const openRuntimeUpdateDialog = (app: InstalledApp) => {
+    resetNotices();
+    const entry = catalog.find((item) => item.app_id === app.app_id);
+    if (!entry) {
+      setActionError("A matching catalog entry is required before a managed runtime can be updated.");
+      return;
+    }
+    setRuntimeApprovalConfirmed(false);
+    setInstallDialog({
+      status: "confirm",
+      operation: "update",
+      entry,
+      mode: "compose",
+      plan: buildCatalogDeploymentPlan(entry, "compose"),
+    });
   };
 
   const setInstallMode = (mode: InstallCatalogEntryMode) => {
@@ -370,7 +419,7 @@ export function AppsPage() {
       return;
     }
 
-    const { entry, mode, plan } = installDialog;
+    const { operation, entry, mode, plan } = installDialog;
     let approval: AppRuntimeStartApproval | undefined;
     if (mode === "compose") {
       if (!runtimeApprovalConfirmed || !plan.package_sha256 || !plan.package_url || !plan.compose_file) {
@@ -390,20 +439,24 @@ export function AppsPage() {
       };
     }
     resetNotices();
-    setInstallDialog({ status: "running", entry, mode, plan });
+    setInstallDialog({ status: "running", operation, entry, mode, plan });
 
     try {
-      const result = await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode, approval });
+      const result = operation === "update"
+        ? await updateManagedRuntime.mutateAsync({ appId: entry.app_id, approval: approval! })
+        : await installCatalogEntry.mutateAsync({ appId: entry.app_id, mode, approval });
       const message =
-        result.status === "staged"
+        operation === "update"
+          ? `${entry.app_name} runtime was updated.`
+          : result.status === "staged"
           ? `${entry.app_name} was staged for installation.`
           : `${entry.app_name} was installed.`;
-      setInstallDialog({ status: "result", entry, message, plan: result.deployment_plan });
+      setInstallDialog({ status: "result", operation, entry, message, plan: result.deployment_plan });
       setMessage(message);
     } catch (error) {
       const formatted = formatActionError(error);
       setActionError(formatted);
-      setInstallDialog({ status: "error", entry, mode, error: formatted, plan });
+      setInstallDialog({ status: "error", operation, entry, mode, error: formatted, plan });
     }
   };
 
@@ -525,6 +578,26 @@ export function AppsPage() {
       const token = await issueAppTokenMutation.mutateAsync(app.app_id);
       setAppTokenDialog({ status: "issued", app, token });
       setMessage(`${pickAppDisplayName(app)} app token was issued.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
+  const handleStopManagedRuntime = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      await stopManagedRuntime.mutateAsync(app.app_id);
+      setMessage(`${pickAppDisplayName(app)} runtime was stopped.`);
+    } catch (error) {
+      setActionError(formatActionError(error));
+    }
+  };
+
+  const handleRotateManagedRuntimeToken = async (app: InstalledApp) => {
+    resetNotices();
+    try {
+      const result = await rotateManagedRuntimeToken.mutateAsync(app.app_id);
+      setMessage(`${pickAppDisplayName(app)} runtime token was rotated; valid until ${formatDate(result.expires_at)}.`);
     } catch (error) {
       setActionError(formatActionError(error));
     }
@@ -652,7 +725,8 @@ export function AppsPage() {
           onCreate={handleCreateCatalogSource}
           onSync={handleSyncCatalogSource}
           onSetEnabled={handleSetCatalogSourceEnabled}
-          isMutating={createCatalogSource.isPending || syncCatalogSource.isPending || setCatalogSourceEnabled.isPending}
+          onSetAutoRefresh={handleSetCatalogSourceAutoRefresh}
+          isMutating={createCatalogSource.isPending || syncCatalogSource.isPending || setCatalogSourceEnabled.isPending || setCatalogSourceAutoRefresh.isPending}
         />
       )}
 
@@ -739,10 +813,13 @@ export function AppsPage() {
             onCheckUpdate={handleCheckUpdate}
             onClearUpdateSignal={handleClearUpdateSignal}
             onIssueAppToken={handleIssueAppToken}
+            onStopRuntime={handleStopManagedRuntime}
+            onRotateRuntimeToken={handleRotateManagedRuntimeToken}
+            onUpdateRuntime={openRuntimeUpdateDialog}
             onRefreshCatalog={handleRefreshCatalogFromInstalled}
             onRefreshArtifact={handleRefreshArtifact}
             onUninstall={(app) => { setUninstallConfirmChecked(false); setUninstallState({ status: "confirm", app }); }}
-            isMutating={checkUpdateMutation.isPending || clearUpdateSignalMutation.isPending || issueAppTokenMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending}
+            isMutating={checkUpdateMutation.isPending || clearUpdateSignalMutation.isPending || issueAppTokenMutation.isPending || refreshArtifactMutation.isPending || refreshCatalogFromInstalled.isPending || stopManagedRuntime.isPending || rotateManagedRuntimeToken.isPending || updateManagedRuntime.isPending}
           /> : <Card><div className="text-sm text-hc-muted">Installed application not found.</div></Card>
         ) : <Card id="installed" className="rounded-hc-md p-0">
           <div className="flex items-center justify-between border-b border-hc-outline px-5 py-4">
@@ -860,6 +937,7 @@ function CatalogSourcesPanel({
   onCreate,
   onSync,
   onSetEnabled,
+  onSetAutoRefresh,
   isMutating,
 }: {
   sources: AppCatalogSource[];
@@ -869,6 +947,7 @@ function CatalogSourcesPanel({
   onCreate: () => Promise<void>;
   onSync: (source: AppCatalogSource) => Promise<void>;
   onSetEnabled: (source: AppCatalogSource, isEnabled: boolean) => Promise<void>;
+  onSetAutoRefresh: (source: AppCatalogSource, autoRefreshEnabled: boolean) => Promise<void>;
   isMutating: boolean;
 }) {
   return (
@@ -925,7 +1004,15 @@ function CatalogSourcesPanel({
                   {source.last_error ? ` / ${source.last_error}` : ""}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className={`flex items-center gap-2 text-xs ${source.trust_mode === "verified" || source.trust_mode === "official" ? "text-hc-text" : "text-hc-muted"}`}>
+                  <Switch
+                    checked={source.auto_refresh_enabled}
+                    disabled={isMutating || !source.is_enabled || (source.trust_mode !== "verified" && source.trust_mode !== "official")}
+                    onClick={() => void onSetAutoRefresh(source, !source.auto_refresh_enabled)}
+                  />
+                  Auto refresh
+                </label>
                 <Button variant="outlined" disabled={!source.is_enabled || isMutating} onClick={() => void onSync(source)}>
                   Sync
                 </Button>
@@ -1089,6 +1176,9 @@ function InstalledAppDetail({
   onCheckUpdate,
   onClearUpdateSignal,
   onIssueAppToken,
+  onStopRuntime,
+  onRotateRuntimeToken,
+  onUpdateRuntime,
   onRefreshCatalog,
   onRefreshArtifact,
   onUninstall,
@@ -1101,12 +1191,18 @@ function InstalledAppDetail({
   onCheckUpdate: (app: InstalledApp) => Promise<void>;
   onClearUpdateSignal: (app: InstalledApp) => Promise<void>;
   onIssueAppToken: (app: InstalledApp) => Promise<void>;
+  onStopRuntime: (app: InstalledApp) => Promise<void>;
+  onRotateRuntimeToken: (app: InstalledApp) => Promise<void>;
+  onUpdateRuntime: (app: InstalledApp) => void;
   onRefreshCatalog: (app: InstalledApp) => Promise<void>;
   onRefreshArtifact: (app: InstalledApp) => Promise<void>;
   onUninstall: (app: InstalledApp) => void;
   isMutating: boolean;
 }) {
   const status = getInstalledStatus(app, registrySlugs);
+  const { locale } = useLocalization();
+  const localization = readAppLocalization(app);
+  const effectiveLocale = localization.supportedLocales.includes(locale) ? locale : localization.defaultLocale;
 
   return (
     <Card className="overflow-hidden p-0">
@@ -1116,10 +1212,14 @@ function InstalledAppDetail({
         {app.app_version && <Badge>{app.app_version}</Badge>}
         {app.update_signal && <Badge tone="warn">update signal</Badge>}
         {app.catalog_update?.state === "available" && <Badge tone="warn">catalog update available</Badge>}
+        {app.managed_runtime && <Badge tone="good">Core-managed runtime</Badge>}
+        <Badge tone={effectiveLocale === locale ? "good" : "neutral"}>{getLocaleLabel(effectiveLocale)}</Badge>
       </div>
       <dl className="grid border-t border-hc-outline md:grid-cols-2">
         <DetailCell label="Runtime" value={status.detail ?? status.label} />
+        <DetailCell label="Runtime owner" value={app.managed_runtime ? `${app.managed_runtime.compose_project} / ${app.managed_runtime.service_name}` : "External"} />
         <DetailCell label="Entitlement" value={app.resolved_entitlement ? `${app.resolved_entitlement.tier}, valid to ${formatDate(app.resolved_entitlement.valid_to)}` : "No active entitlement"} />
+        <DetailCell label="Languages" value={localization.supportedLocales.map(getLocaleLabel).join(", ")} />
         <DetailCell label="UI URL" value={app.ui_url} />
         <DetailCell label="Catalog state" value={app.catalog_update ? `${app.catalog_update.state} · ${app.catalog_update.source_type} / ${app.catalog_update.trust_status}` : "Not checked"} />
       </dl>
@@ -1132,6 +1232,9 @@ function InstalledAppDetail({
         <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>Check update</Button>
         {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>Clear signal</Button>}
         <Button variant="outlined" disabled={isMutating} onClick={() => void onIssueAppToken(app)}>Issue token</Button>
+        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => void onRotateRuntimeToken(app)}>Rotate runtime token</Button>}
+        {app.managed_runtime && <Button variant="outlined" disabled={isMutating} onClick={() => onUpdateRuntime(app)}>Update runtime</Button>}
+        {app.managed_runtime && <Button variant="ghost" disabled={isMutating} onClick={() => void onStopRuntime(app)}>Stop runtime</Button>}
         <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshCatalog(app)}>Refresh catalog</Button>
         <Button variant="outlined" disabled={isMutating} onClick={() => void onRefreshArtifact(app)}>Refresh artifact</Button>
         <Button variant="ghost" onClick={() => onUninstall(app)}>Uninstall</Button>
@@ -1274,6 +1377,7 @@ function CatalogInstallDialog({
 
   const entry = state.entry;
   const plan = state.plan;
+  const operation = state.operation;
   const mode = state.status === "result" ? undefined : state.mode;
   const isRunning = state.status === "running";
   const composeApprovalBlocked =
@@ -1281,9 +1385,9 @@ function CatalogInstallDialog({
     (!runtimeApprovalConfirmed || !plan.package_sha256 || !plan.package_url || !plan.compose_file);
 
   return (
-    <Dialog open title="Install app" disableClose={isRunning} onClose={onClose}>
+    <Dialog open title={operation === "update" ? "Update runtime" : "Install app"} disableClose={isRunning} onClose={onClose}>
       <div>
-        <div className="text-lg font-semibold">Install {entry.app_name}</div>
+        <div className="text-lg font-semibold">{operation === "update" ? "Update" : "Install"} {entry.app_name}</div>
         <div className="mt-3 rounded-hc-md border border-hc-outline bg-hc-surface-variant p-3">
           <div className="text-sm font-medium">{entry.app_id}</div>
           <div className="mt-1 text-xs text-hc-muted">{entry.base_url}</div>
@@ -1293,7 +1397,7 @@ function CatalogInstallDialog({
           </div>
         </div>
 
-        {state.status !== "result" && (
+        {state.status !== "result" && operation === "install" && (
           <div className="mt-4 grid gap-2">
             {[
               ["external", "External service", "Install the app registry record and use its existing base URL."],
@@ -1346,9 +1450,9 @@ function CatalogInstallDialog({
               disabled={isRunning || !plan.package_sha256 || !plan.package_url || !plan.compose_file}
             />
             <span>
-              <span className="block font-medium text-hc-text">Approve Core-managed runtime start</span>
+              <span className="block font-medium text-hc-text">Approve Core-managed runtime {operation === "update" ? "update" : "start"}</span>
               <span className="mt-1 block text-xs text-hc-muted">
-                I reviewed the manifest and package hashes and authorize Core to build and start this Compose service.
+                I reviewed the manifest and package hashes and authorize Core to build and {operation === "update" ? "replace" : "start"} this Compose service.
               </span>
               {(!plan.package_sha256 || !plan.package_url || !plan.compose_file) && (
                 <span className="mt-2 block text-xs text-hc-danger">
@@ -1359,7 +1463,7 @@ function CatalogInstallDialog({
           </label>
         )}
 
-        {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">Installation is running...</div>}
+        {state.status === "running" && <div className="mt-4 text-sm text-hc-muted">{operation === "update" ? "Runtime update" : "Installation"} is running...</div>}
 
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={isRunning}>

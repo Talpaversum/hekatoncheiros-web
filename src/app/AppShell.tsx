@@ -12,12 +12,12 @@ export function AppShell() {
   const token = getAccessToken();
   const { data } = useContextQuery(!!token);
   const privileges = data?.privileges ?? [];
-  const { locale, setLocale, t } = useLocalization();
+  const { setLocale, t } = useLocalization();
 
   useEffect(() => {
     const preferred = data?.actor?.preferred_locale;
-    if (locales.includes(preferred as Locale) && preferred !== locale) setLocale(preferred as Locale);
-  }, [data?.actor?.preferred_locale, locale, setLocale]);
+    if (locales.includes(preferred as Locale)) setLocale(preferred as Locale);
+  }, [data?.actor?.preferred_locale, setLocale]);
 
   if (!token) {
     return <Navigate to="/login" replace />;

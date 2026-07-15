@@ -2,6 +2,19 @@ export const locales = ["en", "cs", "sk", "de", "fr", "es"] as const;
 export type Locale = (typeof locales)[number];
 export type Messages = Record<string, string>;
 
+export const localeOptions: ReadonlyArray<{ value: Locale; label: string }> = [
+  { value: "en", label: "English" },
+  { value: "cs", label: "Čeština" },
+  { value: "sk", label: "Slovenčina" },
+  { value: "de", label: "Deutsch" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+];
+
+export function getLocaleLabel(locale: string) {
+  return localeOptions.find((option) => option.value === locale)?.label ?? locale.toUpperCase();
+}
+
 const en: Messages = {
   "nav.dashboard": "Dashboard", "nav.apps": "Apps", "nav.licensing": "Licensing", "nav.help": "Help",
   "nav.manageApps": "Manage apps", "nav.allGuides": "All guides", "nav.account": "Account",
@@ -11,6 +24,8 @@ const en: Messages = {
   "common.signOut": "Sign out", "common.settings": "Settings", "common.user": "User",
   "settings.platform": "Platform configuration", "settings.tenant": "Tenant configuration",
   "settings.darkMode": "Dark mode", "settings.switchAppearance": "Switch appearance",
+  "settings.language": "Display language", "settings.languageSaving": "Saving language...",
+  "settings.languageError": "Language could not be saved.",
   "settings.tenantMode": "Tenant mode: {{mode}}", "account.profile": "User profile",
   "account.description": "Current session, identity fields, language, and password controls.",
   "account.displayName": "Display name", "account.email": "Email", "account.language": "Display language",
@@ -31,6 +46,8 @@ const cs: Messages = {
   "common.signOut": "Odhlásit se", "common.settings": "Nastavení", "common.user": "Uživatel",
   "settings.platform": "Nastavení platformy", "settings.tenant": "Nastavení tenantu",
   "settings.darkMode": "Tmavý režim", "settings.switchAppearance": "Přepnout vzhled",
+  "settings.language": "Jazyk zobrazení", "settings.languageSaving": "Ukládání jazyka...",
+  "settings.languageError": "Jazyk se nepodařilo uložit.",
   "settings.tenantMode": "Režim tenantu: {{mode}}", "account.profile": "Profil uživatele",
   "account.description": "Aktuální relace, identita, jazyk a nastavení hesla.",
   "account.displayName": "Zobrazované jméno", "account.email": "E-mail", "account.language": "Jazyk zobrazení",

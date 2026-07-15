@@ -16,6 +16,15 @@ export type InstalledApp = {
   required_privileges: string[];
   nav_entries?: Array<{ label: string; path: string; required_privileges?: string[] }>;
   enabled?: boolean;
+  managed_runtime: {
+    app_id: string;
+    runtime_type: "compose";
+    compose_project: string;
+    service_name: string;
+    package_sha256: string | null;
+    created_at: string;
+    updated_at: string;
+  } | null;
   catalog_update: {
     state: "available" | "same" | "stale" | "baseline_missing";
     update_available: boolean | null;
@@ -225,5 +234,30 @@ export function useClearInstalledAppUpdateSignalMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
     },
+  });
+}
+
+export function useStopManagedAppRuntimeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<{ app_id: string; compose_project: string; service_name: string; status: string }>(
+        `/apps/installed/${encodeURIComponent(appId)}/runtime/stop`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["installed-apps"] });
+    },
+  });
+}
+
+export function useRotateManagedAppRuntimeTokenMutation() {
+  return useMutation({
+    mutationFn: (appId: string) =>
+      authFetch<{ app_id: string; status: "rotated"; expires_at: string; container_path: string }>(
+        `/apps/installed/${encodeURIComponent(appId)}/runtime/token/rotate`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
   });
 }

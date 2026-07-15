@@ -60,6 +60,7 @@ const sidebarConfig = [
       { to: "/core/platform/instance", label: "Instance" },
       { to: "/core/platform/trusted-origins", label: "Trusted origins" },
       { to: "/core/platform/app-distribution", label: "App distribution" },
+      { to: "/core/platform/authors", label: "Application authors" },
       { to: "/core/platform/identity", label: "Identity & tenancy" },
       { to: "/core/platform/automation", label: "Automation" },
     ],
