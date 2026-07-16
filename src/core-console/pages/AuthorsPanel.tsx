@@ -6,6 +6,12 @@ import {
   useOnboardAuthorMutation,
   useRotateAuthorKeysMutation,
   useSyncAuthorRegistryTrustMutation,
+  useRegistryDashboardQuery,
+  useRegistryAuthorsQuery,
+  useRegistryAuditQuery,
+  useRegistryAuthorActionMutation,
+  useRegistryAuthorDetailQuery,
+  useRegistryLifecycleMutation,
   type AuthorOnboarding,
   type PublicJwks,
 } from "../../data/api/authors";
@@ -46,9 +52,16 @@ export function AuthorsPanel() {
   const onboardAuthor = useOnboardAuthorMutation();
   const rotateKeys = useRotateAuthorKeysMutation();
   const syncTrust = useSyncAuthorRegistryTrustMutation();
+  const { data: registryDashboard } = useRegistryDashboardQuery(true);
+  const { data: registryAuthors } = useRegistryAuthorsQuery(true);
+  const { data: registryAudit } = useRegistryAuditQuery(true);
+  const registryAction = useRegistryAuthorActionMutation();
+  const registryLifecycle = useRegistryLifecycleMutation();
   const authors = useMemo(() => data?.items ?? [], [data?.items]);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [selectedRegistryId, setSelectedRegistryId] = useState<string | null>(null);
+  const { data: registryDetail } = useRegistryAuthorDetailQuery(selectedRegistryId);
   const [selectedAuthor, setSelectedAuthor] = useState<AuthorOnboarding | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [jwks, setJwks] = useState(emptyJwks);
@@ -112,11 +125,23 @@ export function AuthorsPanel() {
       <ToastNotice message={error ?? message} tone={error ? "danger" : "success"} onDismiss={clearNotice} />
 
       <MetricStrip items={[
-        { label: t("authors.authors"), value: authors.length },
+        { label: t("authors.authors"), value: registryDashboard?.registered_authors ?? authors.length },
         { label: t("authors.rootKeys"), value: trust?.root_jwks_json.keys.length ?? 0 },
-        { label: t("authors.revocations"), value: countRevocations(trust?.revocations_json) },
+        { label: t("authors.revocations"), value: registryDashboard?.revocations ?? countRevocations(trust?.revocations_json) },
         { label: t("authors.trustSync"), value: t(trust ? "authors.current" : "authors.missing"), tone: trust ? "success" : "warning" },
       ]} />
+
+      {registryDashboard && <Card className="overflow-hidden p-0">
+        <SectionHeader title={t("authors.registryOperations")} description={`${registryDashboard.trust_anchor.registry_id} · ${registryDashboard.trust_anchor.fingerprint}`} meta={<StatusBadge>{t("authors.pendingCount", { count: registryDashboard.pending_requests })}</StatusBadge>} />
+        <Table className="rounded-none border-0 border-t shadow-none"><thead><tr><th>{t("authors.author")}</th><th>{t("platform.status")}</th><th>{t("authors.publicKeys")}</th><th>{t("authors.certificateExpiry")}</th><th className="text-right">{t("authors.action")}</th></tr></thead>
+          <tbody>{(registryAuthors?.items ?? []).map((author) => <tr key={author.author_id}><td><div className="font-medium">{author.display_name}</div><div className="font-mono text-xs text-hc-muted">{author.author_id}</div></td><td><StatusBadge>{author.status}</StatusBadge></td><td>{author.active_keys}</td><td>{formatDate(author.certificate_expires_at, t)}</td><td className="text-right"><div className="inline-flex gap-1"><Button size="sm" variant="ghost" onClick={() => setSelectedRegistryId(author.author_id)}>{t("common.open")}</Button>{author.status === "pending" && <Button size="sm" onClick={() => registryAction.mutate({ authorId: author.author_id, action: "approve" })}>{t("authors.approve")}</Button>}{author.status === "active" && <Button size="sm" variant="outlined" onClick={() => registryAction.mutate({ authorId: author.author_id, action: "suspend" })}>{t("authors.suspend")}</Button>}{author.status !== "revoked" && <Button size="sm" variant="ghost" onClick={() => registryAction.mutate({ authorId: author.author_id, action: "revoke", reason: "Revoked by registry operator" })}>{t("authors.revoke")}</Button>}</div></td></tr>)}</tbody>
+        </Table>
+      </Card>}
+
+      {registryDetail && <Card className="overflow-hidden p-0">
+        <SectionHeader title={registryDetail.display_name} description={registryDetail.author_id} meta={<div className="flex gap-2"><Button size="sm" variant="ghost" onClick={() => registryLifecycle.mutate({ path: `/platform/author-registry/authors/${encodeURIComponent(registryDetail.author_id)}`, method: "DELETE" })}>{t("platform.delete")}</Button><Button size="sm" variant="ghost" onClick={() => setSelectedRegistryId(null)}>{t("common.close")}</Button></div>} />
+        <div className="grid gap-4 border-t border-hc-outline p-4 lg:grid-cols-2"><div><h3 className="mb-2 text-sm font-semibold">{t("authors.publicKeys")}</h3>{registryDetail.keys.map((key) => <div className="flex items-center justify-between border-t border-hc-outline py-2" key={key.kid}><div><div className="font-mono text-xs">{key.kid}</div><div className="text-xs text-hc-muted">{key.revoked_at ? t("authors.revoked") : key.disabled_at ? t("authors.disabled") : t("config.active")}</div></div>{!key.revoked_at && <div className="flex gap-1"><Button size="sm" variant="outlined" onClick={() => registryLifecycle.mutate({ path: `/platform/author-registry/authors/${encodeURIComponent(registryDetail.author_id)}/keys/${encodeURIComponent(key.kid)}/status`, body: { revoke: false } })}>{t("authors.disable")}</Button><Button size="sm" variant="ghost" onClick={() => registryLifecycle.mutate({ path: `/platform/author-registry/authors/${encodeURIComponent(registryDetail.author_id)}/keys/${encodeURIComponent(key.kid)}/status`, body: { revoke: true, reason: "Revoked by registry operator" } })}>{t("authors.revoke")}</Button></div>}</div>)}</div><div><h3 className="mb-2 text-sm font-semibold">{t("authors.certificates")}</h3>{registryDetail.certificates.map((cert) => <div className="flex items-center justify-between border-t border-hc-outline py-2" key={cert.id}><div><div className="font-mono text-xs">{cert.root_kid ?? cert.id}</div><div className="text-xs text-hc-muted">{cert.status} · {formatDate(cert.not_after, t)}</div></div>{cert.status === "active" && <Button size="sm" variant="ghost" onClick={() => registryLifecycle.mutate({ path: `/platform/author-registry/certificates/${encodeURIComponent(cert.id)}/revoke`, body: { reason: "Revoked by registry operator" } })}>{t("authors.revoke")}</Button>}</div>)}</div></div>
+      </Card>}
 
       <Card className="overflow-hidden p-0">
         <SectionHeader
@@ -164,6 +189,8 @@ export function AuthorsPanel() {
           <Button variant="outlined" onClick={() => void handleRotate()} disabled={rotateKeys.isPending}>{t(rotateKeys.isPending ? "authors.rotating" : "authors.rotateKeys")}</Button>
         </div>
       </Card>}
+
+      {registryAudit && <Card className="overflow-hidden p-0"><SectionHeader title={t("authors.audit")} description={t("authors.auditDescription")} /><Table className="rounded-none border-0 border-t shadow-none"><thead><tr><th>{t("authors.updated")}</th><th>{t("authors.author")}</th><th>{t("platform.action")}</th><th>{t("platform.status")}</th></tr></thead><tbody>{registryAudit.items.slice(0, 20).map((event) => <tr key={String(event.id)}><td>{formatDate(String(event.created_at), t)}</td><td>{String(event.username ?? "-")}</td><td>{String(event.operation ?? "-")}</td><td>{String(event.outcome ?? "-")}</td></tr>)}</tbody></Table></Card>}
     </div>
   );
 }
