@@ -1,5 +1,5 @@
 import { apiFetch } from "../api/client";
-import { getRefreshToken, storeTokens } from "./storage";
+import { clearTokens, getRefreshToken, storeTokens } from "./storage";
 
 export type LoginResponse = {
   access_token: string;
@@ -28,10 +28,18 @@ export async function refreshAccessToken() {
   if (!refreshToken) {
     return null;
   }
-  const response = await apiFetch<RefreshResponse>("/auth/refresh", {
-    method: "POST",
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  storeTokens(response.access_token, null);
-  return response;
+  try {
+    const response = await apiFetch<RefreshResponse>("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    storeTokens(response.access_token, null);
+    return response;
+  } catch (error) {
+    if (error && typeof error === "object" && (error as { status?: unknown }).status === 401) {
+      clearTokens();
+      return null;
+    }
+    throw error;
+  }
 }
