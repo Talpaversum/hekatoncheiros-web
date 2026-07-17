@@ -13,18 +13,35 @@ type SidebarItem = { to: string; labelKey: string; required?: string };
 
 const sidebarConfig = [
   {
+    prefix: "/core/author-onboarding",
+    titleKey: "authorPortal.become",
+    items: [{ to: "/core/author-onboarding", labelKey: "authorPortal.become" }],
+  },
+  {
     prefix: "/core/author",
     titleKey: "nav.authorPortal",
     items: [
       { to: "/core/author", labelKey: "nav.overview" },
-      { to: "/core/author/become", labelKey: "authorPortal.become" },
       { to: "/core/author/profiles", labelKey: "authorPortal.profiles" },
       { to: "/core/author/git", labelKey: "authorPortal.gitConnections" },
       { to: "/core/author/applications", labelKey: "authorPortal.applications" },
       { to: "/core/author/licensing", labelKey: "nav.licensing" },
       { to: "/core/author/catalog", labelKey: "authorPortal.catalogSubmissions" },
       { to: "/core/author/activity", labelKey: "authorPortal.activity" },
-      { to: "/core/author/reviews", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage" },
+    ] satisfies SidebarItem[],
+  },
+  {
+    prefix: "/core/developer",
+    titleKey: "authorPortal.developerTools",
+    items: [{ to: "/core/developer", labelKey: "nav.overview" }],
+  },
+  {
+    prefix: "/core/registry",
+    titleKey: "authorPortal.registryAdministration",
+    items: [
+      { to: "/core/registry", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage" },
+      { to: "/core/registry/applications", labelKey: "authorPortal.applications", required: "platform.catalog.manage" },
+      { to: "/core/registry/catalog", labelKey: "authorPortal.catalogSubmissions", required: "platform.catalog.manage" },
     ] satisfies SidebarItem[],
   },
   {

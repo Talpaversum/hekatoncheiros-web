@@ -1,6 +1,17 @@
 const en: Record<string, string> = {
   "nav.authorPortal": "Author Portal",
   "authorPortal.title": "Author Portal",
+  "authorPortal.developerTools": "Developer Tools",
+  "authorPortal.developerToolsDescription": "Build, install and test private applications without official registry approval.",
+  "authorPortal.privateApps": "Private applications",
+  "authorPortal.officialServices": "Optional official services",
+  "authorPortal.officialServicesDescription": "These links only appear when this instance provides and configures the relevant service.",
+  "authorPortal.registryAdministration": "Registry Administration",
+  "authorPortal.capabilityUnavailable": "This service is not available or configured on this instance.",
+  "authorPortal.available": "Available",
+  "authorPortal.unavailable": "Unavailable",
+  "authorPortal.openTool": "Open tool",
+  "authorPortal.activeAuthor": "Active author",
   "authorPortal.eyebrow": "Application authoring",
   "authorPortal.description": "Manage author identities, source repositories, applications, licensing and catalog submissions.",
   "authorPortal.requests": "Requests",
@@ -201,6 +212,17 @@ const cs: Record<string, string> = {
   ...en,
   "nav.authorPortal": "Portál autora",
   "authorPortal.title": "Portál autora",
+  "authorPortal.developerTools": "Vývojářské nástroje",
+  "authorPortal.developerToolsDescription": "Vyvíjejte, instalujte a testujte soukromé aplikace bez schválení oficiálním registrem.",
+  "authorPortal.privateApps": "Soukromé aplikace",
+  "authorPortal.officialServices": "Volitelné oficiální služby",
+  "authorPortal.officialServicesDescription": "Odkazy se zobrazí pouze tehdy, když instance příslušnou službu poskytuje a má ji nakonfigurovanou.",
+  "authorPortal.registryAdministration": "Správa registru",
+  "authorPortal.capabilityUnavailable": "Tato služba není na této instanci dostupná nebo nakonfigurovaná.",
+  "authorPortal.available": "Dostupné",
+  "authorPortal.unavailable": "Nedostupné",
+  "authorPortal.openTool": "Otevřít nástroj",
+  "authorPortal.activeAuthor": "Aktivní autor",
   "authorPortal.eyebrow": "Vývoj aplikací",
   "authorPortal.description": "Správa identit autorů, zdrojových repozitářů, aplikací, licencování a publikování do katalogu.",
   "authorPortal.requests": "Žádosti",
@@ -397,12 +419,16 @@ const cs: Record<string, string> = {
   "authorPortal.event.author.catalog.unpublish": "Položka katalogu stažena",
 };
 
-// EN is the documented fallback for portal strings not translated in these locales yet.
+const sk = { ...en, "authorPortal.developerTools": "Vývojárske nástroje", "authorPortal.developerToolsDescription": "Vyvíjajte, inštalujte a testujte súkromné aplikácie bez schválenia oficiálnym registrom.", "authorPortal.privateApps": "Súkromné aplikácie", "authorPortal.officialServices": "Voliteľné oficiálne služby", "authorPortal.officialServicesDescription": "Odkazy sa zobrazia iba vtedy, keď inštancia príslušnú službu poskytuje a má ju nakonfigurovanú.", "authorPortal.registryAdministration": "Správa registra", "authorPortal.capabilityUnavailable": "Táto služba nie je na tejto inštancii dostupná alebo nakonfigurovaná.", "authorPortal.available": "Dostupné", "authorPortal.unavailable": "Nedostupné", "authorPortal.openTool": "Otvoriť nástroj", "authorPortal.activeAuthor": "Aktívny autor" };
+const de = { ...en, "authorPortal.developerTools": "Entwicklerwerkzeuge", "authorPortal.developerToolsDescription": "Private Anwendungen ohne Freigabe der offiziellen Registry entwickeln, installieren und testen.", "authorPortal.privateApps": "Private Anwendungen", "authorPortal.officialServices": "Optionale offizielle Dienste", "authorPortal.officialServicesDescription": "Links erscheinen nur, wenn diese Instanz den Dienst bereitstellt und konfiguriert hat.", "authorPortal.registryAdministration": "Registry-Verwaltung", "authorPortal.capabilityUnavailable": "Dieser Dienst ist auf dieser Instanz nicht verfügbar oder nicht konfiguriert.", "authorPortal.available": "Verfügbar", "authorPortal.unavailable": "Nicht verfügbar", "authorPortal.openTool": "Werkzeug öffnen", "authorPortal.activeAuthor": "Aktiver Autor" };
+const fr = { ...en, "authorPortal.developerTools": "Outils de développement", "authorPortal.developerToolsDescription": "Développez, installez et testez des applications privées sans approbation du registre officiel.", "authorPortal.privateApps": "Applications privées", "authorPortal.officialServices": "Services officiels facultatifs", "authorPortal.officialServicesDescription": "Les liens apparaissent uniquement lorsque cette instance fournit et configure le service concerné.", "authorPortal.registryAdministration": "Administration du registre", "authorPortal.capabilityUnavailable": "Ce service n’est pas disponible ou configuré sur cette instance.", "authorPortal.available": "Disponible", "authorPortal.unavailable": "Indisponible", "authorPortal.openTool": "Ouvrir l’outil", "authorPortal.activeAuthor": "Auteur actif" };
+const es = { ...en, "authorPortal.developerTools": "Herramientas de desarrollo", "authorPortal.developerToolsDescription": "Desarrolla, instala y prueba aplicaciones privadas sin la aprobación del registro oficial.", "authorPortal.privateApps": "Aplicaciones privadas", "authorPortal.officialServices": "Servicios oficiales opcionales", "authorPortal.officialServicesDescription": "Los enlaces solo aparecen cuando esta instancia ofrece y tiene configurado el servicio correspondiente.", "authorPortal.registryAdministration": "Administración del registro", "authorPortal.capabilityUnavailable": "Este servicio no está disponible o configurado en esta instancia.", "authorPortal.available": "Disponible", "authorPortal.unavailable": "No disponible", "authorPortal.openTool": "Abrir herramienta", "authorPortal.activeAuthor": "Autor activo" };
+
 export const authorResources = {
   en,
   cs,
-  sk: { ...en },
-  de: { ...en },
-  fr: { ...en },
-  es: { ...en },
+  sk,
+  de,
+  fr,
+  es,
 };

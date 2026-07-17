@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
@@ -33,27 +33,37 @@ const tone = (status: string): "neutral" | "success" | "warning" | "danger" | "i
     ["rejected", "revoked", "manifest_invalid", "disabled"].includes(status) ? "danger" :
       ["submitted", "pending_review", "needs_changes", "runtime_pending", "suspended"].includes(status) ? "warning" : "neutral";
 
-export function AuthorPortalPage() {
+type AuthorModule = "workspace" | "onboarding" | "registry";
+
+export function AuthorPortalPage({ module = "workspace" }: { module?: AuthorModule }) {
   const { t } = useLocalization(); const location = useLocation(); const section = location.pathname.split("/")[3] ?? "";
   const overview = useAuthorOverview(); const profiles = overview.data?.profiles ?? [];
+  const [activeAuthorId, setActiveAuthorId] = useState(() => localStorage.getItem("hc.activeAuthorId") ?? "");
+  useEffect(() => { if (module !== "workspace" || !profiles.length) return; const valid = profiles.some((profile) => profile.author_id === activeAuthorId); if (!valid) { setActiveAuthorId(profiles[0].author_id); localStorage.setItem("hc.activeAuthorId", profiles[0].author_id); } }, [activeAuthorId, module, profiles]);
   const [message, setMessage] = useState<string | null>(null); const [error, setError] = useState<string | null>(null);
   const notify = async (action: () => Promise<unknown>, success: string) => { setError(null); try { await action(); setMessage(success); } catch (err) { setError(readErrorMessage(err)); } };
-  const title = t("authorPortal.title"); const description = t("authorPortal.description");
+  const instance = overview.data?.capabilities.instance;
+  const available = module === "onboarding" ? instance?.officialAuthorOnboarding.available : module === "registry" ? instance?.officialAuthorRegistry.available : true;
+  const title = module === "registry" ? t("authorPortal.authorReviews") : module === "onboarding" ? t("authorPortal.become") : t("authorPortal.title"); const description = t("authorPortal.description");
   const header = <PageHeader eyebrow={t("authorPortal.eyebrow")} title={title} description={description} />;
   const toast = <ToastNotice message={error ?? message} tone={error ? "danger" : "success"} onDismiss={() => { setMessage(null); setError(null); }} />;
 
   let body;
-  if (section === "become") body = <BecomeAuthor profiles={profiles} requests={overview.data?.requests ?? []} notify={notify} />;
+  if (overview.isLoading) body = <Card><EmptyState>{t("common.loading")}</EmptyState></Card>;
+  else if (!available) body = <Card><EmptyState>{t("authorPortal.capabilityUnavailable")}</EmptyState></Card>;
+  else if (module === "onboarding") body = <BecomeAuthor profiles={profiles} requests={overview.data?.requests ?? []} notify={notify} />;
+  else if (module === "registry" && section === "catalog") body = <Catalog registry notify={notify} />;
+  else if (module === "registry" && section === "applications") body = <Applications registry catalogOperator={Boolean(overview.data?.capabilities.catalog_review)} runtimeOperator={Boolean(overview.data?.capabilities.runtime_review)} notify={notify} />;
+  else if (module === "registry") body = <Reviews enabled={Boolean(overview.data?.capabilities.author_review)} notify={notify} />;
   else if (section === "profiles") body = <Profiles profiles={profiles} notify={notify} />;
   else if (section === "git") body = <GitConnections profiles={profiles} notify={notify} />;
   else if (section === "applications") body = <Applications catalogOperator={Boolean(overview.data?.capabilities.catalog_review)} runtimeOperator={Boolean(overview.data?.capabilities.runtime_review)} notify={notify} />;
   else if (section === "licensing") body = <AuthorLicensing profiles={profiles} />;
   else if (section === "catalog") body = <Catalog notify={notify} />;
   else if (section === "activity") body = <Activity />;
-  else if (section === "reviews") body = <Reviews enabled={Boolean(overview.data?.capabilities.author_review)} notify={notify} />;
   else body = <Overview data={overview.data} />;
 
-  return <div className="space-y-5">{header}{toast}{body}</div>;
+  return <div className="space-y-5">{header}{module === "workspace" && profiles.length > 0 && <Card><Field label={t("authorPortal.activeAuthor")} hint={activeAuthorId}><Select value={activeAuthorId} onChange={(event) => { setActiveAuthorId(event.target.value); localStorage.setItem("hc.activeAuthorId", event.target.value); }}>{profiles.map((profile) => <option key={profile.author_id} value={profile.author_id}>{profile.display_name} ({profile.author_id})</option>)}</Select></Field></Card>}{toast}{body}</div>;
 }
 
 function Overview({ data }: { data: ReturnType<typeof useAuthorOverview>["data"] }) {
@@ -61,7 +71,7 @@ function Overview({ data }: { data: ReturnType<typeof useAuthorOverview>["data"]
   return <>
     <MetricStrip items={[{ label: t("authorPortal.requests"), value: data?.requests.length ?? 0 }, { label: t("authorPortal.profiles"), value: data?.profiles.length ?? 0 }, { label: t("authorPortal.applications"), value: data?.apps.length ?? 0 }, { label: t("authorPortal.catalogSubmissions"), value: data?.submissions.length ?? 0 }]} />
     <div className="grid gap-3 lg:grid-cols-3">{modes.map((mode) => <Card key={mode} className="space-y-3"><div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">{t(`authorPortal.mode.${mode}`)}</h2><StatusBadge tone={mode === "private_self_hosted" ? "neutral" : "info"}>{mode === "private_self_hosted" ? t("authorPortal.private") : t("authorPortal.official")}</StatusBadge></div><p className="text-sm text-hc-muted">{t(`authorPortal.mode.${mode}.description`)}</p><div className="text-xs text-hc-muted">{t(`authorPortal.mode.${mode}.responsibility`)}</div></Card>)}</div>
-    {!data?.profiles.length && <Card><EmptyState><div className="space-y-3"><p>{t("authorPortal.emptyOverview")}</p><Link className="text-hc-primary" to="/core/author/become">{t("authorPortal.become")}</Link></div></EmptyState></Card>}
+    {!data?.profiles.length && <Card><EmptyState><div className="space-y-3"><p>{t("authorPortal.emptyOverview")}</p>{data?.capabilities.instance.officialAuthorOnboarding.available && <Link className="text-hc-primary" to="/core/author-onboarding">{t("authorPortal.become")}</Link>}</div></EmptyState></Card>}
   </>;
 }
 
@@ -100,8 +110,8 @@ function GitConnections({ profiles, notify }: { profiles: Array<{ author_id: str
   </div>;
 }
 
-function Applications({ catalogOperator, runtimeOperator, notify }: { catalogOperator: boolean; runtimeOperator: boolean; notify: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
-  const { t } = useLocalization(); const apps = useAuthorApps(); const action = useAuthorPortalMutation(authorPortalRequests.appAction); const catalog = useAuthorPortalMutation(authorPortalRequests.submitCatalog);
+function Applications({ catalogOperator, runtimeOperator, notify, registry = false }: { catalogOperator: boolean; runtimeOperator: boolean; registry?: boolean; notify: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const { t } = useLocalization(); const apps = useAuthorApps(registry ? "registry" : "workspace"); const action = useAuthorPortalMutation(authorPortalRequests.appAction); const catalog = useAuthorPortalMutation(authorPortalRequests.submitCatalog);
   const buttons = (app: AuthorApp) => { const canSubmit = app.member_permissions_json?.includes("author.apps.submit"); const canPublish = app.member_permissions_json?.includes("author.apps.publish"); return <div className="flex flex-wrap gap-2">{canSubmit && app.status === "ready_for_review" && <Button size="sm" onClick={() => void notify(() => action.mutateAsync({ appId: app.author_app_id, action: "submit" }), t("authorPortal.appSubmitted"))}>{t("authorPortal.submit")}</Button>}{catalogOperator && app.status === "submitted" && <><Button size="sm" onClick={() => void notify(() => action.mutateAsync({ appId: app.author_app_id, action: "approve" }), t("authorPortal.appApproved"))}>{t("authorPortal.approve")}</Button><Button size="sm" variant="danger" onClick={() => void notify(() => action.mutateAsync({ appId: app.author_app_id, action: "reject" }), t("authorPortal.appRejected"))}>{t("authorPortal.reject")}</Button></>}{canSubmit && app.status === "approved" && app.runtime_management === "talpaversum_managed" && <Button size="sm" onClick={() => void notify(() => action.mutateAsync({ appId: app.author_app_id, action: "request_runtime" }), t("authorPortal.runtimeRequested"))}>{t("authorPortal.requestRuntime")}</Button>}{runtimeOperator && app.status === "runtime_pending" && <Button size="sm" onClick={() => void notify(() => action.mutateAsync({ appId: app.author_app_id, action: "approve_runtime" }), t("authorPortal.runtimeApproved"))}>{t("authorPortal.approveRuntime")}</Button>}{canPublish && ["approved", "running", "runtime_approved"].includes(app.status) && <Button size="sm" variant="outlined" onClick={() => void notify(() => catalog.mutateAsync(app.author_app_id), t("authorPortal.catalogSubmitted"))}>{t("authorPortal.submitCatalog")}</Button>}</div>; };
   return <Card className="p-0"><SectionHeader title={t("authorPortal.applications")} description={t("authorPortal.applicationsDescription")} />{apps.data?.items.length ? <Table className="rounded-none border-x-0 border-b-0"><thead><tr><th>{t("authorPortal.application")}</th><th>{t("authorPortal.source")}</th><th>{t("authorPortal.runtime")}</th><th>{t("authorPortal.status")}</th><th>{t("authorPortal.actions")}</th></tr></thead><tbody>{apps.data.items.map((app) => <tr key={app.author_app_id}><td>{app.display_name}<div className="text-xs text-hc-muted">{app.app_id ?? app.author_app_id}</div></td><td>{app.repository_full_name}<div className="text-xs text-hc-muted">{app.branch} · {app.manifest_path}</div>{app.manifest_json && <details className="mt-2 max-w-md"><summary className="cursor-pointer text-xs text-hc-primary">{t("authorPortal.reviewRuntimePlan")}</summary><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-hc-sm bg-hc-bg p-2 text-xs text-hc-muted">{JSON.stringify({ deployment: app.manifest_json.deployment, runtime: app.manifest_json.runtime, integration: app.manifest_json.integration, privileges: app.manifest_json.privileges }, null, 2)}</pre></details>}</td><td>{t(`authorPortal.runtime.${app.runtime_management}`)}</td><td><StatusBadge tone={tone(app.status)}>{t(`authorPortal.status.${app.status}`)}</StatusBadge>{app.manifest_errors_json?.length > 0 && <div className="mt-1 max-w-xs text-xs text-hc-danger">{app.manifest_errors_json.join("; ")}</div>}</td><td>{buttons(app)}</td></tr>)}</tbody></Table> : <EmptyState>{t("authorPortal.noApplications")}</EmptyState>}</Card>;
 }
@@ -110,8 +120,8 @@ function AuthorLicensing({ profiles }: { profiles: Array<{ author_id: string; di
   const { t } = useLocalization(); return <div className="grid gap-3 lg:grid-cols-2">{profiles.length ? profiles.map((profile) => <Card key={profile.author_id} className="space-y-3"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">{profile.display_name}</h2><StatusBadge>{t(`authorPortal.mode.${profile.operating_mode}`)}</StatusBadge></div><p className="text-sm text-hc-muted">{t(`authorPortal.licensing.${profile.operating_mode}`)}</p>{profile.operating_mode === "talpaversum_hosted" ? <Link className="text-sm text-hc-primary" to="/core/licensing">{t("authorPortal.openLicensing")}</Link> : profile.operating_mode === "trusted_self_hosted" ? <div className="text-xs text-hc-muted">{profile.external_issuer_url ?? t("authorPortal.issuerNotConfigured")}</div> : <Link className="text-sm text-hc-primary" to="/core/apps">{t("authorPortal.privateLicensing")}</Link>}</Card>) : <Card><EmptyState>{t("authorPortal.noProfiles")}</EmptyState></Card>}</div>;
 }
 
-function Catalog({ notify }: { notify: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
-  const { t } = useLocalization(); const submissions = useCatalogSubmissions(); const review = useAuthorPortalMutation(authorPortalRequests.reviewCatalog);
+function Catalog({ notify, registry = false }: { registry?: boolean; notify: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const { t } = useLocalization(); const submissions = useCatalogSubmissions(registry ? "registry" : "workspace"); const review = useAuthorPortalMutation(authorPortalRequests.reviewCatalog);
   const actions = (item: NonNullable<typeof submissions.data>["items"][number]) => !submissions.data?.operator ? null : <div className="flex flex-wrap gap-2">{item.status === "submitted" && <Button size="sm" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "start_review" }), t("authorPortal.reviewStarted"))}>{t("authorPortal.startReview")}</Button>}{item.status === "pending_review" && <><Button size="sm" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "approve" }), t("authorPortal.catalogApproved"))}>{t("authorPortal.approve")}</Button><Button size="sm" variant="outlined" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "request_changes" }), t("authorPortal.changesRequested"))}>{t("authorPortal.requestChanges")}</Button><Button size="sm" variant="danger" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "reject" }), t("authorPortal.catalogRejected"))}>{t("authorPortal.reject")}</Button></>}{item.status === "approved" && <Button size="sm" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "publish" }), t("authorPortal.catalogPublished"))}>{t("authorPortal.publish")}</Button>}{item.status === "published" && <Button size="sm" variant="danger" onClick={() => void notify(() => review.mutateAsync({ submissionId: item.submission_id, action: "unpublish" }), t("authorPortal.catalogUnpublished"))}>{t("authorPortal.unpublish")}</Button>}</div>;
   return <Card className="p-0"><SectionHeader title={t("authorPortal.catalogSubmissions")} description={t("authorPortal.catalogDescription")} />{submissions.data?.items.length ? <Table className="rounded-none border-x-0 border-b-0"><thead><tr><th>{t("authorPortal.application")}</th><th>{t("authorPortal.mode")}</th><th>{t("authorPortal.status")}</th><th>{t("authorPortal.actions")}</th></tr></thead><tbody>{submissions.data.items.map((item) => <tr key={item.submission_id}><td>{item.display_name ?? item.app_id ?? item.author_app_id}</td><td>{item.operating_mode ? t(`authorPortal.mode.${item.operating_mode}`) : "-"}</td><td><StatusBadge tone={tone(item.status)}>{t(`authorPortal.status.${item.status}`)}</StatusBadge></td><td>{actions(item)}</td></tr>)}</tbody></Table> : <EmptyState>{t("authorPortal.noCatalogSubmissions")}</EmptyState>}</Card>;
 }

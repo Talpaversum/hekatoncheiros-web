@@ -11,6 +11,7 @@ export type GitRepository = { id: number; full_name: string; visibility: "public
 export type CatalogSubmission = { submission_id: string; author_app_id: string; author_id: string; app_id?: string | null; display_name?: string; operating_mode?: AuthorMode; status: string; eligibility_json: Record<string, boolean>; review_notes: string | null; created_at: string };
 export type ActivityEvent = { event_id: string; author_id: string | null; action: string; from_status: string | null; to_status: string | null; metadata_json: Record<string, unknown>; created_at: string };
 export type AuthorMember = { author_id: string; user_id: string; email: string; role: string; permissions_json: string[]; status: string; created_at: string };
+export type InstanceCapabilities = Record<"privateAppDevelopment" | "trustedOrigins" | "privateCatalogs" | "officialAuthorOnboarding" | "officialAuthorRegistry" | "officialCatalogPublishing" | "officialCatalogReview" | "hostedAuthorServices" | "hostedBuilds" | "hostedRuntime" | "hostedLicensing" | "externalTrustedAuthorPublishing", { enabled: boolean; configured: boolean; available: boolean }>;
 
 const invalidate = (client: ReturnType<typeof useQueryClient>) => Promise.all([
   client.invalidateQueries({ queryKey: ["author-portal"] }), client.invalidateQueries({ queryKey: ["author-requests-admin"] }),
@@ -19,12 +20,13 @@ const invalidate = (client: ReturnType<typeof useQueryClient>) => Promise.all([
   client.invalidateQueries({ queryKey: ["author-members"] }),
 ]);
 
-export function useAuthorOverview() { return useQuery({ queryKey: ["author-portal"], queryFn: () => authFetch<{ requests: AuthorRequest[]; profiles: AuthorProfile[]; apps: AuthorApp[]; submissions: CatalogSubmission[]; operator: boolean; capabilities: { author_review: boolean; catalog_review: boolean; runtime_review: boolean } }>("/author-portal/overview") }); }
+export function useAuthorOverview() { return useQuery({ queryKey: ["author-portal"], queryFn: () => authFetch<{ requests: AuthorRequest[]; profiles: AuthorProfile[]; apps: AuthorApp[]; submissions: CatalogSubmission[]; operator: boolean; capabilities: { author_review: boolean; catalog_review: boolean; runtime_review: boolean; instance: InstanceCapabilities } }>("/author-portal/overview") }); }
 export function useAdminAuthorRequests(enabled: boolean) { return useQuery({ queryKey: ["author-requests-admin"], queryFn: () => authFetch<{ items: AuthorRequest[] }>("/author-portal/admin/requests"), enabled }); }
-export function useGitConnections() { return useQuery({ queryKey: ["author-git"], queryFn: () => authFetch<{ items: GitConnection[] }>("/author-portal/git-connections") }); }
-export function useAuthorApps() { return useQuery({ queryKey: ["author-apps"], queryFn: () => authFetch<{ items: AuthorApp[] }>("/author-portal/apps") }); }
-export function useCatalogSubmissions() { return useQuery({ queryKey: ["author-catalog"], queryFn: () => authFetch<{ items: CatalogSubmission[]; operator: boolean }>("/author-portal/catalog-submissions") }); }
-export function useAuthorActivity() { return useQuery({ queryKey: ["author-activity"], queryFn: () => authFetch<{ items: ActivityEvent[] }>("/author-portal/activity") }); }
+const activeAuthor = () => localStorage.getItem("hc.activeAuthorId") ?? "";
+export function useGitConnections(authorId = activeAuthor()) { return useQuery({ queryKey: ["author-git", authorId], queryFn: () => authFetch<{ items: GitConnection[] }>(`/author-portal/git-connections${authorId ? `?author_id=${encodeURIComponent(authorId)}` : ""}`) }); }
+export function useAuthorApps(scope: "workspace" | "registry" = "workspace", authorId = scope === "workspace" ? activeAuthor() : "") { return useQuery({ queryKey: ["author-apps", scope, authorId], queryFn: () => authFetch<{ items: AuthorApp[] }>(`/author-portal/apps?scope=${scope}${authorId ? `&author_id=${encodeURIComponent(authorId)}` : ""}`) }); }
+export function useCatalogSubmissions(scope: "workspace" | "registry" = "workspace", authorId = scope === "workspace" ? activeAuthor() : "") { return useQuery({ queryKey: ["author-catalog", scope, authorId], queryFn: () => authFetch<{ items: CatalogSubmission[]; operator: boolean }>(`/author-portal/catalog-submissions?scope=${scope}${authorId ? `&author_id=${encodeURIComponent(authorId)}` : ""}`) }); }
+export function useAuthorActivity(authorId = activeAuthor()) { return useQuery({ queryKey: ["author-activity", authorId], queryFn: () => authFetch<{ items: ActivityEvent[] }>(`/author-portal/activity${authorId ? `?author_id=${encodeURIComponent(authorId)}` : ""}`) }); }
 export function useGitRepositories(connectionId: string) { return useQuery({ queryKey: ["author-git-repos", connectionId], queryFn: () => authFetch<{ items: GitRepository[] }>(`/author-portal/git-connections/${encodeURIComponent(connectionId)}/repositories`), enabled: Boolean(connectionId), retry: false }); }
 export function useAuthorMembers(authorId: string) { return useQuery({ queryKey: ["author-members", authorId], queryFn: () => authFetch<{ items: AuthorMember[] }>(`/author-portal/profiles/${encodeURIComponent(authorId)}/members`), enabled: Boolean(authorId), retry: false }); }
 

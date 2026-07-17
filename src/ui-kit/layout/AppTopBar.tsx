@@ -164,14 +164,14 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
               {t("nav.licensing")}
             </NavLink>
             <NavLink
-              to="/core/author"
+              to="/core/developer"
               className={({ isActive }) =>
                 `rounded-hc-sm px-3 py-2 transition ${
                   isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted hover:text-hc-text"
                 }`
               }
             >
-              {t("nav.authorPortal")}
+              {t("authorPortal.developerTools")}
             </NavLink>
             <div className="relative">
               <button
@@ -334,8 +334,8 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
         <NavLink to="/core/licensing" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
           {t("nav.licensing")}
         </NavLink>
-        <NavLink to="/core/author" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
-          {t("nav.authorPortal")}
+        <NavLink to="/core/developer" className={({ isActive }) => `whitespace-nowrap rounded-hc-sm px-2 py-1.5 ${isActive ? "bg-hc-surface text-hc-text" : "text-hc-muted"}`}>
+          {t("authorPortal.developerTools")}
         </NavLink>
         <div className="relative">
           <button
