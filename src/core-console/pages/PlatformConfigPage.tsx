@@ -27,6 +27,7 @@ import {
   useCreateTrustedOriginMutation,
   useDeleteTrustedOriginMutation,
   useTrustedOriginsQuery,
+  useTestTrustedOriginMutation,
   useUpdateTrustedOriginMutation,
   type TrustedOrigin,
 } from "../../data/api/trusted-origins";
@@ -731,6 +732,7 @@ function TrustedOriginRow({
   const [editingNote, setEditingNote] = useState(item.note ?? "");
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const testOrigin = useTestTrustedOriginMutation();
 
   return (
     <div className="border-b border-hc-outline last:border-b-0">
@@ -742,9 +744,12 @@ function TrustedOriginRow({
         <div className="flex items-center gap-2 lg:justify-end">
           <Switch checked={item.is_enabled} onClick={onToggle} disabled={busy} aria-label={`${t(item.is_enabled ? "common.disable" : "common.enable")} ${item.origin}`} />
           <Button size="sm" variant="ghost" onClick={() => setEditing((value) => !value)} disabled={busy}>{t("platform.edit")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => testOrigin.mutate(item.id)} disabled={busy || testOrigin.isPending}>{t(testOrigin.isPending ? "platform.testingOrigin" : "platform.testOrigin")}</Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirmDelete((prev) => !prev)} disabled={busy}>{t("platform.delete")}</Button>
         </div>
       </div>
+
+      {testOrigin.data && <div className={`border-t border-hc-outline px-4 py-2 text-xs ${testOrigin.data.reachable ? "text-hc-success" : "text-hc-danger"}`}>{testOrigin.data.reachable ? t("platform.originReachable", { status: testOrigin.data.status_code ?? 0, latency: testOrigin.data.latency_ms }) : t("platform.originUnreachable", { error: testOrigin.data.error ?? "-" })}</div>}
 
       {editing && <div className="grid gap-2 border-t border-hc-outline bg-hc-surface-variant/30 px-4 py-3 md:grid-cols-[1fr_auto]">
         <Input value={editingNote} onChange={(e) => setEditingNote(e.target.value)} placeholder={t("platform.note")} />

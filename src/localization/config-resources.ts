@@ -64,6 +64,7 @@ const en = {
   "platform.customPrivilege": "Custom privilege", "platform.platform": "Platform", "platform.allTenantsLabel": "All tenants", "platform.remove": "Remove",
   "platform.noNote": "No note", "platform.edit": "Edit", "platform.delete": "Delete", "platform.saveNote": "Save note", "platform.deleteOrigin": "Delete this trusted origin?",
   "platform.confirmDelete": "Confirm delete", "platform.originRequired": "Origin is required.", "platform.httpConfirmation": "You must explicitly enable Allow HTTP for an http:// origin.",
+  "platform.testOrigin": "Test", "platform.testingOrigin": "Testing...", "platform.originReachable": "Origin responded with HTTP {{status}} in {{latency}} ms.", "platform.originUnreachable": "Origin is unreachable: {{error}}",
   "platform.originAdded": "Trusted origin added.", "platform.instanceUpdated": "Platform instance settings were updated.", "platform.userCreated": "User was created.",
   "platform.tenantCreated": "Tenant was created.", "platform.platformPrivilegeScope": "Platform privilege cannot be scoped to a tenant.", "platform.grantExists": "This privilege grant already exists.",
   "platform.grantAdded": "Privilege grant was added.", "platform.grantRemoved": "Privilege grant was removed.",
@@ -139,6 +140,7 @@ const cs: Record<keyof typeof en, string> = {
   "platform.originAdded": "Důvěryhodný zdroj byl přidán.", "platform.instanceUpdated": "Nastavení instance platformy bylo aktualizováno.", "platform.userCreated": "Uživatel byl vytvořen.",
   "platform.tenantCreated": "Tenant byl vytvořen.", "platform.platformPrivilegeScope": "Oprávnění platformy nelze omezit na tenant.", "platform.grantExists": "Toto přidělení oprávnění již existuje.",
   "platform.grantAdded": "Oprávnění bylo přidáno.", "platform.grantRemoved": "Oprávnění bylo odebráno.",
+  "platform.testOrigin": "Otestovat", "platform.testingOrigin": "Testování...", "platform.originReachable": "Origin odpověděl HTTP {{status}} za {{latency}} ms.", "platform.originUnreachable": "Origin není dostupný: {{error}}",
 };
 
 export const configResources = { en, cs };

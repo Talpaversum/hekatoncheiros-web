@@ -4,6 +4,7 @@ import { en } from "./locales/en";
 import { es } from "./locales/es";
 import { fr } from "./locales/fr";
 import { sk } from "./locales/sk";
+import { authorResources } from "./author-resources";
 
 export const locales = ["en", "cs", "sk", "de", "fr", "es"] as const;
 export type Locale = (typeof locales)[number];
@@ -27,10 +28,10 @@ function withEnglishFallback(messages: Partial<Messages>): Messages {
 }
 
 export const resources: Record<Locale, Messages> = {
-  en,
-  cs,
-  sk: withEnglishFallback(sk),
-  de: withEnglishFallback(de),
-  fr: withEnglishFallback(fr),
-  es: withEnglishFallback(es),
+  en: { ...en, ...authorResources.en },
+  cs: { ...cs, ...authorResources.cs },
+  sk: { ...withEnglishFallback(sk), ...authorResources.sk },
+  de: { ...withEnglishFallback(de), ...authorResources.de },
+  fr: { ...withEnglishFallback(fr), ...authorResources.fr },
+  es: { ...withEnglishFallback(es), ...authorResources.es },
 };

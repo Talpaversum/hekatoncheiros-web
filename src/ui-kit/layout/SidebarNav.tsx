@@ -9,7 +9,24 @@ type SidebarNavProps = PropsWithChildren<{
   privileges?: string[];
 }>;
 
+type SidebarItem = { to: string; labelKey: string; required?: string };
+
 const sidebarConfig = [
+  {
+    prefix: "/core/author",
+    titleKey: "nav.authorPortal",
+    items: [
+      { to: "/core/author", labelKey: "nav.overview" },
+      { to: "/core/author/become", labelKey: "authorPortal.become" },
+      { to: "/core/author/profiles", labelKey: "authorPortal.profiles" },
+      { to: "/core/author/git", labelKey: "authorPortal.gitConnections" },
+      { to: "/core/author/applications", labelKey: "authorPortal.applications" },
+      { to: "/core/author/licensing", labelKey: "nav.licensing" },
+      { to: "/core/author/catalog", labelKey: "authorPortal.catalogSubmissions" },
+      { to: "/core/author/activity", labelKey: "authorPortal.activity" },
+      { to: "/core/author/reviews", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage" },
+    ] satisfies SidebarItem[],
+  },
   {
     prefix: "/core/audit",
     titleKey: "nav.auditLog",
@@ -104,7 +121,7 @@ export function SidebarNav({ children, privileges = [] }: SidebarNavProps) {
         if (section.prefix === "/core/audit" && !["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read", "platform.superadmin"].some((item) => privileges.includes(item))) section = fallbackSection;
         return {
           title: t(section.titleKey),
-          items: section.items.map((item) => ({
+          items: section.items.filter((item: SidebarItem) => !item.required || privileges.includes("platform.superadmin") || privileges.includes(item.required)).map((item) => ({
             to: item.to,
             label: t(item.labelKey),
           })),

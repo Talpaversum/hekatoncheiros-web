@@ -62,3 +62,9 @@ export function useDeleteTrustedOriginMutation() {
     },
   });
 }
+
+export function useTestTrustedOriginMutation() {
+  return useMutation({
+    mutationFn: (id: string) => authFetch<{ reachable: boolean; status_code: number | null; latency_ms: number; checked_at: string; error?: string }>(`/platform/trusted-origins/${encodeURIComponent(id)}/test`, { method: "POST" }),
+  });
+}
