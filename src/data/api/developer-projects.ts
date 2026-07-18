@@ -35,6 +35,8 @@ export type DeveloperProject = {
   last_deployment_at: string | null;
   wizard_step: number;
   wizard_state_json: Record<string, unknown>;
+  synced_manifest_json: Record<string, unknown> | null;
+  pending_diff_json: DeveloperProjectDiff | null;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +58,7 @@ export type DeveloperRuntimeStatus = {
   trust_status: "unverified";
   runtime: { status: string; last_checked_at: string | null; message: string | null };
 };
+export type DeveloperProjectDiff = { manifest: { changed: boolean; before_hash?: string | null; after_hash?: string | null }; runtime: { changed: boolean; before?: Record<string,unknown>|null; after?: Record<string,unknown>|null } };
 
 const projectKey = ["developer-projects"] as const;
 
@@ -66,6 +69,7 @@ export function useDeveloperProjects() {
 export function useDeveloperRuntimeStatus(projectId: string, enabled: boolean) {
   return useQuery({ queryKey: ["developer-project-runtime", projectId], queryFn: () => authFetch<DeveloperRuntimeStatus>(`/developer-projects/${encodeURIComponent(projectId)}/runtime-status`), enabled, refetchInterval: enabled ? 5_000 : false });
 }
+export function useDeveloperProjectDiff(projectId:string,enabled:boolean){return useQuery({queryKey:["developer-project-diff",projectId],queryFn:()=>authFetch<DeveloperProjectDiff>(`/developer-projects/${encodeURIComponent(projectId)}/diff`),enabled});}
 
 export function useDeveloperProjectMutation<T>(action: (payload: T) => Promise<DeveloperProject>) {
   const client = useQueryClient();
@@ -75,6 +79,7 @@ export function useDeveloperProjectMutation<T>(action: (payload: T) => Promise<D
 export const developerProjectRequests = {
   createDraft: (input: { source_type: SourceType; display_name?: string }) => authFetch<DeveloperProject>("/developer-projects/drafts", { method: "POST", body: JSON.stringify(input) }),
   saveDraft: ({ projectId, input }: { projectId: string; input: { wizard_step: number; display_name?: string; origin_url?: string | null; source_connection_id?: string | null; repository?: string | null; workspace_path?: string | null; branch?: string | null; manifest_path?: string | null; manifest_url?: string | null; feed_url?: string | null; runtime_type?: DeveloperProject["runtime_type"]; wizard_state_json?: Record<string, unknown> } }) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/draft`, { method: "PATCH", body: JSON.stringify(input) }),
+  sync: (projectId:string)=>authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/sync`,{method:"POST"}),
   create: (input: DeveloperProjectInput) => authFetch<DeveloperProject>("/developer-projects", { method: "POST", body: JSON.stringify(input) }),
   update: ({ projectId, input }: { projectId: string; input: DeveloperProjectInput }) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}`, { method: "PUT", body: JSON.stringify(input) }),
   testOrigin: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/test-origin`, { method: "POST" }),
