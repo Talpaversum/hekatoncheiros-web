@@ -37,8 +37,8 @@ export default function App() {
         <Route path="author/:authorId/*" element={<RequireAuthorMembership><AuthorWorkspacePage /></RequireAuthorMembership>} />
         <Route path="developer/*" element={<RequireCapability capability="privateAppDevelopment"><DeveloperToolsPage /></RequireCapability>} />
         <Route path="author-onboarding/*" element={<RequireCapability capability="officialAuthorOnboarding"><AuthorOnboardingPage /></RequireCapability>} />
-        <Route path="admin/authors/*" element={<RequireCapability capability="officialAuthorOnboarding"><RequirePrivilege required="platform.authors.manage"><AuthorAdministrationPage /></RequirePrivilege></RequireCapability>} />
-        <Route path="admin/registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.author_registry.manage"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/authors/*" element={<RequireCapability capability="officialAuthorOnboarding"><RequirePrivilege required="platform.authors.review"><AuthorAdministrationPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.author_registry.read"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />
         <Route path="admin/catalog/*" element={<RequireCapability capability="officialCatalogReview"><RequirePrivilege required="platform.catalog.manage"><CatalogReviewPage /></RequirePrivilege></RequireCapability>} />
         <Route path="admin/runtime/*" element={<RequireCapability capability="hostedRuntime"><RequirePrivilege required="platform.apps.runtime.manage"><RuntimeReviewPage /></RequirePrivilege></RequireCapability>} />
         <Route path="audit" element={<AuditLogPage />} />

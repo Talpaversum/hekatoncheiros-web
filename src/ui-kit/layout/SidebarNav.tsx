@@ -40,12 +40,12 @@ const sidebarConfig = [
   {
     prefix: "/core/admin/authors",
     titleKey: "authorPortal.authorReviews",
-    items: [{ to: "/core/admin/authors", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage", capability: "officialAuthorOnboarding" }],
+    items: [{ to: "/core/admin/authors", labelKey: "authorPortal.authorReviews", required: "platform.authors.review", capability: "officialAuthorOnboarding" }],
   },
   {
     prefix: "/core/admin/registry",
     titleKey: "authorPortal.registryAdministration",
-    items: [{ to: "/core/admin/registry", labelKey: "authorPortal.registryAdministration", required: "platform.author_registry.manage", capability: "officialAuthorRegistry" }],
+    items: [{ to: "/core/admin/registry", labelKey: "authorPortal.registryAdministration", required: "platform.author_registry.read", capability: "officialAuthorRegistry" }],
   },
   {
     prefix: "/core/admin/catalog",
