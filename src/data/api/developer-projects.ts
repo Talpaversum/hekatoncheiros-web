@@ -58,7 +58,7 @@ export type DeveloperRuntimeStatus = {
   trust_status: "unverified";
   runtime: { status: string; last_checked_at: string | null; message: string | null };
 };
-export type DeveloperProjectDiff = { manifest: { changed: boolean; before_hash?: string | null; after_hash?: string | null }; runtime: { changed: boolean; before?: Record<string,unknown>|null; after?: Record<string,unknown>|null } };
+export type DeveloperProjectDiff = { manifest: { changed: boolean; before_hash?: string | null; after_hash?: string | null }; runtime: { changed: boolean; before?: Record<string,unknown>|null; after?: Record<string,unknown>|null }; requires_runtime_approval?:boolean; [key:string]:unknown };
 
 const projectKey = ["developer-projects"] as const;
 
@@ -85,5 +85,6 @@ export const developerProjectRequests = {
   testOrigin: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/test-origin`, { method: "POST" }),
   trustOrigin: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/trust-origin`, { method: "POST", body: JSON.stringify({ confirmed: true }) }),
   validateSource: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/validate-source`, { method: "POST" }),
+  approveRuntime: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/approve-runtime`, { method: "POST", body: JSON.stringify({ confirmed: true }) }),
   install: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/install`, { method: "POST" }),
 };
