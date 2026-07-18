@@ -35,7 +35,7 @@ export default function App() {
         <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing/*" element={<LicensingPage />} />
         <Route path="author/:authorId/*" element={<RequireAuthorMembership><AuthorWorkspacePage /></RequireAuthorMembership>} />
-        <Route path="developer/*" element={<RequireCapability capability="privateAppDevelopment"><DeveloperToolsPage /></RequireCapability>} />
+        <Route path="developer/*" element={<RequireCapability capability="privateAppDevelopment"><RequirePrivilege required="developer.projects.read"><DeveloperToolsPage /></RequirePrivilege></RequireCapability>} />
         <Route path="author-onboarding/*" element={<RequireCapability capability="officialAuthorOnboarding"><AuthorOnboardingPage /></RequireCapability>} />
         <Route path="admin/authors/*" element={<RequireCapability capability="officialAuthorOnboarding"><RequirePrivilege required="platform.authors.review"><AuthorAdministrationPage /></RequirePrivilege></RequireCapability>} />
         <Route path="admin/registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.author_registry.read"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />

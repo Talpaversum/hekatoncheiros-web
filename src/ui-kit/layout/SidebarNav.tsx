@@ -35,7 +35,13 @@ const sidebarConfig = [
   {
     prefix: "/core/developer",
     titleKey: "authorPortal.developerTools",
-    items: [{ to: "/core/developer", labelKey: "nav.overview", capability: "privateAppDevelopment" }],
+    items: [
+      { to: "/core/developer/overview", labelKey: "developerProject.section.overview", required: "developer.projects.read", capability: "privateAppDevelopment" },
+      { to: "/core/developer/projects", labelKey: "developerProject.section.projects", required: "developer.projects.read", capability: "privateAppDevelopment" },
+      { to: "/core/developer/deployments", labelKey: "developerProject.section.deployments", required: "developer.projects.read", capability: "privateAppDevelopment" },
+      { to: "/core/developer/logs", labelKey: "developerProject.section.logs", required: "developer.logs.read", capability: "privateAppDevelopment" },
+      { to: "/core/developer/connections", labelKey: "developerProject.section.connections", required: "developer.connections.manage", capability: "privateAppDevelopment" },
+    ],
   },
   {
     prefix: "/core/admin/authors",

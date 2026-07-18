@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   developerProjectRequests,
@@ -16,13 +16,64 @@ import { useLocalization } from "../../../localization/LocalizationProvider";
 import { Button } from "../../../ui-kit/components/Button";
 import { Card } from "../../../ui-kit/components/Card";
 import { Input } from "../../../ui-kit/components/Input";
-import { EmptyState, Field, PageHeader, StatusBadge } from "../../../ui-kit/components/Page";
+import { EmptyState, Field, PageHeader, SectionHeader, StatusBadge } from "../../../ui-kit/components/Page";
+import { Table } from "../../../ui-kit/components/Table";
 import { Select } from "../../../ui-kit/components/Select";
 import { ToastNotice } from "../../../ui-kit/components/ToastNotice";
 
 const reached = (project: DeveloperProject | undefined, statuses: DeveloperProject["status"][]) => Boolean(project && statuses.includes(project.status));
 
+const developerSections = ["overview", "projects", "deployments", "logs", "connections"] as const;
+
 export function DeveloperToolsPage() {
+  const location = useLocation();
+  if (location.pathname.endsWith("/add")) return <AddProjectWorkflow />;
+  return <DeveloperWorkspace />;
+}
+
+function DeveloperWorkspace() {
+  const { t } = useLocalization();
+  const projects = useDeveloperProjects();
+  const location = useLocation();
+  const segment = location.pathname.split("/").filter(Boolean).at(-1);
+  const active = developerSections.includes(segment as (typeof developerSections)[number]) ? segment : "overview";
+  const items = useMemo(() => projects.data?.items ?? [], [projects.data?.items]);
+  const latest = items.slice(0, 5);
+  const metrics = [
+    ["developerProject.metric.projects", items.length],
+    ["developerProject.metric.running", items.filter((item) => ["healthy", "running"].includes(item.runtime_status)).length],
+    ["developerProject.metric.updates", items.filter((item) => item.update_status === "update_available").length],
+    ["developerProject.metric.invalid", items.filter((item) => item.update_status === "validation_failed" || item.status === "source_invalid").length],
+    ["developerProject.metric.runtimeErrors", items.filter((item) => item.runtime_status === "error").length],
+  ] as const;
+  const projectId = location.pathname.match(/\/projects\/([^/]+)$/)?.[1];
+  const selected = projectId ? items.find((item) => item.project_id === decodeURIComponent(projectId)) : undefined;
+
+  return <div className="space-y-5">
+    <PageHeader eyebrow={t("authorPortal.eyebrow")} title={t("authorPortal.developerTools")} description={t("developerProject.workspaceDescription")} actions={<Link to="/core/developer/add"><Button>{t("developerProject.addProject")}</Button></Link>} />
+    <nav className="flex gap-1 overflow-x-auto border-b border-hc-outline" aria-label={t("authorPortal.developerTools")}>
+      {developerSections.map((section) => <Link key={section} to={`/core/developer/${section}`} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm ${active === section ? "border-hc-primary text-hc-text" : "border-transparent text-hc-muted"}`}>{t(`developerProject.section.${section}`)}</Link>)}
+    </nav>
+    {projects.isLoading ? <Card><EmptyState>{t("common.loading")}</EmptyState></Card> : projectId ? <ProjectSummary project={selected} /> : active === "overview" ? <>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{metrics.map(([label, value]) => <Card key={label}><div className="text-xs text-hc-muted">{t(label)}</div><div className="mt-2 text-2xl font-semibold">{value}</div></Card>)}</div>
+      <ProjectTable items={latest} title={t("developerProject.recentProjects")} />
+      <ProjectTable items={items.filter((item) => item.last_deployment_at).slice(0, 5)} title={t("developerProject.recentDeployments")} />
+    </> : active === "projects" ? <ProjectTable items={items} title={t("developerProject.projects")} /> : <Card><SectionHeader title={t(`developerProject.section.${active}`)} /><EmptyState>{t("developerProject.sectionComingSoon")}</EmptyState></Card>}
+  </div>;
+}
+
+function ProjectTable({ items, title }: { items: DeveloperProject[]; title: string }) {
+  const { t } = useLocalization();
+  return <Card className="p-0"><SectionHeader title={title} />{items.length ? <Table className="rounded-none border-x-0"><thead><tr><th>{t("developerProject.displayName")}</th><th>{t("developerProject.sourceType")}</th><th>{t("developerProject.validation")}</th><th>{t("developerProject.deploymentStatus")}</th><th>{t("developerProject.runtime")}</th><th>{t("developerProject.lastChanged")}</th><th /></tr></thead><tbody>{items.map((item) => <tr key={item.project_id}><td className="font-medium">{item.display_name}</td><td>{t(`developerProject.source.${item.source_type}`)}</td><td><StatusBadge tone={item.update_status === "validation_failed" ? "danger" : "neutral"}>{t(`developerProject.update.${item.update_status}`)}</StatusBadge></td><td>{item.deployment_status}</td><td>{item.runtime_status}</td><td>{new Date(item.updated_at).toLocaleString()}</td><td><Link className="text-hc-primary" to={`/core/developer/projects/${encodeURIComponent(item.project_id)}`}>{t("developerProject.open")}</Link></td></tr>)}</tbody></Table> : <EmptyState>{t("developerProject.emptyProjects")}</EmptyState>}</Card>;
+}
+
+function ProjectSummary({ project }: { project?: DeveloperProject }) {
+  const { t } = useLocalization();
+  if (!project) return <Card><EmptyState>{t("developerProject.notFound")}</EmptyState></Card>;
+  return <div className="space-y-4"><Card><SectionHeader title={project.display_name} description={t("developerProject.projectEntityDescription")} /><dl className="grid gap-3 text-sm md:grid-cols-3"><Item label={t("developerProject.sourceRevision")} value={project.source_revision ?? "-"} /><Item label={t("developerProject.validatedRevision")} value={project.validated_revision ?? "-"} /><Item label={t("developerProject.deployedRevision")} value={project.deployed_revision ?? "-"} /><Item label={t("developerProject.deploymentStatus")} value={project.deployment_status} /><Item label={t("developerProject.runtime")} value={project.runtime_status} /><Item label={t("developerProject.installedApp")} value={project.installed_app_id ?? "-"} /></dl></Card></div>;
+}
+
+function AddProjectWorkflow() {
   const { t } = useLocalization();
   const capabilities = useInstanceCapabilities();
   const projects = useDeveloperProjects();
