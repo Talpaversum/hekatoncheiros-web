@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { authFetch } from "../auth/auth-fetch";
 
-export type SourceType = "manifest" | "feed";
+export type SourceType = "github" | "gitlab" | "git" | "local_workspace" | "manifest" | "private_feed";
 export type DeveloperProject = {
   project_id: string;
   tenant_id: string;
   created_by: string;
   display_name: string;
-  origin_url: string;
+  origin_url: string | null;
   source_type: SourceType;
   manifest_url: string | null;
   feed_url: string | null;
@@ -33,6 +33,8 @@ export type DeveloperProject = {
   last_sync_at: string | null;
   last_validation_at: string | null;
   last_deployment_at: string | null;
+  wizard_step: number;
+  wizard_state_json: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };
@@ -40,7 +42,7 @@ export type DeveloperProject = {
 export type DeveloperProjectInput = {
   display_name: string;
   origin_url: string;
-  source_type: SourceType;
+  source_type: "manifest" | "private_feed";
   manifest_url: string | null;
   feed_url: string | null;
 };
@@ -71,6 +73,8 @@ export function useDeveloperProjectMutation<T>(action: (payload: T) => Promise<D
 }
 
 export const developerProjectRequests = {
+  createDraft: (input: { source_type: SourceType; display_name?: string }) => authFetch<DeveloperProject>("/developer-projects/drafts", { method: "POST", body: JSON.stringify(input) }),
+  saveDraft: ({ projectId, input }: { projectId: string; input: { wizard_step: number; display_name?: string; origin_url?: string | null; source_connection_id?: string | null; repository?: string | null; workspace_path?: string | null; branch?: string | null; manifest_path?: string | null; manifest_url?: string | null; feed_url?: string | null; runtime_type?: DeveloperProject["runtime_type"]; wizard_state_json?: Record<string, unknown> } }) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/draft`, { method: "PATCH", body: JSON.stringify(input) }),
   create: (input: DeveloperProjectInput) => authFetch<DeveloperProject>("/developer-projects", { method: "POST", body: JSON.stringify(input) }),
   update: ({ projectId, input }: { projectId: string; input: DeveloperProjectInput }) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}`, { method: "PUT", body: JSON.stringify(input) }),
   testOrigin: (projectId: string) => authFetch<DeveloperProject>(`/developer-projects/${encodeURIComponent(projectId)}/test-origin`, { method: "POST" }),

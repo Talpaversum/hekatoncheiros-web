@@ -7,7 +7,6 @@ import {
   useDeveloperProjects,
   useDeveloperRuntimeStatus,
   type DeveloperProject,
-  type DeveloperProjectInput,
   type SourceType,
 } from "./api";
 import { useInstanceCapabilities } from "../../../data/api/capabilities";
@@ -77,36 +76,44 @@ function AddProjectWorkflow() {
   const { t } = useLocalization();
   const capabilities = useInstanceCapabilities();
   const projects = useDeveloperProjects();
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState("new");
   const project = selectedId === "new" ? undefined : projects.data?.items.find((item) => item.project_id === selectedId) ?? projects.data?.items[0];
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [originUrl, setOriginUrl] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<SourceType | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [trustConfirmed, setTrustConfirmed] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [runtimeType, setRuntimeType] = useState<DeveloperProject["runtime_type"]>("already_running_service");
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "danger" } | null>(null);
 
-  const create = useDeveloperProjectMutation(developerProjectRequests.create);
-  const update = useDeveloperProjectMutation(developerProjectRequests.update);
+  const createDraft = useDeveloperProjectMutation(developerProjectRequests.createDraft);
+  const saveDraft = useDeveloperProjectMutation(developerProjectRequests.saveDraft);
   const testOrigin = useDeveloperProjectMutation(developerProjectRequests.testOrigin);
   const trustOrigin = useDeveloperProjectMutation(developerProjectRequests.trustOrigin);
   const validateSource = useDeveloperProjectMutation(developerProjectRequests.validateSource);
   const install = useDeveloperProjectMutation(developerProjectRequests.install);
   const runtime = useDeveloperRuntimeStatus(project?.project_id ?? "", project?.status === "installed");
-  const busy = create.isPending || update.isPending || testOrigin.isPending || trustOrigin.isPending || validateSource.isPending || install.isPending;
+  const busy = createDraft.isPending || saveDraft.isPending || testOrigin.isPending || trustOrigin.isPending || validateSource.isPending || install.isPending;
 
   const effectiveName = displayName ?? project?.display_name ?? "";
   const effectiveOrigin = originUrl ?? project?.origin_url ?? "";
   const effectiveSourceType = sourceType ?? project?.source_type ?? "manifest";
   const effectiveSourceUrl = sourceUrl ?? project?.manifest_url ?? project?.feed_url ?? "";
-  const input = (): DeveloperProjectInput => ({ display_name: effectiveName, origin_url: effectiveOrigin, source_type: effectiveSourceType, manifest_url: effectiveSourceType === "manifest" ? effectiveSourceUrl : null, feed_url: effectiveSourceType === "feed" ? effectiveSourceUrl : null });
   const run = async (action: () => Promise<DeveloperProject>, success: string) => {
     setNotice(null);
     try { const result = await action(); setSelectedId(result.project_id); setNotice({ message: success, tone: "success" }); }
     catch (error) { setNotice({ message: readErrorMessage(error), tone: "danger" }); }
   };
-  const selectProject = (projectId: string) => { setSelectedId(projectId); setDisplayName(null); setOriginUrl(null); setSourceType(null); setSourceUrl(null); setTrustConfirmed(false); };
-  const startNew = () => { selectProject("new"); setDisplayName(""); setOriginUrl(""); setSourceType("manifest"); setSourceUrl(""); };
+  const selectProject = (projectId: string) => { const selectedProject = projects.data?.items.find((item) => item.project_id === projectId); setSelectedId(projectId); setDisplayName(null); setOriginUrl(null); setSourceType(null); setSourceUrl(null); setTrustConfirmed(false); setRuntimeType(selectedProject?.runtime_type ?? "already_running_service"); setWizardStep(selectedProject?.wizard_step ?? 1); };
+  const persist = async (nextStep: number) => {
+    if (!project || selectedId === "new") {
+      const result = await createDraft.mutateAsync({ source_type: effectiveSourceType, display_name: effectiveName || undefined });
+      setSelectedId(result.project_id); setWizardStep(nextStep); return result;
+    }
+    const result = await saveDraft.mutateAsync({ projectId: project.project_id, input: { wizard_step: nextStep, display_name: effectiveName || undefined, origin_url: effectiveOrigin || null, manifest_url: effectiveSourceType === "manifest" ? effectiveSourceUrl || null : null, feed_url: effectiveSourceType === "private_feed" ? effectiveSourceUrl || null : null, runtime_type: runtimeType, wizard_state_json: { trust_confirmed: trustConfirmed } } });
+    setWizardStep(nextStep); return result;
+  };
 
   if (capabilities.isLoading || projects.isLoading) return <Card><EmptyState>{t("common.loading")}</EmptyState></Card>;
 
@@ -119,41 +126,21 @@ function AddProjectWorkflow() {
   const licensing = manifest?.licensing as { required?: boolean; issuer_url?: string } | undefined;
 
   return <div className="space-y-5">
-    <PageHeader eyebrow={t("authorPortal.eyebrow")} title={t("authorPortal.developerTools")} description={t("authorPortal.developerToolsDescription")} actions={<Button variant="outlined" onClick={startNew}>{t("developerProject.newProject")}</Button>} />
+    <PageHeader eyebrow={t("authorPortal.developerTools")} title={t("developerProject.addProject")} description={t("developerProject.wizardDescription")} actions={<Link to="/core/developer/projects"><Button variant="outlined">{t("developerProject.cancel")}</Button></Link>} />
     {notice && <ToastNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} />}
-    {projects.data?.items.length ? <Field label={t("developerProject.projects")}><Select value={selectedId === "new" ? "new" : (project?.project_id ?? "")} onChange={(event) => selectProject(event.target.value)}><option value="new">{t("developerProject.newProject")}</option>{projects.data.items.map((item) => <option key={item.project_id} value={item.project_id}>{item.display_name}</option>)}</Select></Field> : null}
-
-    <Step number={1} title={t("developerProject.details")} state={project ? "complete" : "active"}>
-      <Field label={t("developerProject.displayName")}><Input value={effectiveName} onChange={(event) => setDisplayName(event.target.value)} /></Field>
-      <Link className="text-sm text-hc-primary" to="/core/help">{t("developerProject.specification")}</Link>
-    </Step>
-
-    <Step number={2} title={t("developerProject.runningApplication")} state={project ? "complete" : "active"}>
-      <p className="text-sm text-hc-muted">{t("developerProject.runningHint")}</p>
-      <div className="grid gap-3 md:grid-cols-2"><Field label={t("developerProject.originUrl")}><Input type="url" value={effectiveOrigin} onChange={(event) => setOriginUrl(event.target.value)} /></Field><Field label={t("developerProject.sourceType")}><Select value={effectiveSourceType} onChange={(event) => setSourceType(event.target.value as SourceType)}><option value="manifest">{t("developerProject.manifest")}</option><option value="feed">{t("developerProject.feed")}</option></Select></Field></div>
-      <Field label={t(effectiveSourceType === "manifest" ? "developerProject.manifestUrl" : "developerProject.feedUrl")}><Input type="url" value={effectiveSourceUrl} onChange={(event) => setSourceUrl(event.target.value)} /></Field>
-      <Button disabled={busy} onClick={() => void run(() => project && selectedId !== "new" ? update.mutateAsync({ projectId: project.project_id, input: input() }) : create.mutateAsync(input()), t(project ? "developerProject.updated" : "developerProject.created"))}>{t(project && selectedId !== "new" ? "developerProject.saveChanges" : "developerProject.createProject")}</Button>
-    </Step>
-
-    <Step number={3} title={t("developerProject.connectivity")} state={connectivityPassed ? "complete" : project ? "active" : "locked"}>
-      {project ? <><Button disabled={busy} onClick={() => void run(() => testOrigin.mutateAsync(project.project_id), t("developerProject.connectivityChecked"))}>{t("developerProject.testOrigin")}</Button>{project.connectivity_result_json && <Result tone={project.connectivity_result_json.reachable ? "success" : "danger"}>{project.connectivity_result_json.reachable ? t("developerProject.httpResult", { status: String(project.connectivity_result_json.status_code), latency: String(project.connectivity_result_json.latency_ms) }) : project.connectivity_result_json.error ?? t("developerProject.connectionFailed")}</Result>}</> : <Locked />}
-    </Step>
-
-    <Step number={4} title={t("developerProject.trustedOrigin")} state={originTrusted ? "complete" : connectivityPassed ? "active" : "locked"}>
-      {project && connectivityPassed ? <><div className="font-mono text-sm">{project.origin_url}</div><p className="text-sm text-hc-danger">{t("developerProject.trustWarning")}</p><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={trustConfirmed} onChange={(event) => setTrustConfirmed(event.target.checked)} />{t("developerProject.confirmTrust")}</label><Button disabled={busy || !trustConfirmed || originTrusted} onClick={() => void run(() => trustOrigin.mutateAsync(project.project_id), t("developerProject.originTrusted"))}>{t("developerProject.trustOrigin")}</Button></> : <Locked />}
-    </Step>
-
-    <Step number={5} title={t("developerProject.validation")} state={sourceValid ? "complete" : originTrusted ? "active" : "locked"}>
-      {project && originTrusted ? <><Button disabled={busy} onClick={() => void run(() => validateSource.mutateAsync(project.project_id), t("developerProject.sourceValidated"))}>{t("developerProject.validateSource")}</Button>{project.manifest_result_json && <Result tone={project.manifest_result_json.valid ? "success" : "danger"}>{project.manifest_result_json.valid ? t("developerProject.validSource") : <ul className="list-disc pl-5">{project.manifest_result_json.errors.map((error) => <li key={error}>{error}</li>)}</ul>}</Result>}</> : <Locked />}
-    </Step>
-
-    <Step number={6} title={t("developerProject.installation")} state={project?.status === "installed" ? "complete" : sourceValid ? "active" : "locked"}>
-      {project && sourceValid && selected ? <><dl className="grid gap-2 text-sm md:grid-cols-2"><Item label={t("developerProject.appId")} value={selected.app_id} /><Item label={t("developerProject.appName")} value={selected.app_name} /><Item label={t("developerProject.routes")} value={integration?.api?.exposes?.base_path ?? "-"} /><Item label={t("developerProject.ui")} value={integration?.slug ?? "-"} /><Item label={t("developerProject.licensing")} value={licensing?.required ? licensing.issuer_url ?? t("developerProject.required") : t("developerProject.notRequired")} /></dl><Button disabled={busy || project.status === "installed"} onClick={() => void run(() => install.mutateAsync(project.project_id), t("developerProject.installed"))}>{t("developerProject.install")}</Button></> : <Locked />}
-    </Step>
-
-    <Step number={7} title={t("developerProject.result")} state={project?.status === "installed" ? "complete" : "locked"}>
-      {project?.status === "installed" ? <><div className="flex flex-wrap gap-2"><StatusBadge tone="warning">{t("developerProject.localUnverified")}</StatusBadge><StatusBadge tone={runtime.data?.runtime.status === "healthy" ? "success" : "neutral"}>{runtime.data?.runtime.status ?? t("common.loading")}</StatusBadge></div>{runtime.data && <div className="flex flex-wrap gap-3"><Link className="text-hc-primary" to={runtime.data.open_url}>{t("developerProject.openApplication")}</Link><Link className="text-hc-primary" to="/core/apps/installed">{t("developerProject.appsManagement")}</Link></div>}</> : <Locked />}
-    </Step>
+    {projects.data?.items.some((item) => item.status === "draft") && <Field label={t("developerProject.resumeDraft")}><Select value={selectedId} onChange={(event) => selectProject(event.target.value)}><option value="new">{t("developerProject.newProject")}</option>{projects.data.items.filter((item) => item.status === "draft").map((item) => <option key={item.project_id} value={item.project_id}>{item.display_name}</option>)}</Select></Field>}
+    <div className="flex gap-1 overflow-x-auto">{Array.from({ length: 10 }, (_, index) => <div key={index} className={`h-1.5 min-w-8 flex-1 ${index + 1 <= wizardStep ? "bg-hc-primary" : "bg-hc-outline"}`} />)}</div>
+    {wizardStep === 1 && <Step number={1} title={t("developerProject.wizard.sourceType")} state="active"><Field label={t("developerProject.sourceType")}><Select value={effectiveSourceType} onChange={(event) => setSourceType(event.target.value as SourceType)}>{(["github", "gitlab", "git", "local_workspace", "manifest", "private_feed"] as SourceType[]).map((type) => <option key={type} value={type}>{t(`developerProject.source.${type}`)}</option>)}</Select></Field></Step>}
+    {wizardStep === 2 && <Step number={2} title={t("developerProject.wizard.sourceSelection")} state="active"><Field label={t("developerProject.originUrl")}><Input type="url" value={effectiveOrigin} onChange={(event) => setOriginUrl(event.target.value)} /></Field>{["manifest", "private_feed"].includes(effectiveSourceType) ? <Field label={t(effectiveSourceType === "manifest" ? "developerProject.manifestUrl" : "developerProject.feedUrl")}><Input type="url" value={effectiveSourceUrl} onChange={(event) => setSourceUrl(event.target.value)} /></Field> : <EmptyState>{t("developerProject.connectionRequired")}</EmptyState>}</Step>}
+    {wizardStep === 3 && <Step number={3} title={t("developerProject.wizard.discovery")} state="active"><Field label={t("developerProject.manifestPath")}><Input value={project?.manifest_path ?? ""} readOnly /></Field><p className="text-sm text-hc-muted">{t("developerProject.discoveryHint")}</p></Step>}
+    {wizardStep === 4 && <Step number={4} title={t("developerProject.wizard.details")} state="active"><Field label={t("developerProject.displayName")}><Input value={effectiveName} onChange={(event) => setDisplayName(event.target.value)} /></Field><Link className="text-sm text-hc-primary" to="/core/help">{t("developerProject.specification")}</Link></Step>}
+    {wizardStep === 5 && <Step number={5} title={t("developerProject.wizard.runtime")} state="active"><Field label={t("developerProject.runtimeType")}><Select value={runtimeType} onChange={(event) => setRuntimeType(event.target.value as DeveloperProject["runtime_type"])}>{["dockerfile", "docker_compose", "external_runtime", "already_running_service"].map((type) => <option key={type} value={type}>{t(`developerProject.runtimeType.${type}`)}</option>)}</Select></Field></Step>}
+    {wizardStep === 6 && <Step number={6} title={t("developerProject.wizard.connectivity")} state="active">{project && effectiveOrigin ? <><Button disabled={busy} onClick={() => void run(() => testOrigin.mutateAsync(project.project_id), t("developerProject.connectivityChecked"))}>{t("developerProject.testOrigin")}</Button>{project.connectivity_result_json && <Result tone={project.connectivity_result_json.reachable ? "success" : "danger"}>{project.connectivity_result_json.reachable ? t("developerProject.httpResult", { status: String(project.connectivity_result_json.status_code), latency: String(project.connectivity_result_json.latency_ms) }) : project.connectivity_result_json.error ?? t("developerProject.connectionFailed")}</Result>}{connectivityPassed && <><p className="text-sm text-hc-danger">{t("developerProject.trustWarning")}</p><label className="flex gap-2 text-sm"><input type="checkbox" checked={trustConfirmed} onChange={(event) => setTrustConfirmed(event.target.checked)} />{t("developerProject.confirmTrust")}</label><Button disabled={busy || !trustConfirmed || originTrusted} onClick={() => void run(() => trustOrigin.mutateAsync(project.project_id), t("developerProject.originTrusted"))}>{t("developerProject.trustOrigin")}</Button></>}</> : <Locked />}</Step>}
+    {wizardStep === 7 && <Step number={7} title={t("developerProject.wizard.validation")} state="active">{project && (originTrusted || !["manifest", "private_feed"].includes(effectiveSourceType)) ? <><Button disabled={busy} onClick={() => void run(() => validateSource.mutateAsync(project.project_id), t("developerProject.sourceValidated"))}>{t("developerProject.validateSource")}</Button>{project.manifest_result_json && <Result tone={project.manifest_result_json.valid ? "success" : "danger"}>{project.manifest_result_json.valid ? t("developerProject.validSource") : <ul className="list-disc pl-5">{project.manifest_result_json.errors.map((error) => <li key={error}>{error}</li>)}</ul>}</Result>}</> : <Locked />}</Step>}
+    {wizardStep === 8 && <Step number={8} title={t("developerProject.wizard.review")} state="active">{selected ? <dl className="grid gap-2 text-sm md:grid-cols-2"><Item label={t("developerProject.appId")} value={selected.app_id} /><Item label={t("developerProject.appName")} value={selected.app_name} /><Item label={t("developerProject.routes")} value={integration?.api?.exposes?.base_path ?? "-"} /><Item label={t("developerProject.ui")} value={integration?.slug ?? "-"} /><Item label={t("developerProject.runtimeType")} value={t(`developerProject.runtimeType.${runtimeType}`)} /><Item label={t("developerProject.licensing")} value={licensing?.required ? licensing.issuer_url ?? t("developerProject.required") : t("developerProject.notRequired")} /></dl> : <Locked />}</Step>}
+    {wizardStep === 9 && <Step number={9} title={t("developerProject.wizard.deploy")} state="active">{project && sourceValid ? <Button disabled={busy || project.status === "installed"} onClick={() => void run(async () => { const result = await install.mutateAsync(project.project_id); setWizardStep(10); return result; }, t("developerProject.installed"))}>{t("developerProject.install")}</Button> : <Locked />}</Step>}
+    {wizardStep === 10 && <Step number={10} title={t("developerProject.wizard.result")} state={project?.status === "installed" ? "complete" : "active"}>{project?.status === "installed" ? <><div className="flex gap-2"><StatusBadge tone="warning">{t("developerProject.localUnverified")}</StatusBadge><StatusBadge tone={runtime.data?.runtime.status === "healthy" ? "success" : "neutral"}>{runtime.data?.runtime.status ?? t("common.loading")}</StatusBadge></div><div className="flex gap-3">{runtime.data && <Link className="text-hc-primary" to={runtime.data.open_url}>{t("developerProject.openApplication")}</Link>}<Link className="text-hc-primary" to={`/core/developer/projects/${project.project_id}`}>{t("developerProject.openProject")}</Link></div></> : <Locked />}</Step>}
+    <div className="flex flex-wrap justify-between gap-2"><div>{wizardStep > 1 && <Button variant="outlined" disabled={busy} onClick={() => setWizardStep((value) => Math.max(1, value - 1))}>{t("developerProject.back")}</Button>}</div><div className="flex gap-2"><Link to="/core/developer/projects"><Button variant="outlined" disabled={busy} onClick={() => project && void persist(wizardStep)}>{t("developerProject.saveExit")}</Button></Link>{wizardStep < 10 && <Button disabled={busy} onClick={() => void persist(Math.min(10, wizardStep + 1))}>{t("developerProject.next")}</Button>}</div></div>
   </div>;
 }
 
