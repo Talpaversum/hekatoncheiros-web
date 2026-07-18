@@ -92,7 +92,7 @@ export function AppRuntimePage() {
 
     const appContext: AppContext = {
       api: {
-        request: (path, init) => authFetch(path, init),
+        request: (path, init) => authFetch(`/apps/${encodeURIComponent(appEntry.slug)}${path.startsWith("/") ? path : `/${path}`}`, init),
       },
       privileges: context?.privileges ?? [],
       entitlement: null,
