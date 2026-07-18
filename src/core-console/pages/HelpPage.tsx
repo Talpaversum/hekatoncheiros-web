@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAppRegistryQuery } from "../../data/api/app-registry";
 import { useContextQuery } from "../../data/api/context";
+import { useInstanceCapabilities } from "../../data/api/capabilities";
 import { useLocalization } from "../../localization/LocalizationProvider";
 import { Card } from "../../ui-kit/components/Card";
 import { Input } from "../../ui-kit/components/Input";
@@ -32,11 +33,12 @@ export function HelpPage() {
   const [openGuideKey, setOpenGuideKey] = useState<string | null>(null);
   const { data: context } = useContextQuery();
   const { data: registry, isLoading } = useAppRegistryQuery(true);
+  const { data: capabilities } = useInstanceCapabilities();
   const privileges = useMemo(() => context?.privileges ?? [], [context?.privileges]);
   const { t } = useLocalization();
 
   const allGuides = useMemo(() => {
-    const visiblePlatformGuides = getVisiblePlatformHelpGuides(privileges, t);
+    const visiblePlatformGuides = getVisiblePlatformHelpGuides(privileges, t, capabilities);
     const appGuides =
       registry?.items.flatMap((app) =>
         (app.help_entries ?? []).map((entry) => ({
@@ -52,7 +54,7 @@ export function HelpPage() {
       ) ?? [];
 
     return [...visiblePlatformGuides, ...appGuides];
-  }, [privileges, registry?.items, t]);
+  }, [capabilities, privileges, registry?.items, t]);
 
   const categories = useMemo(() => {
     return Array.from(new Set(allGuides.map((item) => item.category))).sort((a, b) => a.localeCompare(b));

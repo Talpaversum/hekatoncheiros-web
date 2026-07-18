@@ -1,4 +1,5 @@
 import { hasPrivilege } from "../../access/privileges";
+import type { InstanceCapabilities } from "../../data/api/author-portal";
 import type { Translate } from "../../localization/LocalizationProvider";
 
 export type HelpGuide = {
@@ -11,6 +12,7 @@ export type HelpGuide = {
   source: string;
   actionLabel?: string;
   requiredPrivilege?: string;
+  requiredCapability?: keyof InstanceCapabilities;
 };
 
 type HelpGuideDefinition = {
@@ -19,9 +21,19 @@ type HelpGuideDefinition = {
   stepCount: number;
   path: string;
   requiredPrivilege?: string;
+  requiredCapability?: keyof InstanceCapabilities;
 };
 
 const platformHelpGuideDefinitions: HelpGuideDefinition[] = [
+  { key: "privateVsOfficial", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/developer", requiredCapability: "privateAppDevelopment" },
+  { key: "officialModes", categoryKey: "help.categoryDistribution", stepCount: 2, path: "/core/author/onboarding", requiredCapability: "officialAuthorOnboarding" },
+  { key: "trustedOrigin", categoryKey: "help.categoryPlatform", stepCount: 2, path: "/core/developer", requiredCapability: "trustedOrigins" },
+  { key: "privateManifestFeed", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/developer", requiredCapability: "privateAppDevelopment" },
+  { key: "authorScope", categoryKey: "help.categoryPlatform", stepCount: 2, path: "/core/author", requiredCapability: "officialAuthorOnboarding" },
+  { key: "registryCertificate", categoryKey: "help.categoryPlatform", stepCount: 2, path: "/core/platform/author-registry", requiredCapability: "officialAuthorRegistry", requiredPrivilege: "platform.author_registry.read" },
+  { key: "licensingModes", categoryKey: "help.categoryLicensing", stepCount: 2, path: "/core/author", requiredCapability: "officialAuthorOnboarding" },
+  { key: "catalogReview", categoryKey: "help.categoryDistribution", stepCount: 2, path: "/core/author/catalog", requiredCapability: "officialCatalogPublishing" },
+  { key: "runtimeReview", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/platform/runtime-review", requiredCapability: "hostedRuntime", requiredPrivilege: "platform.apps.runtime.manage" },
   {
     key: "installCatalog",
     categoryKey: "help.categoryApplications",
@@ -79,19 +91,20 @@ const platformHelpGuideDefinitions: HelpGuideDefinition[] = [
   },
 ];
 
-export function getVisiblePlatformHelpGuides(privileges: string[], t: Translate): HelpGuide[] {
+export function getVisiblePlatformHelpGuides(privileges: string[], t: Translate, capabilities?: InstanceCapabilities): HelpGuide[] {
   return platformHelpGuideDefinitions
     .filter((item) => !item.requiredPrivilege || hasPrivilege(privileges, item.requiredPrivilege))
+    .filter((item) => !item.requiredCapability || capabilities?.[item.requiredCapability]?.available === true)
     .map((item) => ({
-      title: t(`help.guide.${item.key}.title`),
-      summary: t(`help.guide.${item.key}.summary`),
-      outcome: t(`help.guide.${item.key}.outcome`),
+      title: t(item.requiredCapability ? `help.workflow.${item.key}.title` : `help.guide.${item.key}.title`),
+      summary: t(item.requiredCapability ? `help.workflow.${item.key}.summary` : `help.guide.${item.key}.summary`),
+      outcome: t(item.requiredCapability ? `help.workflow.${item.key}.outcome` : `help.guide.${item.key}.outcome`),
       category: t(item.categoryKey),
       path: item.path,
       source: "Hekatoncheiros",
-      actionLabel: t(`help.guide.${item.key}.action`),
+      actionLabel: t(item.requiredCapability ? `help.workflow.${item.key}.action` : `help.guide.${item.key}.action`),
       requiredPrivilege: item.requiredPrivilege,
-      steps: Array.from({ length: item.stepCount }, (_, index) => t(`help.guide.${item.key}.step${index + 1}`)),
+      steps: Array.from({ length: item.stepCount }, (_, index) => t(`${item.requiredCapability ? "help.workflow" : "help.guide"}.${item.key}.step${index + 1}`)),
     }));
 }
 

@@ -5,6 +5,7 @@ import { hasPrivilege } from "../../access/privileges";
 import { getHelpCategoryPath, getVisiblePlatformHelpGuides } from "../../core-console/pages/help-guides";
 import { useUpdateAccountMutation } from "../../data/api/account";
 import { useAppRegistryQuery } from "../../data/api/app-registry";
+import { useInstanceCapabilities } from "../../data/api/capabilities";
 import { clearTokens } from "../../data/auth/storage";
 import { useLocalization } from "../../localization/LocalizationProvider";
 import { localeOptions, type Locale } from "../../localization/resources";
@@ -29,6 +30,7 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
   const { locale, setLocale, t } = useLocalization();
   const updateAccount = useUpdateAccountMutation();
   const { data: registry, isLoading: registryLoading } = useAppRegistryQuery(true);
+  const { data: capabilities } = useInstanceCapabilities();
   const [appsOpen, setAppsOpen] = useState(false);
   const [desktopAdministrationOpen, setDesktopAdministrationOpen] = useState(false);
   const [mobileAdministrationOpen, setMobileAdministrationOpen] = useState(false);
@@ -93,10 +95,10 @@ export function AppTopBar({ userId, displayName, privileges = [], tenantMode }: 
 
   const appGroups = useMemo(() => registry?.items ?? [], [registry?.items]);
   const helpCategories = useMemo(() => {
-    const platformCategories = getVisiblePlatformHelpGuides(privileges, t).map((guide) => guide.category);
+    const platformCategories = getVisiblePlatformHelpGuides(privileges, t, capabilities).map((guide) => guide.category);
     const appCategories = appGroups.flatMap((app) => (app.help_entries ?? []).map((entry) => entry.category ?? t("help.categoryApplications")));
     return Array.from(new Set([...platformCategories, ...appCategories])).sort((a, b) => a.localeCompare(b));
-  }, [appGroups, privileges, t]);
+  }, [appGroups, capabilities, privileges, t]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-hc-outline bg-hc-topbar">
