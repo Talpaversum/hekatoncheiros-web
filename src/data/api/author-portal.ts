@@ -11,7 +11,7 @@ export type GitRepository = { id: number; full_name: string; visibility: "public
 export type CatalogSubmission = { submission_id: string; author_app_id: string; author_id: string; app_id?: string | null; display_name?: string; operating_mode?: AuthorMode; status: string; eligibility_json: Record<string, boolean>; review_notes: string | null; created_at: string };
 export type ActivityEvent = { event_id: string; author_id: string | null; action: string; from_status: string | null; to_status: string | null; metadata_json: Record<string, unknown>; created_at: string };
 export type AuthorMember = { author_id: string; user_id: string; email: string; role: string; permissions_json: string[]; status: string; created_at: string };
-export type InstanceCapabilities = Record<"privateAppDevelopment" | "trustedOrigins" | "privateCatalogs" | "officialAuthorOnboarding" | "officialAuthorRegistry" | "officialCatalogPublishing" | "officialCatalogReview" | "hostedAuthorServices" | "hostedBuilds" | "hostedRuntime" | "hostedLicensing" | "externalTrustedAuthorPublishing", { enabled: boolean; configured: boolean; available: boolean }>;
+export type InstanceCapabilities = Record<"privateAppDevelopment" | "trustedOrigins" | "privateCatalogs" | "officialAuthorOnboarding" | "officialAuthorRegistry" | "officialCatalogPublishing" | "officialCatalogReview" | "hostedAuthorServices" | "hostedBuilds" | "hostedRuntime" | "hostedLicensing" | "externalTrustedAuthorPublishing", { enabled: boolean; configured: boolean; available: boolean; reason?: string; url?: string }>;
 
 const invalidate = (client: ReturnType<typeof useQueryClient>) => Promise.all([
   client.invalidateQueries({ queryKey: ["author-portal"] }), client.invalidateQueries({ queryKey: ["author-requests-admin"] }),

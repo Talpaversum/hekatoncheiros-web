@@ -12,8 +12,12 @@ import { PlatformConfigPage } from "./core-console/pages/PlatformConfigPage";
 import { TenantConfigPage } from "./core-console/pages/TenantConfigPage";
 import { AppRuntimePage } from "./app/AppRuntimePage";
 import { AuditLogPage } from "./core-console/pages/AuditLogPage";
-import { AuthorPortalPage } from "./core-console/pages/AuthorPortalPage";
+import { AuthorWorkspacePage } from "./core-console/pages/AuthorPortalPage";
 import { DeveloperToolsPage } from "./core-console/pages/DeveloperToolsPage";
+import { AuthorOnboardingPage } from "./core-console/pages/AuthorOnboardingPage";
+import { RegistryAdministrationPage } from "./core-console/pages/RegistryAdministrationPage";
+import { RequireCapability } from "./app/RequireCapability";
+import { RequireAuthorMembership } from "./app/RequireAuthorMembership";
 
 export default function App() {
   return (
@@ -27,10 +31,10 @@ export default function App() {
         <Route path="account/*" element={<AccountPage />} />
         <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing/*" element={<LicensingPage />} />
-        <Route path="author/*" element={<AuthorPortalPage />} />
-        <Route path="developer" element={<DeveloperToolsPage />} />
-        <Route path="author-onboarding/*" element={<AuthorPortalPage module="onboarding" />} />
-        <Route path="registry/*" element={<AuthorPortalPage module="registry" />} />
+        <Route path="author/*" element={<RequireAuthorMembership><AuthorWorkspacePage /></RequireAuthorMembership>} />
+        <Route path="developer" element={<RequireCapability capability="privateAppDevelopment"><DeveloperToolsPage /></RequireCapability>} />
+        <Route path="author-onboarding/*" element={<RequireCapability capability="officialAuthorOnboarding"><AuthorOnboardingPage /></RequireCapability>} />
+        <Route path="registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.authors.manage"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />
         <Route path="audit" element={<AuditLogPage />} />
         <Route
           path="platform/*"

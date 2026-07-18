@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { AuthorsPanel } from "./AuthorsPanel";
 
 import {
   usePlatformInstanceSettingsQuery,
@@ -420,7 +419,6 @@ export function PlatformConfigPage() {
           </div>
         </Card>}
 
-        {section === "authors" && <AuthorsPanel />}
 
         {section === "identity" && <div className="grid gap-4">
           <TabBar

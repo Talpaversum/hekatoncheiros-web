@@ -3,13 +3,15 @@ import type { PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useAppRegistryQuery } from "../../data/api/app-registry";
+import { useInstanceCapabilities } from "../../data/api/capabilities";
+import type { InstanceCapabilities } from "../../data/api/author-portal";
 import { useLocalization } from "../../localization/LocalizationProvider";
 
 type SidebarNavProps = PropsWithChildren<{
   privileges?: string[];
 }>;
 
-type SidebarItem = { to: string; labelKey: string; required?: string };
+type SidebarItem = { to: string; labelKey: string; required?: string; capability?: keyof InstanceCapabilities };
 
 const sidebarConfig = [
   {
@@ -33,15 +35,15 @@ const sidebarConfig = [
   {
     prefix: "/core/developer",
     titleKey: "authorPortal.developerTools",
-    items: [{ to: "/core/developer", labelKey: "nav.overview" }],
+    items: [{ to: "/core/developer", labelKey: "nav.overview", capability: "privateAppDevelopment" }],
   },
   {
     prefix: "/core/registry",
     titleKey: "authorPortal.registryAdministration",
     items: [
-      { to: "/core/registry", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage" },
-      { to: "/core/registry/applications", labelKey: "authorPortal.applications", required: "platform.catalog.manage" },
-      { to: "/core/registry/catalog", labelKey: "authorPortal.catalogSubmissions", required: "platform.catalog.manage" },
+      { to: "/core/registry", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage", capability: "officialAuthorRegistry" },
+      { to: "/core/registry/applications", labelKey: "authorPortal.applications", required: "platform.catalog.manage", capability: "officialAuthorRegistry" },
+      { to: "/core/registry/catalog", labelKey: "authorPortal.catalogSubmissions", required: "platform.catalog.manage", capability: "officialCatalogReview" },
     ] satisfies SidebarItem[],
   },
   {
@@ -102,7 +104,6 @@ const sidebarConfig = [
       { to: "/core/platform/instance", labelKey: "nav.instance" },
       { to: "/core/platform/trusted-origins", labelKey: "nav.trustedOrigins" },
       { to: "/core/platform/app-distribution", labelKey: "nav.appDistribution" },
-      { to: "/core/platform/authors", labelKey: "nav.applicationAuthors" },
       { to: "/core/platform/identity", labelKey: "nav.identityTenancy" },
       { to: "/core/platform/automation", labelKey: "nav.automation" },
     ],
@@ -124,6 +125,7 @@ export function SidebarNav({ children, privileges = [] }: SidebarNavProps) {
   const { t } = useLocalization();
   const location = useLocation();
   const { data: appRegistry } = useAppRegistryQuery(location.pathname.startsWith("/app/"));
+  const { data: capabilities } = useInstanceCapabilities();
   const slug = location.pathname.startsWith("/app/") ? location.pathname.split("/")[2] : null;
   const appEntry = appRegistry?.items.find((item) => item.slug === slug);
   const fallbackSection = sidebarConfig[0];
@@ -138,7 +140,7 @@ export function SidebarNav({ children, privileges = [] }: SidebarNavProps) {
         if (section.prefix === "/core/audit" && !["core.audit.read.own", "core.audit.read.tenant", "platform.audit.read", "platform.superadmin"].some((item) => privileges.includes(item))) section = fallbackSection;
         return {
           title: t(section.titleKey),
-          items: section.items.filter((item: SidebarItem) => !item.required || privileges.includes("platform.superadmin") || privileges.includes(item.required)).map((item) => ({
+          items: section.items.filter((item: SidebarItem) => (!item.required || privileges.includes("platform.superadmin") || privileges.includes(item.required)) && (!item.capability || capabilities?.[item.capability]?.available)).map((item) => ({
             to: item.to,
             label: t(item.labelKey),
           })),
