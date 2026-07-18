@@ -23,13 +23,13 @@ const sidebarConfig = [
     prefix: "/core/author",
     titleKey: "nav.authorPortal",
     items: [
-      { to: "/core/author", labelKey: "nav.overview" },
-      { to: "/core/author/profiles", labelKey: "authorPortal.profiles" },
-      { to: "/core/author/git", labelKey: "authorPortal.gitConnections" },
-      { to: "/core/author/applications", labelKey: "authorPortal.applications" },
-      { to: "/core/author/licensing", labelKey: "nav.licensing" },
-      { to: "/core/author/catalog", labelKey: "authorPortal.catalogSubmissions" },
-      { to: "/core/author/activity", labelKey: "authorPortal.activity" },
+      { to: "/core/author/:authorId/overview", labelKey: "nav.overview" },
+      { to: "/core/author/:authorId/git", labelKey: "authorPortal.gitConnections" },
+      { to: "/core/author/:authorId/applications", labelKey: "authorPortal.applications" },
+      { to: "/core/author/:authorId/licensing", labelKey: "nav.licensing" },
+      { to: "/core/author/:authorId/catalog", labelKey: "authorPortal.catalogSubmissions" },
+      { to: "/core/author/:authorId/team", labelKey: "authorPortal.members" },
+      { to: "/core/author/:authorId/activity", labelKey: "authorPortal.activity" },
     ] satisfies SidebarItem[],
   },
   {
@@ -38,13 +38,24 @@ const sidebarConfig = [
     items: [{ to: "/core/developer", labelKey: "nav.overview", capability: "privateAppDevelopment" }],
   },
   {
-    prefix: "/core/registry",
+    prefix: "/core/admin/authors",
+    titleKey: "authorPortal.authorReviews",
+    items: [{ to: "/core/admin/authors", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage", capability: "officialAuthorOnboarding" }],
+  },
+  {
+    prefix: "/core/admin/registry",
     titleKey: "authorPortal.registryAdministration",
-    items: [
-      { to: "/core/registry", labelKey: "authorPortal.authorReviews", required: "platform.authors.manage", capability: "officialAuthorRegistry" },
-      { to: "/core/registry/applications", labelKey: "authorPortal.applications", required: "platform.catalog.manage", capability: "officialAuthorRegistry" },
-      { to: "/core/registry/catalog", labelKey: "authorPortal.catalogSubmissions", required: "platform.catalog.manage", capability: "officialCatalogReview" },
-    ] satisfies SidebarItem[],
+    items: [{ to: "/core/admin/registry", labelKey: "authorPortal.registryAdministration", required: "platform.author_registry.manage", capability: "officialAuthorRegistry" }],
+  },
+  {
+    prefix: "/core/admin/catalog",
+    titleKey: "authorPortal.catalogSubmissions",
+    items: [{ to: "/core/admin/catalog", labelKey: "authorPortal.catalogSubmissions", required: "platform.catalog.manage", capability: "officialCatalogReview" }],
+  },
+  {
+    prefix: "/core/admin/runtime",
+    titleKey: "authorPortal.runtime",
+    items: [{ to: "/core/admin/runtime", labelKey: "authorPortal.runtime", required: "platform.apps.runtime.manage", capability: "hostedRuntime" }],
   },
   {
     prefix: "/core/audit",
@@ -141,7 +152,7 @@ export function SidebarNav({ children, privileges = [] }: SidebarNavProps) {
         return {
           title: t(section.titleKey),
           items: section.items.filter((item: SidebarItem) => (!item.required || privileges.includes("platform.superadmin") || privileges.includes(item.required)) && (!item.capability || capabilities?.[item.capability]?.available)).map((item) => ({
-            to: item.to,
+            to: item.to.replace(":authorId", location.pathname.split("/")[3] ?? ""),
             label: t(item.labelKey),
           })),
         };

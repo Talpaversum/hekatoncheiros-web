@@ -12,10 +12,13 @@ import { PlatformConfigPage } from "./core-console/pages/PlatformConfigPage";
 import { TenantConfigPage } from "./core-console/pages/TenantConfigPage";
 import { AppRuntimePage } from "./app/AppRuntimePage";
 import { AuditLogPage } from "./core-console/pages/AuditLogPage";
-import { AuthorWorkspacePage } from "./core-console/pages/AuthorPortalPage";
-import { DeveloperToolsPage } from "./core-console/pages/DeveloperToolsPage";
-import { AuthorOnboardingPage } from "./core-console/pages/AuthorOnboardingPage";
-import { RegistryAdministrationPage } from "./core-console/pages/RegistryAdministrationPage";
+import { AuthorWorkspacePage } from "./core-console/pages/author-workspace/AuthorWorkspacePage";
+import { DeveloperToolsPage } from "./core-console/pages/developer/DeveloperToolsPage";
+import { AuthorOnboardingPage } from "./core-console/pages/author-workspace/AuthorOnboardingPage";
+import { AuthorAdministrationPage } from "./core-console/pages/platform-admin/authors/AuthorAdministrationPage";
+import { RegistryAdministrationPage } from "./core-console/pages/platform-admin/registry/RegistryAdministrationPage";
+import { CatalogReviewPage } from "./core-console/pages/platform-admin/catalog/CatalogReviewPage";
+import { RuntimeReviewPage } from "./core-console/pages/platform-admin/runtime/RuntimeReviewPage";
 import { RequireCapability } from "./app/RequireCapability";
 import { RequireAuthorMembership } from "./app/RequireAuthorMembership";
 
@@ -31,10 +34,13 @@ export default function App() {
         <Route path="account/*" element={<AccountPage />} />
         <Route path="apps/*" element={<AppsPage />} />
         <Route path="licensing/*" element={<LicensingPage />} />
-        <Route path="author/*" element={<RequireAuthorMembership><AuthorWorkspacePage /></RequireAuthorMembership>} />
-        <Route path="developer" element={<RequireCapability capability="privateAppDevelopment"><DeveloperToolsPage /></RequireCapability>} />
+        <Route path="author/:authorId/*" element={<RequireAuthorMembership><AuthorWorkspacePage /></RequireAuthorMembership>} />
+        <Route path="developer/*" element={<RequireCapability capability="privateAppDevelopment"><DeveloperToolsPage /></RequireCapability>} />
         <Route path="author-onboarding/*" element={<RequireCapability capability="officialAuthorOnboarding"><AuthorOnboardingPage /></RequireCapability>} />
-        <Route path="registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.authors.manage"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/authors/*" element={<RequireCapability capability="officialAuthorOnboarding"><RequirePrivilege required="platform.authors.manage"><AuthorAdministrationPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/registry/*" element={<RequireCapability capability="officialAuthorRegistry"><RequirePrivilege required="platform.author_registry.manage"><RegistryAdministrationPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/catalog/*" element={<RequireCapability capability="officialCatalogReview"><RequirePrivilege required="platform.catalog.manage"><CatalogReviewPage /></RequirePrivilege></RequireCapability>} />
+        <Route path="admin/runtime/*" element={<RequireCapability capability="hostedRuntime"><RequirePrivilege required="platform.apps.runtime.manage"><RuntimeReviewPage /></RequirePrivilege></RequireCapability>} />
         <Route path="audit" element={<AuditLogPage />} />
         <Route
           path="platform/*"

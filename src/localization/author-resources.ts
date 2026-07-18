@@ -251,6 +251,13 @@ const en: Record<string, string> = {
   "developerProject.state.active": "Current",
   "developerProject.state.complete": "Complete",
   "developerProject.state.locked": "Waiting",
+  "authorPortal.registryDescription": "Cryptographic author trust, certificates, keys, revocations and Registry audit.",
+  "authorPortal.registryAuthors": "Registered authors",
+  "authorPortal.registryExpiring": "Expiring certificates",
+  "authorPortal.registryRevocations": "Revocations",
+  "authorPortal.registryTrust": "Registry trust anchor",
+  "authorPortal.registrySync": "Synchronize trust snapshot",
+  "authorPortal.registryAudit": "Registry audit",
 };
 
 const cs: Record<string, string> = {
@@ -507,6 +514,13 @@ const cs: Record<string, string> = {
   "developerProject.state.active": "Aktuální",
   "developerProject.state.complete": "Hotovo",
   "developerProject.state.locked": "Čeká",
+  "authorPortal.registryDescription": "Kryptografická důvěra autorů, certifikáty, klíče, revokace a audit registru.",
+  "authorPortal.registryAuthors": "Registrovaní autoři",
+  "authorPortal.registryExpiring": "Končící certifikáty",
+  "authorPortal.registryRevocations": "Revokace",
+  "authorPortal.registryTrust": "Kořen důvěry registru",
+  "authorPortal.registrySync": "Synchronizovat snapshot důvěry",
+  "authorPortal.registryAudit": "Audit registru",
 };
 
 const sk = { ...en, "authorPortal.developerTools": "Vývojárske nástroje", "authorPortal.developerToolsDescription": "Vyvíjajte, inštalujte a testujte súkromné aplikácie bez schválenia oficiálnym registrom.", "authorPortal.privateApps": "Súkromné aplikácie", "authorPortal.officialServices": "Voliteľné oficiálne služby", "authorPortal.officialServicesDescription": "Odkazy sa zobrazia iba vtedy, keď inštancia príslušnú službu poskytuje a má ju nakonfigurovanú.", "authorPortal.registryAdministration": "Správa registra", "authorPortal.capabilityUnavailable": "Táto služba nie je na tejto inštancii dostupná alebo nakonfigurovaná.", "authorPortal.available": "Dostupné", "authorPortal.unavailable": "Nedostupné", "authorPortal.openTool": "Otvoriť nástroj", "authorPortal.activeAuthor": "Aktívny autor" };

@@ -9,16 +9,16 @@ import {
   type DeveloperProject,
   type DeveloperProjectInput,
   type SourceType,
-} from "../../data/api/developer-projects";
-import { useInstanceCapabilities } from "../../data/api/capabilities";
-import { readErrorMessage } from "../../data/api/read-error-message";
-import { useLocalization } from "../../localization/LocalizationProvider";
-import { Button } from "../../ui-kit/components/Button";
-import { Card } from "../../ui-kit/components/Card";
-import { Input } from "../../ui-kit/components/Input";
-import { EmptyState, Field, PageHeader, StatusBadge } from "../../ui-kit/components/Page";
-import { Select } from "../../ui-kit/components/Select";
-import { ToastNotice } from "../../ui-kit/components/ToastNotice";
+} from "./api";
+import { useInstanceCapabilities } from "../../../data/api/capabilities";
+import { readErrorMessage } from "../../../data/api/read-error-message";
+import { useLocalization } from "../../../localization/LocalizationProvider";
+import { Button } from "../../../ui-kit/components/Button";
+import { Card } from "../../../ui-kit/components/Card";
+import { Input } from "../../../ui-kit/components/Input";
+import { EmptyState, Field, PageHeader, StatusBadge } from "../../../ui-kit/components/Page";
+import { Select } from "../../../ui-kit/components/Select";
+import { ToastNotice } from "../../../ui-kit/components/ToastNotice";
 
 const reached = (project: DeveloperProject | undefined, statuses: DeveloperProject["status"][]) => Boolean(project && statuses.includes(project.status));
 
