@@ -40,7 +40,7 @@ const sidebarConfig = [
       { to: "/core/developer/projects", labelKey: "developerProject.section.projects", required: "developer.projects.read", capability: "privateAppDevelopment" },
       { to: "/core/developer/deployments", labelKey: "developerProject.section.deployments", required: "developer.projects.read", capability: "privateAppDevelopment" },
       { to: "/core/developer/logs", labelKey: "developerProject.section.logs", required: "developer.logs.read", capability: "privateAppDevelopment" },
-      { to: "/core/developer/connections", labelKey: "developerProject.section.connections", required: "developer.connections.manage", capability: "privateAppDevelopment" },
+      { to: "/core/developer/connections", labelKey: "developerProject.section.connections", required: "developer.connections.use", capability: "privateAppDevelopment" },
     ],
   },
   {
