@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { authFetch } from "../auth/auth-fetch";
 
-export type AuthorMode = "talpaversum_hosted" | "trusted_self_hosted" | "private_self_hosted";
+export type AuthorMode =
+  | "talpaversum_hosted"
+  | "trusted_self_hosted";
 export type AuthorRequest = { request_id: string; requested_display_name: string; legal_name: string | null; contact_email: string; website: string | null; git_provider_profile: string | null; description: string; operating_mode: AuthorMode; intended_distribution: string; terms_accepted: boolean; public_jwks_json?: { keys: Record<string, unknown>[] } | null; external_issuer_url?: string | null; status: string; review_notes: string | null; author_id: string | null; created_at: string };
 export type AuthorProfile = { author_id: string; display_name: string; operating_mode: AuthorMode; registry_status: string; status: string; role: string; permissions_json: string[]; external_issuer_url?: string | null };
 export type AuthorApp = { author_app_id: string; author_id: string; app_id: string | null; display_name: string; repository_full_name: string | null; repository_visibility: string | null; branch: string | null; manifest_path: string | null; manifest_json?: Record<string, unknown> | null; manifest_errors_json: string[]; status: string; runtime_management: string; licensing_management: string; operating_mode?: AuthorMode; member_permissions_json?: string[] };
