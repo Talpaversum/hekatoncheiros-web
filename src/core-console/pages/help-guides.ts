@@ -26,6 +26,7 @@ type HelpGuideDefinition = {
 
 const platformHelpGuideDefinitions: HelpGuideDefinition[] = [
   { key: "privateVsOfficial", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/developer", requiredCapability: "privateAppDevelopment" },
+  { key: "developerLifecycle", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/developer", requiredCapability: "privateAppDevelopment", requiredPrivilege: "developer.projects.read" },
   { key: "officialModes", categoryKey: "help.categoryDistribution", stepCount: 2, path: "/core/author/onboarding", requiredCapability: "officialAuthorOnboarding" },
   { key: "trustedOrigin", categoryKey: "help.categoryPlatform", stepCount: 2, path: "/core/developer", requiredCapability: "trustedOrigins" },
   { key: "privateManifestFeed", categoryKey: "help.categoryApplications", stepCount: 2, path: "/core/developer", requiredCapability: "privateAppDevelopment" },
