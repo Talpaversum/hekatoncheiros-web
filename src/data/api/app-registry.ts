@@ -27,6 +27,8 @@ export type AppRegistryEntry = {
     path: string;
     required_privileges?: string[];
   }>;
+  availability?: "available" | "degraded" | "blocked" | "unavailable" | "disabled";
+  availability_reason?: "runtime_unreachable" | "runtime_degraded" | "runtime_stopped" | "license_missing" | "license_expired" | "license_revoked" | "ui_missing" | "ui_unreachable" | "application_disabled" | "installation_failed" | null;
   runtime: { status: "unknown" | "starting" | "healthy" | "degraded" | "unreachable" | "stopped"; last_checked_at: string | null; last_healthy_at: string | null; status_changed_at: string; consecutive_failures: number; message: string | null };
 };
 

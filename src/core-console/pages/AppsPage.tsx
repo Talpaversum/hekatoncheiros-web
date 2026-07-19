@@ -29,11 +29,13 @@ import {
   useInstalledAppsQuery,
   useRefreshInstalledAppArtifactMutation,
   useRotateManagedAppRuntimeTokenMutation,
+  useRunAppDiagnosticsMutation,
   useStopManagedAppRuntimeMutation,
   useUninstallAppMutation,
   type IssueInstalledAppTokenResponse,
   type InstalledApp,
 } from "../../data/api/installed-apps";
+import { selectInstalledAppAvailability } from "../../data/installed-app-availability";
 import { readErrorMessage } from "../../data/api/read-error-message";
 import { useContextQuery } from "../../data/api/context";
 import { useLocalization, type Translate } from "../../localization/LocalizationProvider";
@@ -108,27 +110,11 @@ function readAppLocalization(app: InstalledApp) {
 }
 
 function getInstalledStatus(app: InstalledApp, registrySlugs: Set<string>, t: Translate) {
-  const licensing = app.manifest?.["licensing"] as { required?: boolean } | undefined;
-
-  if (app.ui_url.trim().length === 0) {
-    return { label: t("apps.status.broken"), tone: "danger" as const, detail: t("apps.status.missingArtifact") };
-  }
-
-  if (licensing?.required === true && !app.resolved_entitlement) {
-    return {
-      label: app.has_any_entitlement ? t("apps.status.licenseInactive") : t("apps.status.licenseMissing"),
-      tone: "warn" as const,
-      detail: app.has_any_entitlement
-        ? t("apps.status.tenantLicenseInactive")
-        : t("apps.status.runtimeBlocked"),
-    };
-  }
-
-  if (!registrySlugs.has(app.slug)) {
-    return { label: t("apps.status.hidden"), tone: "neutral" as const, detail: t("apps.status.hiddenDescription") };
-  }
-
-  return { label: t("apps.status.ready"), tone: "good" as const, detail: null };
+  const state = selectInstalledAppAvailability(app);
+  const reason = !registrySlugs.has(app.slug) && state.reason === null ? "ui_missing" : state.reason;
+  const availability = reason === "ui_missing" ? "unavailable" : state.availability;
+  const tone = availability === "available" ? "good" as const : availability === "degraded" || availability === "blocked" ? "warn" as const : "danger" as const;
+  return { label: t(`apps.availability.${availability}`), tone, detail: reason ? t(`apps.reason.${reason}`) : null };
 }
 
 function getCatalogRuntimeStatus(entry: AppCatalogEntry, t: Translate) {
@@ -1180,7 +1166,9 @@ function InstalledAppDetail({
   isMutating: boolean;
 }) {
   const { locale, t } = useLocalization();
+  const diagnostics = useRunAppDiagnosticsMutation();
   const status = getInstalledStatus(app, registrySlugs, t);
+  const availability = selectInstalledAppAvailability(app);
   const localization = readAppLocalization(app);
   const effectiveLocale = localization.supportedLocales.includes(locale) ? locale : localization.defaultLocale;
   const runtimeTone = app.runtime_health.status === "healthy" ? "good" : app.runtime_health.status === "degraded" ? "warn" : "danger";
@@ -1198,18 +1186,26 @@ function InstalledAppDetail({
         <Badge tone={effectiveLocale === locale ? "good" : "neutral"}>{getLocaleLabel(effectiveLocale)}</Badge>
       </div>
       <dl className="grid border-t border-hc-outline md:grid-cols-2">
-        <DetailCell label={t("apps.runtime")} value={t(`runtime.status.${app.runtime_health.status}`)} />
+        <DetailCell label={t("apps.installationStatus")} value={t(`apps.installation.${availability.installationStatus}`)} />
+        <DetailCell label={t("apps.runtime")} value={t(`runtime.status.${availability.runtimeHealth}`)} />
+        <DetailCell label={t("apps.licenseStatus")} value={t(`apps.licenseStatus.${availability.licenseStatus}`)} />
+        <DetailCell label={t("apps.uiIntegration")} value={t(`apps.uiStatus.${availability.uiStatus}`)} />
+        <DetailCell label={t("apps.lastHealthCheck")} value={formatDate(app.last_health_check?.checked_at ?? app.runtime_health.last_checked_at)} />
+        <DetailCell label={t("apps.availabilityReason")} value={availability.reason ? t(`apps.reason.${availability.reason}`) : t("apps.reason.none")} />
         <DetailCell label={t("apps.runtimeOwner")} value={app.managed_runtime ? `${app.managed_runtime.compose_project} / ${app.managed_runtime.service_name}` : t("apps.external")} />
         <DetailCell label={t("apps.entitlement")} value={app.resolved_entitlement ? t("apps.validTo", { tier: app.resolved_entitlement.tier, date: formatDate(app.resolved_entitlement.valid_to) }) : t("apps.noActiveEntitlement")} />
         <DetailCell label={t("apps.languages")} value={localization.supportedLocales.map(getLocaleLabel).join(", ")} />
         <DetailCell label="UI URL" value={app.ui_url} />
         <DetailCell label={t("apps.catalogState")} value={app.catalog_update ? `${app.catalog_update.state} · ${app.catalog_update.source_type} / ${app.catalog_update.trust_status}` : t("apps.notChecked")} />
       </dl>
+      {status.detail && <div className="border-t border-hc-warning/30 bg-hc-warning/10 px-4 py-3 text-sm text-hc-warning">{status.detail}</div>}
+      {diagnostics.data && <div className="border-t border-hc-outline px-4 py-3"><div className="mb-2 text-sm font-semibold">{t("apps.diagnostics")}</div><div className="grid gap-2 md:grid-cols-2">{diagnostics.data.checks.map((check) => <div key={check.id} className="flex gap-2 text-sm"><Badge tone={check.status === "passed" ? "good" : check.status === "warning" ? "warn" : "danger"}>{t(`apps.diagnosticStatus.${check.status}`)}</Badge><div><div className="font-medium">{t(`apps.diagnostic.${check.id}`)}</div><div className="text-xs text-hc-muted">{check.message}</div></div></div>)}</div></div>}
       {app.update_signal && <div className="border-t border-hc-warning/30 bg-hc-warning/10 px-4 py-3 text-sm">
         <div className="font-semibold text-hc-warning">{t("apps.updateReportedBy", { source: app.update_signal.source })}</div>
         <div className="mt-1 text-xs text-hc-muted">{app.update_signal.note ?? t("apps.noNote")} · {formatDate(app.update_signal.reported_at)}</div>
       </div>}
       <div className="flex flex-wrap justify-end gap-2 border-t border-hc-outline px-4 py-3">
+        <Button variant="tonal" disabled={diagnostics.isPending} onClick={() => diagnostics.mutate(app.app_id)}>{diagnostics.isPending ? t("apps.runningDiagnostics") : t("apps.runDiagnostics")}</Button>
         <Button variant="tonal" onClick={() => onLicense(app.app_id)}>{t("apps.manageLicense")}</Button>
         <Button variant="outlined" disabled={isMutating} onClick={() => void onCheckUpdate(app)}>{t("apps.checkUpdate")}</Button>
         {app.update_signal && <Button variant="ghost" disabled={isMutating} onClick={() => void onClearUpdateSignal(app)}>{t("apps.clearSignal")}</Button>}

@@ -16,6 +16,12 @@ export type InstalledApp = {
   required_privileges: string[];
   nav_entries?: Array<{ label: string; path: string; required_privileges?: string[] }>;
   enabled?: boolean;
+  installation_status?: "installed" | "disabled" | "installing" | "updating" | "failed";
+  license_status?: "not_required" | "active" | "missing" | "expired" | "revoked" | "invalid";
+  ui_status?: "ready" | "missing" | "invalid" | "unreachable";
+  runtime_management_status?: "external" | "managed_running" | "managed_stopped" | "managed_failed";
+  availability?: "available" | "degraded" | "blocked" | "unavailable" | "disabled";
+  availability_reason?: "runtime_unreachable" | "runtime_degraded" | "runtime_stopped" | "license_missing" | "license_expired" | "license_revoked" | "ui_missing" | "ui_unreachable" | "application_disabled" | "installation_failed" | null;
   managed_runtime: {
     app_id: string;
     runtime_type: "compose";
@@ -25,7 +31,8 @@ export type InstalledApp = {
     created_at: string;
     updated_at: string;
   } | null;
-  runtime_health: { status: "unknown" | "starting" | "healthy" | "degraded" | "unreachable" | "stopped"; last_checked_at: string | null; last_healthy_at: string | null; status_changed_at: string; consecutive_failures: number; message: string | null };
+  runtime_health: { status: "unknown" | "starting" | "healthy" | "degraded" | "unreachable" | "stopped"; checked_at?: string | null; last_checked_at: string | null; url?: string | null; http_status?: number | null; reported_status?: string | null; latency_ms?: number | null; error_code?: string | null; error_message?: string | null; last_healthy_at: string | null; status_changed_at: string; consecutive_failures: number; message: string | null };
+  last_health_check?: InstalledApp["runtime_health"] | null;
   catalog_update: {
     state: "available" | "same" | "stale" | "baseline_missing";
     update_available: boolean | null;
@@ -59,6 +66,8 @@ export type InstalledApp = {
   has_any_entitlement: boolean;
   manifest: Record<string, unknown>;
 };
+
+export type AppDiagnostics = { app_id: string; checked_at: string; runtime_health: InstalledApp["runtime_health"]; checks: Array<{ id: "dns" | "http" | "health" | "manifest" | "ui_artifact" | "license" | "trusted_origin"; status: "passed" | "failed" | "warning"; message: string; error_code?: string }> };
 
 export type InstallAppPayload = {
   base_url: string;
@@ -111,6 +120,14 @@ export function useInstalledAppsQuery(enabled = true) {
     queryFn: () => authFetch<{ items: InstalledApp[] }>("/apps/installed"),
     enabled,
     refetchInterval: enabled ? 5000 : false,
+  });
+}
+
+export function useRunAppDiagnosticsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appId: string) => authFetch<AppDiagnostics>(`/apps/installed/${encodeURIComponent(appId)}/diagnostics`, { method: "POST", body: JSON.stringify({}) }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["installed-apps"] }); },
   });
 }
 
