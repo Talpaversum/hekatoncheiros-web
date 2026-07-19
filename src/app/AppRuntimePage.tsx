@@ -79,12 +79,22 @@ export function AppRuntimePage() {
     () => registry?.items.find((item) => item.slug === slug),
     [registry?.items, slug],
   );
+  const pluginAppId = appEntry?.app_id ?? null;
+  const pluginSlug = appEntry?.slug ?? null;
+  const pluginUiUrl = appEntry?.ui_url ?? null;
+  const pluginSupportedLocales = JSON.stringify(appEntry?.localization.supported_locales ?? []);
+  const pluginResources = JSON.stringify(appEntry?.localization.resources ?? []);
+  const pluginPrivileges = JSON.stringify(context?.privileges ?? []);
+  const canLoadPlugin = appEntry?.runtime.status === "healthy" || appEntry?.runtime.status === "degraded";
 
   useEffect(() => {
-    if (!appEntry || (appEntry.runtime.status !== "healthy" && appEntry.runtime.status !== "degraded")) {
-      setPlugin(null);
+    if (!pluginAppId || !pluginSlug || !pluginUiUrl || !canLoadPlugin) {
       return;
     }
+
+    const supportedLocales = JSON.parse(pluginSupportedLocales) as string[];
+    const resources = JSON.parse(pluginResources) as AppContext["localization"]["resources"];
+    const privileges = JSON.parse(pluginPrivileges) as string[];
 
     let cancelled = false;
     setIsPluginLoading(true);
@@ -92,26 +102,26 @@ export function AppRuntimePage() {
 
     const appContext: AppContext = {
       api: {
-        request: (path, init) => authFetch(`/apps/${encodeURIComponent(appEntry.slug)}${path.startsWith("/") ? path : `/${path}`}`, init),
+        request: (path, init) => authFetch(`/apps/${encodeURIComponent(pluginSlug)}${path.startsWith("/") ? path : `/${path}`}`, init),
       },
-      privileges: context?.privileges ?? [],
+      privileges,
       entitlement: null,
       localization: {
         requested_locale: locale,
-        locale: appEntry.localization.supported_locales.includes(locale) ? locale : "en",
+        locale: supportedLocales.includes(locale) ? locale : "en",
         fallback_locale: "en",
-        resources: appEntry.localization.resources,
+        resources,
       },
     };
 
     const loadPlugin = async () => {
       try {
-        const pluginUrl = new URL(appEntry.ui_url, window.location.origin).toString();
+        const pluginUrl = new URL(pluginUiUrl, window.location.origin).toString();
         const [reactShim, jsxRuntimeShim, pluginResponse, entitlementResponse] = await Promise.all([
           import("./runtime/react-shim"),
           import("./runtime/jsx-runtime-shim"),
           fetch(pluginUrl),
-          authFetch<AppContext["entitlement"]>(`/apps/${encodeURIComponent(appEntry.slug)}/entitlement`).catch(() => null),
+          authFetch<AppContext["entitlement"]>(`/apps/${encodeURIComponent(pluginSlug)}/entitlement`).catch(() => null),
         ]);
 
         appContext.entitlement = entitlementResponse;
@@ -163,7 +173,7 @@ export function AppRuntimePage() {
     return () => {
       cancelled = true;
     };
-  }, [appEntry, context?.privileges, locale, t]);
+  }, [canLoadPlugin, locale, pluginAppId, pluginPrivileges, pluginResources, pluginSlug, pluginSupportedLocales, pluginUiUrl, t]);
 
   if (!slug) {
     return <div className="text-sm text-hc-danger">{t("runtime.missingSlug")}</div>;
