@@ -16,14 +16,42 @@ export type PrivilegeGrant = {
   tenant_id: string | null;
 };
 
+export type TenantRole = {
+  id: string;
+  tenant_id: string;
+  key: string;
+  name: string;
+  description: string;
+  is_system: boolean;
+  version: number;
+  privileges: string[];
+  member_count: number;
+};
+
+export type TenantMembership = {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  user_id: string;
+  status: string;
+  version: number;
+  roles: TenantRole[];
+  direct_privileges: string[];
+  effective_privileges: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 export type IdentityUser = {
   id: string;
   email: string;
   display_name: string | null;
+  nickname: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   privileges: PrivilegeGrant[];
+  memberships: TenantMembership[];
 };
 
 export type IdentityTenant = {
@@ -55,7 +83,7 @@ export function useCreateIdentityUserMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { id: string; email: string; display_name?: string | null; password: string; status: string }) =>
+    mutationFn: (payload: { email: string; display_name?: string | null; nickname?: string | null; password: string; status: string; memberships?: { tenant_id: string; role_ids?: string[]; role_keys?: string[] }[] }) =>
       authFetch<IdentityUser>("/identity/users", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["identity-users"] });
@@ -67,12 +95,13 @@ export function useUpdateIdentityUserMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { id: string; email?: string; display_name?: string | null; status?: string }) =>
+    mutationFn: (payload: { id: string; email?: string; display_name?: string | null; nickname?: string | null; status?: string }) =>
       authFetch<IdentityUser>(`/identity/users/${encodeURIComponent(payload.id)}`, {
         method: "PATCH",
         body: JSON.stringify({
           email: payload.email,
           display_name: payload.display_name,
+          nickname: payload.nickname,
           status: payload.status,
         }),
       }),
@@ -123,7 +152,7 @@ export function useCreateIdentityTenantMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { id: string; name: string; primary_domain?: string | null; status: string }) =>
+    mutationFn: (payload: { name: string; primary_domain?: string | null; status: string; first_admin_user_id?: string | null }) =>
       authFetch<IdentityTenant>("/identity/tenants", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async () => {
       await Promise.all([
@@ -163,6 +192,83 @@ export function useTenantUsersQuery(enabled = true) {
     queryFn: () => authFetch<{ items: IdentityUser[] }>("/tenant/users"),
     enabled,
   });
+}
+
+export function useTenantMembershipsQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["tenant-memberships"],
+    queryFn: () => authFetch<{ items: TenantMembership[] }>("/tenant/memberships"),
+    enabled,
+  });
+}
+
+export function useTenantUserDirectoryQuery(search: string) {
+  return useQuery({
+    queryKey: ["tenant-user-directory", search],
+    queryFn: () => authFetch<{ items: IdentityUser[] }>(`/tenant/user-directory?search=${encodeURIComponent(search.trim())}`),
+    enabled: search.trim().length >= 2,
+  });
+}
+
+export function useTenantRolesQuery(enabled = true) {
+  return useQuery({
+    queryKey: ["tenant-roles"],
+    queryFn: () => authFetch<{ items: TenantRole[] }>("/tenant/roles"),
+    enabled,
+  });
+}
+
+function useTenantRbacMutation<T>(mutationFn: (payload: T) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn, onSuccess: async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["tenant-memberships"] }),
+      queryClient.invalidateQueries({ queryKey: ["tenant-roles"] }),
+      queryClient.invalidateQueries({ queryKey: ["tenant-users"] }),
+      queryClient.invalidateQueries({ queryKey: ["identity-users"] }),
+      queryClient.invalidateQueries({ queryKey: ["context"] }),
+    ]);
+  } });
+}
+
+export function useCreateTenantMembershipMutation() {
+  return useTenantRbacMutation((payload: { user_id: string; role_ids?: string[] }) =>
+    authFetch<TenantMembership>("/tenant/memberships", { method: "POST", body: JSON.stringify(payload) }));
+}
+
+export function useCreateTenantUserMutation() {
+  return useTenantRbacMutation((payload: { email: string; display_name: string; nickname?: string | null; password: string; status: string; role_ids?: string[] }) =>
+    authFetch<IdentityUser>("/tenant/users", { method: "POST", body: JSON.stringify(payload) }));
+}
+
+export function useUpdateTenantMembershipMutation() {
+  return useTenantRbacMutation((payload: { id: string; status: "active" | "inactive"; version: number }) =>
+    authFetch<TenantMembership>(`/tenant/memberships/${encodeURIComponent(payload.id)}`, {
+      method: "PATCH", body: JSON.stringify({ status: payload.status, version: payload.version }),
+    }));
+}
+
+export function useDeleteTenantMembershipMutation() {
+  return useTenantRbacMutation((id: string) => authFetch<void>(`/tenant/memberships/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+export function useAssignTenantMemberRoleMutation() {
+  return useTenantRbacMutation((payload: { membership_id: string; role_id: string }) =>
+    authFetch<void>(`/tenant/memberships/${encodeURIComponent(payload.membership_id)}/roles/${encodeURIComponent(payload.role_id)}`, { method: "POST" }));
+}
+
+export function useRemoveTenantMemberRoleMutation() {
+  return useTenantRbacMutation((payload: { membership_id: string; role_id: string }) =>
+    authFetch<void>(`/tenant/memberships/${encodeURIComponent(payload.membership_id)}/roles/${encodeURIComponent(payload.role_id)}`, { method: "DELETE" }));
+}
+
+export function useCreateTenantRoleMutation() {
+  return useTenantRbacMutation((payload: { key: string; name: string; description: string; privileges: string[] }) =>
+    authFetch<TenantRole>("/tenant/roles", { method: "POST", body: JSON.stringify(payload) }));
+}
+
+export function useDeleteTenantRoleMutation() {
+  return useTenantRbacMutation((id: string) => authFetch<void>(`/tenant/roles/${encodeURIComponent(id)}`, { method: "DELETE" }));
 }
 
 export function useReplaceTenantUserPrivilegesMutation() {

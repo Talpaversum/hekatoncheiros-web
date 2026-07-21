@@ -6,9 +6,20 @@ import { useContextQuery } from "../../data/api/context";
 import { useAppCatalogQuery } from "../../data/api/app-catalog";
 import { useTenantSettingsQuery, useUpdateTenantSettingsMutation } from "../../data/api/configuration";
 import {
+  useAssignTenantMemberRoleMutation,
+  useCreateTenantMembershipMutation,
+  useCreateTenantRoleMutation,
+  useCreateTenantUserMutation,
+  useDeleteTenantMembershipMutation,
+  useDeleteTenantRoleMutation,
   usePrivilegeCatalogQuery,
+  useRemoveTenantMemberRoleMutation,
   useReplaceTenantUserPrivilegesMutation,
+  useTenantMembershipsQuery,
+  useTenantRolesQuery,
+  useTenantUserDirectoryQuery,
   useTenantUsersQuery,
+  useUpdateTenantMembershipMutation,
   type IdentityUser,
   type PrivilegeGrant,
 } from "../../data/api/identity";
@@ -31,25 +42,57 @@ export function TenantConfigPage() {
   const { data: installedData } = useInstalledAppsQuery(canManageApps);
   const { data: tenantSettings } = useTenantSettingsQuery(true);
   const { data: tenantUsersData } = useTenantUsersQuery(true);
+  const { data: membershipsData } = useTenantMembershipsQuery(true);
+  const { data: rolesData } = useTenantRolesQuery(true);
   const { data: privilegeCatalogData } = usePrivilegeCatalogQuery(true);
   const updateTenant = useUpdateTenantSettingsMutation();
   const replaceTenantUserPrivileges = useReplaceTenantUserPrivilegesMutation();
+  const createMembership = useCreateTenantMembershipMutation();
+  const updateMembership = useUpdateTenantMembershipMutation();
+  const deleteMembership = useDeleteTenantMembershipMutation();
+  const assignRole = useAssignTenantMemberRoleMutation();
+  const removeRole = useRemoveTenantMemberRoleMutation();
+  const createRole = useCreateTenantRoleMutation();
+  const deleteRole = useDeleteTenantRoleMutation();
+  const createTenantUser = useCreateTenantUserMutation();
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [primaryDomain, setPrimaryDomain] = useState<string | null>(null);
   const [selectedTenantUserId, setSelectedTenantUserId] = useState("");
   const [tenantGrantPrivilege, setTenantGrantPrivilege] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [directorySearch, setDirectorySearch] = useState("");
+  const { data: directoryData } = useTenantUserDirectoryQuery(directorySearch);
+  const [directoryUserId, setDirectoryUserId] = useState("");
+  const [newMemberRoleId, setNewMemberRoleId] = useState("");
+  const [showNewTenantUser, setShowNewTenantUser] = useState(false);
+  const [newTenantUserEmail, setNewTenantUserEmail] = useState("");
+  const [newTenantUserName, setNewTenantUserName] = useState("");
+  const [newTenantUserNickname, setNewTenantUserNickname] = useState("");
+  const [newTenantUserPassword, setNewTenantUserPassword] = useState("");
+  const [roleName, setRoleName] = useState("");
+  const [roleKey, setRoleKey] = useState("");
+  const [roleDescription, setRoleDescription] = useState("");
+  const [rolePrivileges, setRolePrivileges] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const catalog = useMemo(() => catalogData?.items ?? [], [catalogData?.items]);
   const installed = useMemo(() => installedData?.items ?? [], [installedData?.items]);
   const tenantUsers = tenantUsersData?.items ?? [];
+  const memberships = membershipsData?.items ?? [];
+  const roles = rolesData?.items ?? [];
+  const directoryUsers = directoryData?.items ?? [];
   const tenantPrivilegeCatalog = (privilegeCatalogData?.items ?? []).filter((item) => item.scope === "tenant");
   const licenseRequired = catalog.filter((item) => item.license_required).length;
   const section = location.pathname.split("/").pop() ?? "";
   const effectiveTenantName = tenantName ?? tenantSettings?.name ?? context?.tenant.name ?? "";
   const effectivePrimaryDomain = primaryDomain ?? tenantSettings?.primary_domain ?? context?.tenant.primary_domain ?? "";
   const selectedTenantUser = tenantUsers.find((item) => item.id === selectedTenantUserId) ?? tenantUsers[0];
+  const usersById = new Map(tenantUsers.map((user) => [user.id, user]));
+  const filteredMemberships = memberships.filter((membership) => {
+    const user = usersById.get(membership.user_id); const query = memberSearch.trim().toLowerCase();
+    return !query || [user?.display_name, user?.nickname, user?.email, user?.id].some((value) => value?.toLowerCase().includes(query));
+  });
   const toastMessage = error ?? message;
   const toastTone = error ? "danger" : "success";
   const dismissToast = () => {
@@ -110,6 +153,35 @@ export function TenantConfigPage() {
     }
   };
 
+  const runRbacAction = async (action: () => Promise<unknown>, success: string) => {
+    setMessage(null); setError(null);
+    try { await action(); setMessage(success); } catch (err) { setError(readErrorMessage(err)); }
+  };
+
+  const handleAddExistingMember = () => {
+    if (!directoryUserId) return;
+    void runRbacAction(async () => {
+      await createMembership.mutateAsync({ user_id: directoryUserId, role_ids: newMemberRoleId ? [newMemberRoleId] : [] });
+      setDirectorySearch(""); setDirectoryUserId(""); setNewMemberRoleId("");
+    }, t("tenant.memberAdded"));
+  };
+
+  const handleCreateTenantUser = () => {
+    void runRbacAction(async () => {
+      await createTenantUser.mutateAsync({ email: newTenantUserEmail.trim(), display_name: newTenantUserName.trim(),
+        nickname: newTenantUserNickname.trim() || null, password: newTenantUserPassword, status: "active",
+        role_ids: newMemberRoleId ? [newMemberRoleId] : [] });
+      setNewTenantUserEmail(""); setNewTenantUserName(""); setNewTenantUserNickname(""); setNewTenantUserPassword(""); setNewMemberRoleId(""); setShowNewTenantUser(false);
+    }, t("tenant.memberCreated"));
+  };
+
+  const handleCreateRole = () => {
+    void runRbacAction(async () => {
+      await createRole.mutateAsync({ key: roleKey.trim(), name: roleName.trim(), description: roleDescription.trim(), privileges: rolePrivileges });
+      setRoleKey(""); setRoleName(""); setRoleDescription(""); setRolePrivileges([]);
+    }, t("tenant.roleCreated"));
+  };
+
   return (
     <div className="space-y-4">
       <ToastNotice message={toastMessage} tone={toastTone} onDismiss={dismissToast} />
@@ -150,40 +222,56 @@ export function TenantConfigPage() {
           </div>
         </Card>}
 
-        {section === "users" && <Card className="overflow-hidden p-0">
-          <SectionHeader title={t("nav.usersPrivileges")} description={t("tenant.usersRolesDescription")} meta={<StatusBadge>{t("tenant.usersCount", { count: tenantUsers.length })}</StatusBadge>} />
+        {section === "users" && <>
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title={t("tenant.members")} description={t("tenant.membersDescription")} meta={<StatusBadge>{t("tenant.usersCount", { count: memberships.length })}</StatusBadge>} />
+            <div className="grid gap-3 border-t border-hc-outline p-3 md:grid-cols-[1fr_auto]">
+              <Input value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder={t("tenant.searchMembers")} />
+              <Button variant="outlined" onClick={() => setShowNewTenantUser((value) => !value)}>{t("tenant.createMember")}</Button>
+            </div>
+            <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+              <Field label={t("tenant.findExistingUser")}><Input value={directorySearch} onChange={(event) => { setDirectorySearch(event.target.value); setDirectoryUserId(""); }} placeholder={t("tenant.searchDirectory")} /></Field>
+              <Field label={t("tenant.user")}><Select value={directoryUserId} onChange={(event) => setDirectoryUserId(event.target.value)}><option value="">{t("tenant.selectUser")}</option>{directoryUsers.map((user) => <option key={user.id} value={user.id}>{user.display_name || user.email}{directoryUsers.filter((item) => (item.display_name || item.email) === (user.display_name || user.email)).length > 1 ? ` — ${user.id}` : ""}</option>)}</Select></Field>
+              <Field label={t("tenant.optionalRole")}><Select value={newMemberRoleId} onChange={(event) => setNewMemberRoleId(event.target.value)}><option value="">{t("tenant.baseRoleOnly")}</option>{roles.filter((role) => role.key !== "tenant_member").map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</Select></Field>
+              <Button onClick={handleAddExistingMember} disabled={!directoryUserId || createMembership.isPending}>{t("tenant.addMember")}</Button>
+            </div>
+            {showNewTenantUser && <div className="grid gap-3 border-t border-hc-outline p-3 md:grid-cols-2 lg:grid-cols-5">
+              <Input value={newTenantUserEmail} onChange={(event) => setNewTenantUserEmail(event.target.value)} placeholder={t("platform.email")} />
+              <Input value={newTenantUserName} onChange={(event) => setNewTenantUserName(event.target.value)} placeholder={t("platform.displayName")} />
+              <Input value={newTenantUserNickname} onChange={(event) => setNewTenantUserNickname(event.target.value)} placeholder={t("platform.nickname")} />
+              <Input type="password" value={newTenantUserPassword} onChange={(event) => setNewTenantUserPassword(event.target.value)} placeholder={t("platform.initialPassword")} />
+              <Button onClick={handleCreateTenantUser} disabled={!newTenantUserEmail.trim() || !newTenantUserName.trim() || newTenantUserPassword.length < 8 || createTenantUser.isPending}>{t("tenant.createMember")}</Button>
+            </div>}
+            <div>
+              {filteredMemberships.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("tenant.noUsers")}</div>}
+              {filteredMemberships.map((membership) => {
+                const user = usersById.get(membership.user_id); const availableRoles = roles.filter((role) => !membership.roles.some((assigned) => assigned.id === role.id));
+                return <div key={membership.id} className="border-t border-hc-outline px-4 py-3">
+                  <div className="grid gap-3 md:grid-cols-[minmax(14rem,1fr)_minmax(16rem,1.5fr)_auto] md:items-center">
+                    <button type="button" className="text-left" onClick={() => setSelectedTenantUserId(membership.user_id)}><div className="text-sm font-semibold">{user?.display_name || user?.email || membership.user_id}</div><div className="text-xs text-hc-muted">{user?.email} · {membership.user_id}</div></button>
+                    <div className="flex flex-wrap gap-1.5">{membership.roles.map((role) => <span key={role.id} className="inline-flex items-center gap-1 rounded-hc-sm border border-hc-outline px-2 py-1 text-xs">{role.name}{role.key !== "tenant_member" && <button type="button" aria-label={`${t("tenant.remove")} ${role.name}`} onClick={() => void runRbacAction(() => removeRole.mutateAsync({ membership_id: membership.id, role_id: role.id }), t("tenant.roleRemoved"))}>×</button>}</span>)}</div>
+                    <div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outlined" onClick={() => void runRbacAction(() => updateMembership.mutateAsync({ id: membership.id, status: membership.status === "active" ? "inactive" : "active", version: membership.version }), t("tenant.membershipUpdated"))}>{membership.status === "active" ? t("tenant.deactivate") : t("tenant.activate")}</Button><Button size="sm" variant="ghost" onClick={() => void runRbacAction(() => deleteMembership.mutateAsync(membership.id), t("tenant.memberRemoved"))}>{t("tenant.remove")}</Button></div>
+                  </div>
+                  <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto] md:items-end"><Field label={t("tenant.addRole")}><Select defaultValue="" onChange={(event) => { if (event.target.value) void runRbacAction(() => assignRole.mutateAsync({ membership_id: membership.id, role_id: event.target.value }), t("tenant.roleAssigned")); event.target.value = ""; }}><option value="">{t("tenant.selectRole")}</option>{availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</Select></Field><span className="pb-2 text-xs text-hc-muted">{t("tenant.effectivePrivileges", { count: membership.effective_privileges.length })}</span></div>
+                </div>;
+              })}
+            </div>
+          </Card>
 
-          <div className="grid gap-3 border-y border-hc-outline bg-hc-surface-variant/40 px-4 py-3 md:grid-cols-[minmax(14rem,1fr)_minmax(14rem,1fr)_auto] md:items-end">
-            <Field label={t("tenant.user")}>
-              <Select value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>
-                {tenantUsers.map((user) => <option key={user.id} value={user.id}>{user.email}</option>)}
-              </Select>
-            </Field>
-            <Field label={t("tenant.privilege")}>
-              <Select value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}>
-                <option value="">{t("tenant.selectPrivilege")}</option>
-                {tenantPrivilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.id}</option>)}
-              </Select>
-            </Field>
-            <Button onClick={() => void handleAddTenantGrant()} disabled={!selectedTenantUser || !tenantGrantPrivilege || replaceTenantUserPrivileges.isPending}>
-              {t("tenant.addPrivilege")}
-            </Button>
-          </div>
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title={t("tenant.roles")} description={t("tenant.rolesDescription")} meta={<StatusBadge>{roles.length}</StatusBadge>} />
+            <div className="grid gap-3 border-t border-hc-outline p-3 md:grid-cols-3"><Input value={roleName} onChange={(event) => { setRoleName(event.target.value); if (!roleKey) setRoleKey(event.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")); }} placeholder={t("tenant.roleName")} /><Input value={roleKey} onChange={(event) => setRoleKey(event.target.value)} placeholder={t("tenant.roleKey")} /><Input value={roleDescription} onChange={(event) => setRoleDescription(event.target.value)} placeholder={t("tenant.roleDescription")} /></div>
+            <div className="grid gap-2 border-t border-hc-outline p-3 sm:grid-cols-2 lg:grid-cols-3">{tenantPrivilegeCatalog.map((privilege) => <label key={privilege.id} className="flex gap-2 text-sm"><input type="checkbox" checked={rolePrivileges.includes(privilege.id)} onChange={(event) => setRolePrivileges((current) => event.target.checked ? [...current, privilege.id] : current.filter((item) => item !== privilege.id))} /><span><span className="block font-medium">{privilege.label}</span><span className="block font-mono text-xs text-hc-muted">{privilege.id}</span></span></label>)}</div>
+            <div className="flex justify-end border-t border-hc-outline p-3"><Button onClick={handleCreateRole} disabled={!roleName.trim() || !roleKey.trim() || createRole.isPending}>{t("tenant.createRole")}</Button></div>
+            {roles.map((role) => <div key={role.id} className="grid gap-2 border-t border-hc-outline px-4 py-3 md:grid-cols-[1fr_1.5fr_auto] md:items-center"><div><div className="text-sm font-semibold">{role.name}</div><div className="font-mono text-xs text-hc-muted">{role.key}</div></div><div><div className="text-sm">{role.description}</div><div className="text-xs text-hc-muted">{t("tenant.roleSummary", { privileges: role.privileges.length, members: role.member_count })}</div></div>{role.is_system ? <StatusBadge>{t("tenant.systemRole")}</StatusBadge> : <Button size="sm" variant="ghost" onClick={() => void runRbacAction(() => deleteRole.mutateAsync(role.id), t("tenant.roleDeleted"))}>{t("platform.delete")}</Button>}</div>)}
+          </Card>
 
-          <div>
-            {tenantUsers.length === 0 && <div className="px-4 py-8 text-center text-sm text-hc-muted">{t("tenant.noUsers")}</div>}
-            {tenantUsers.map((user) => (
-              <TenantUserRow
-                key={user.id}
-                user={user}
-                selected={selectedTenantUser?.id === user.id}
-                onSelect={() => setSelectedTenantUserId(user.id)}
-                onRemove={(grant) => void handleRemoveTenantGrant(user, grant)}
-                busy={replaceTenantUserPrivileges.isPending}
-              />
-            ))}
-          </div>
-        </Card>}
+          <Card className="overflow-hidden p-0">
+            <SectionHeader title={t("tenant.directPrivileges")} description={t("tenant.directPrivilegesDescription")} />
+            <div className="grid gap-3 border-t border-hc-outline p-3 md:grid-cols-[1fr_1fr_auto] md:items-end"><Field label={t("tenant.user")}><Select value={selectedTenantUser?.id ?? ""} onChange={(event) => setSelectedTenantUserId(event.target.value)}>{tenantUsers.map((user) => <option key={user.id} value={user.id}>{user.display_name || user.email}</option>)}</Select></Field><Field label={t("tenant.privilege")}><Select value={tenantGrantPrivilege} onChange={(event) => setTenantGrantPrivilege(event.target.value)}><option value="">{t("tenant.selectPrivilege")}</option>{tenantPrivilegeCatalog.map((privilege) => <option key={privilege.id} value={privilege.id}>{privilege.label}</option>)}</Select></Field><Button onClick={() => void handleAddTenantGrant()} disabled={!selectedTenantUser || !tenantGrantPrivilege || replaceTenantUserPrivileges.isPending}>{t("tenant.addPrivilege")}</Button></div>
+            {selectedTenantUser && <TenantUserRow user={selectedTenantUser} selected onSelect={() => undefined} onRemove={(grant) => void handleRemoveTenantGrant(selectedTenantUser, grant)} busy={replaceTenantUserPrivileges.isPending} />}
+          </Card>
+        </>}
 
         {section === "apps" && <Card className="overflow-hidden p-0">
           <SectionHeader title={t("tenant.appsLicenses")} description={t("tenant.appsLicensesDescription")} meta={<StatusBadge tone="info">{t("tenant.activeElsewhere")}</StatusBadge>} />

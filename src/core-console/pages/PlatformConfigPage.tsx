@@ -94,22 +94,24 @@ export function PlatformConfigPage() {
   const [healthInterval, setHealthInterval] = useState<number | null>(null);
   const [healthTimeout, setHealthTimeout] = useState<number | null>(null);
   const [healthFailures, setHealthFailures] = useState<number | null>(null);
-  const [newUserId, setNewUserId] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
+  const [newUserNickname, setNewUserNickname] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserMemberships, setNewUserMemberships] = useState<Record<string, string>>({});
   const [selectedUserId, setSelectedUserId] = useState("");
   const [grantPrivilege, setGrantPrivilege] = useState("");
   const [grantTenantId, setGrantTenantId] = useState("");
-  const [newTenantId, setNewTenantId] = useState("");
   const [newTenantName, setNewTenantName] = useState("");
   const [newTenantDomain, setNewTenantDomain] = useState("");
+  const [newTenantFirstAdmin, setNewTenantFirstAdmin] = useState("");
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateTenant, setShowCreateTenant] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const origins = useMemo(() => data?.items ?? [], [data?.items]);
   const identityUsers = useMemo(() => identityUsersData?.items ?? [], [identityUsersData?.items]);
@@ -202,23 +204,30 @@ export function PlatformConfigPage() {
   const handleCreateUser = async () => {
     setMessage(null);
     setError(null);
+    setFieldErrors({});
     try {
       const created = await createUser.mutateAsync({
-        id: newUserId.trim(),
         email: newUserEmail.trim(),
         display_name: newUserName.trim() || null,
+        nickname: newUserNickname.trim() || null,
         password: newUserPassword,
         status: "active",
+        memberships: Object.entries(newUserMemberships).map(([tenant_id, role]) => ({
+          tenant_id,
+          role_keys: role ? [role] : [],
+        })),
       });
-      setNewUserId("");
       setNewUserEmail("");
       setNewUserName("");
+      setNewUserNickname("");
       setNewUserPassword("");
+      setNewUserMemberships({});
       setShowCreateUser(false);
       setSelectedUserId(created.id);
       navigate(`/core/platform/identity/users/${encodeURIComponent(created.id)}`);
       setMessage(t("platform.userCreated"));
     } catch (err) {
+      setFieldErrors((err as { field_errors?: Record<string, string> })?.field_errors ?? {});
       setError(readErrorMessage(err));
     }
   };
@@ -226,20 +235,22 @@ export function PlatformConfigPage() {
   const handleCreateTenant = async () => {
     setMessage(null);
     setError(null);
+    setFieldErrors({});
     try {
       const created = await createTenant.mutateAsync({
-        id: newTenantId.trim(),
         name: newTenantName.trim(),
         primary_domain: newTenantDomain.trim() || null,
         status: "active",
+        first_admin_user_id: newTenantFirstAdmin || null,
       });
-      setNewTenantId("");
       setNewTenantName("");
       setNewTenantDomain("");
+      setNewTenantFirstAdmin("");
       setShowCreateTenant(false);
       navigate(`/core/platform/identity/tenants/${encodeURIComponent(created.id)}`);
       setMessage(t("platform.tenantCreated"));
     } catch (err) {
+      setFieldErrors((err as { field_errors?: Record<string, string> })?.field_errors ?? {});
       setError(readErrorMessage(err));
     }
   };
@@ -446,12 +457,29 @@ export function PlatformConfigPage() {
               description={t("platform.usersDescription")}
               meta={<div className="flex items-center gap-2"><StatusBadge>{t("platform.usersCount", { count: identityUsers.length })}</StatusBadge><Button size="sm" onClick={() => setShowCreateUser((value) => !value)}>{t("platform.addUser")}</Button></div>}
             />
-            {showCreateUser && <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-5">
-              <Input placeholder="usr_jana" value={newUserId} onChange={(event) => setNewUserId(event.target.value)} />
-              <Input placeholder="jana@example.com" value={newUserEmail} onChange={(event) => setNewUserEmail(event.target.value)} />
-              <Input placeholder={t("platform.displayName")} value={newUserName} onChange={(event) => setNewUserName(event.target.value)} />
-              <Input type="password" placeholder={t("platform.initialPassword")} value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} />
-              <Button onClick={() => void handleCreateUser()} disabled={createUser.isPending || !newUserId.trim() || !newUserEmail.trim() || newUserPassword.length < 8}>{t("platform.createUser")}</Button>
+            {showCreateUser && <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-2 lg:grid-cols-4">
+              <Field label={t("platform.email")} error={fieldErrors.email}><Input placeholder="jana@example.com" value={newUserEmail} onChange={(event) => setNewUserEmail(event.target.value)} /></Field>
+              <Field label={t("platform.displayName")} error={fieldErrors.display_name}><Input placeholder={t("platform.displayName")} value={newUserName} onChange={(event) => setNewUserName(event.target.value)} /></Field>
+              <Field label={t("platform.nickname")} error={fieldErrors.nickname}><Input placeholder={t("platform.nickname")} value={newUserNickname} onChange={(event) => setNewUserNickname(event.target.value)} /></Field>
+              <Field label={t("platform.initialPassword")} error={fieldErrors.password}><Input type="password" placeholder={t("platform.initialPassword")} value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} /></Field>
+              <div className="grid gap-2 md:col-span-2 lg:col-span-4">
+                <div className="text-xs font-semibold text-hc-muted">{t("platform.optionalMemberships")}</div>
+                {identityTenants.map((tenant) => {
+                  const selected = Object.prototype.hasOwnProperty.call(newUserMemberships, tenant.id);
+                  return <div key={tenant.id} className="grid gap-2 md:grid-cols-[auto_1fr_14rem] md:items-center">
+                    <input type="checkbox" checked={selected} onChange={(event) => setNewUserMemberships((current) => {
+                      const next = { ...current }; if (event.target.checked) next[tenant.id] = ""; else delete next[tenant.id]; return next;
+                    })} aria-label={tenant.name} />
+                    <span className="text-sm">{tenant.name}</span>
+                    <Select disabled={!selected} value={newUserMemberships[tenant.id] ?? ""} onChange={(event) => setNewUserMemberships((current) => ({ ...current, [tenant.id]: event.target.value }))}>
+                      <option value="">{t("platform.baseMemberRole")}</option>
+                      <option value="tenant_admin">{t("platform.tenantAdminRole")}</option>
+                      <option value="tenant_auditor">{t("platform.tenantAuditorRole")}</option>
+                    </Select>
+                  </div>;
+                })}
+              </div>
+              <div className="flex justify-end md:col-span-2 lg:col-span-4"><Button onClick={() => void handleCreateUser()} disabled={createUser.isPending || !newUserEmail.trim() || !newUserName.trim() || newUserPassword.length < 8}>{t("platform.createUser")}</Button></div>
             </div>}
             <div className="border-t border-hc-outline p-3">
               <Input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={t("platform.searchUsers")} />
@@ -474,10 +502,13 @@ export function PlatformConfigPage() {
               meta={<div className="flex items-center gap-2"><StatusBadge>{t("platform.tenantsCount", { count: identityTenants.length })}</StatusBadge><Button size="sm" onClick={() => setShowCreateTenant((value) => !value)}>{t("platform.addTenant")}</Button></div>}
             />
             {showCreateTenant && <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/40 p-3 md:grid-cols-4">
-              <Input placeholder="tnt_partner" value={newTenantId} onChange={(event) => setNewTenantId(event.target.value)} />
-              <Input placeholder={t("tenant.name")} value={newTenantName} onChange={(event) => setNewTenantName(event.target.value)} />
-              <Input placeholder="primary.example.com" value={newTenantDomain} onChange={(event) => setNewTenantDomain(event.target.value)} />
-              <Button onClick={() => void handleCreateTenant()} disabled={createTenant.isPending || !newTenantId.trim() || !newTenantName.trim()}>{t("platform.createTenant")}</Button>
+              <Field label={t("tenant.name")} error={fieldErrors.name}><Input placeholder={t("tenant.name")} value={newTenantName} onChange={(event) => setNewTenantName(event.target.value)} /></Field>
+              <Field label={t("platform.primaryDomain")} error={fieldErrors.primary_domain}><Input placeholder="primary.example.com" value={newTenantDomain} onChange={(event) => setNewTenantDomain(event.target.value)} /></Field>
+              <Select value={newTenantFirstAdmin} onChange={(event) => setNewTenantFirstAdmin(event.target.value)}>
+                <option value="">{t("platform.noFirstAdmin")}</option>
+                {identityUsers.map((user) => <option key={user.id} value={user.id}>{user.display_name || user.email}</option>)}
+              </Select>
+              <Button onClick={() => void handleCreateTenant()} disabled={createTenant.isPending || !newTenantName.trim()}>{t("platform.createTenant")}</Button>
             </div>}
             <div className="border-t border-hc-outline p-3">
               <Input value={tenantSearch} onChange={(event) => setTenantSearch(event.target.value)} placeholder={t("platform.searchTenants")} />
@@ -596,26 +627,28 @@ function IdentityUsersTable({ users, onOpen }: { users: IdentityUser[]; onOpen: 
 function IdentityUserDetail({ user, onBack, onSave, onPasswordReset, busy }: {
   user: IdentityUser;
   onBack: () => void;
-  onSave: (payload: { id: string; email?: string; display_name?: string | null; status?: string }) => Promise<unknown>;
+  onSave: (payload: { id: string; email?: string; display_name?: string | null; nickname?: string | null; status?: string }) => Promise<unknown>;
   onPasswordReset: (password: string) => Promise<unknown>;
   busy: boolean;
 }) {
   const { t } = useLocalization();
   const [email, setEmail] = useState(user.email);
   const [displayName, setDisplayName] = useState(user.display_name ?? "");
+  const [nickname, setNickname] = useState(user.nickname ?? "");
   const [status, setStatus] = useState(user.status);
   const [password, setPassword] = useState("");
 
   return (
     <Card className="overflow-hidden p-0">
       <SectionHeader title={user.display_name || user.email} description={`${user.email} · ${user.id}`} meta={<div className="flex items-center gap-2"><StatusBadge tone={user.status === "active" ? "success" : "neutral"}>{translateConfigStatus(user.status, t)}</StatusBadge><Button size="sm" variant="outlined" onClick={onBack}>{t("platform.backUsers")}</Button></div>} />
-      <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-3">
+      <div className="grid gap-3 border-t border-hc-outline p-4 md:grid-cols-4">
         <Field label={t("platform.email")}><Input value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
         <Field label={t("platform.displayName")}><Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder={t("platform.displayName")} /></Field>
+        <Field label={t("platform.nickname")}><Input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder={t("platform.nickname")} /></Field>
         <Field label={t("platform.status")}><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="active">{t("config.active")}</option><option value="disabled">{t("config.disabled")}</option></Select></Field>
       </div>
       <div className="flex justify-end border-t border-hc-outline px-4 py-3">
-        <Button onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, status })} disabled={busy || !email.trim()}>{t("platform.saveUser")}</Button>
+        <Button onClick={() => void onSave({ id: user.id, email: email.trim(), display_name: displayName.trim() || null, nickname: nickname.trim() || null, status })} disabled={busy || !email.trim() || !displayName.trim()}>{t("platform.saveUser")}</Button>
       </div>
       <div className="grid gap-3 border-t border-hc-outline bg-hc-surface-variant/30 p-4 md:grid-cols-[1fr_auto] md:items-end">
         <Field label={t("platform.newPassword")} hint={t("platform.passwordHint")}><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
@@ -628,6 +661,15 @@ function IdentityUserDetail({ user, onBack, onSave, onPasswordReset, busy }: {
         >
           {t("platform.resetPassword")}
         </Button>
+      </div>
+      <div className="border-t border-hc-outline">
+        <div className="px-4 py-3 text-sm font-semibold">{t("platform.tenantMemberships")}</div>
+        {user.memberships.length === 0 && <div className="border-t border-hc-outline px-4 py-5 text-sm text-hc-muted">{t("platform.noMemberships")}</div>}
+        {user.memberships.map((membership) => <div key={membership.id} className="grid gap-2 border-t border-hc-outline px-4 py-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
+          <div><div className="text-sm font-semibold">{membership.tenant_name}</div><div className="font-mono text-xs text-hc-muted">{membership.tenant_id}</div></div>
+          <div><div className="text-sm">{membership.roles.map((role) => role.name).join(", ")}</div><div className="text-xs text-hc-muted">{t("platform.effectivePrivileges", { count: membership.effective_privileges.length })}</div></div>
+          <StatusBadge tone={membership.status === "active" ? "success" : "neutral"}>{membership.status}</StatusBadge>
+        </div>)}
       </div>
       <div className="border-t border-hc-outline px-4 py-3 text-xs text-hc-muted">{t("platform.createdGrants", { date: new Date(user.created_at).toLocaleString(), count: user.privileges.length })}</div>
     </Card>

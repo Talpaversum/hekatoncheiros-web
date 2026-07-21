@@ -41,12 +41,12 @@ export function SectionHeader({ title, description, meta, className }: SectionHe
   );
 }
 
-export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+export function Field({ label, hint, error, children, className }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string }) {
   return (
     <label className={cn("grid min-w-0 gap-1", className)}>
       <span className="text-xs font-medium text-hc-muted">{label}</span>
       {children}
-      {hint && <span className="text-xs text-hc-muted">{hint}</span>}
+      {error ? <span className="text-xs text-hc-danger">{error}</span> : hint && <span className="text-xs text-hc-muted">{hint}</span>}
     </label>
   );
 }
